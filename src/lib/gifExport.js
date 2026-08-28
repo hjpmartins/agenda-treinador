@@ -1,4 +1,4 @@
-import GIF from "gif.js";
+import { GIFEncoder, quantize, applyPalette } from "gifenc";
 import { HALF_VB, FULL_VB } from "../data";
 import { computeAnimatedPositions } from "../utils";
 import { diagramToSvgString } from "../print";
@@ -24,25 +24,25 @@ async function generateSequenceGif(diagramas, { width = 320, onProgress } = {}) 
     throw new Error("Não há diagramas nesta sequência.");
   }
 
-  // gif.js precisa de saber width/height ANTES de processar qualquer frame
-  // (usa this.options.width/height internamente em getContextData) — por
-  // isso calculamos o tamanho a partir do primeiro diagrama antes de criar o canvas.
   const vb0 = diagramas[0].court === "campo" ? FULL_VB : HALF_VB;
   const height = Math.round(width * (vb0.h / vb0.w));
-
-  const gif = new GIF({ workers: 2, quality: 10, workerScript: "/gif.worker.js", width, height });
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+  const gif = GIFEncoder();
 
   const addFrame = async (diagram, overrides, delay) => {
     const svgStr = diagramToSvgString(diagram, width, overrides);
     const img = await svgToImage(svgStr);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    gif.addFrame(ctx, { copy: true, delay });
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+    const { data } = ctx.getImageData(0, 0, width, height);
+    const palette = quantize(data, 256);
+    const index = applyPalette(data, palette);
+    gif.writeFrame(index, width, height, { palette, delay });
   };
 
   const total = diagramas.length;
@@ -62,18 +62,8 @@ async function generateSequenceGif(diagramas, { width = 320, onProgress } = {}) 
     if (onProgress) onProgress((i + 1) / total);
   }
 
-  return new Promise((resolve, reject) => {
-    gif.on("finished", async (blob) => {
-      // gif.js tem um bug conhecido: por vezes corta o último byte do ficheiro,
-      // que é precisamente o "trailer" (0x3B) exigido pelo standard GIF para
-      // marcar o fim do ficheiro. O browser mostra a imagem na mesma, mas apps
-      // mais rigorosas (ex: o WhatsApp) recusam o ficheiro como formato inválido.
-      const lastByte = new Uint8Array(await blob.slice(blob.size - 1).arrayBuffer())[0];
-      resolve(lastByte === 0x3b ? blob : new Blob([blob, new Uint8Array([0x3b])], { type: "image/gif" }));
-    });
-    gif.on("abort", () => reject(new Error("A geração do GIF foi interrompida.")));
-    gif.render();
-  });
+  gif.finish();
+  return new Blob([gif.bytes()], { type: "image/gif" });
 }
 
 export { generateSequenceGif };

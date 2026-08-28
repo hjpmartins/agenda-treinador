@@ -57,7 +57,7 @@ function PlayersView({ players, sessions, clubLogo, onAdd, onImportClick, onEdit
                       )}
                     </div>
                     <div className="min-w-0">
-                      <div style={{ fontFamily: "'Oswald', sans-serif" }} className="text-base font-semibold uppercase tracking-wide truncate">
+                      <div style={{ fontFamily: "'Oswald', sans-serif" }} className="text-base font-semibold uppercase tracking-wide leading-tight">
                         {p.nome || "Sem nome"}
                       </div>
                       <div className="text-xs text-[#8A93A3] truncate">{p.posicao}{p.nascimento ? ` · ${p.nascimento}` : ""}</div>

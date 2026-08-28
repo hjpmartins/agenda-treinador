@@ -15,8 +15,8 @@ function ImportModal({ onClose, onImport }) {
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        className={inputCls + " resize-none"} style={{ minHeight: 160 }}
-        style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "12px" }}
+        className={inputCls + " resize-none"}
+        style={{ minHeight: 160, fontFamily: "'IBM Plex Mono', monospace", fontSize: "12px" }}
         placeholder={"11;Ana Cláudia Dias Bastos;Poste\n8;Carlota Brigas Raquel;Base\n\n(também aceita listas separadas por tabs ou espaços)"}
       />
       {text.trim() && (

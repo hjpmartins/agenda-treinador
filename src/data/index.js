@@ -147,31 +147,36 @@ const emptyJogo = {
   resultado: "",
   conteudo: "",
   apreciacaoGeral: "",
-  estatisticas: {}, // { playerId: { pontos, ressaltos, assistencias, roubos, bloqueios, faltas } }
+  estatisticas: {}, // { playerId: { pontos, ressaltosOfensivos, ressaltosDefensivos, assistencias, roubos, bloqueios, faltas, perdas, lancamentos2Convertidos, ... } }
 };
 const ESTATISTICAS_CAMPOS = [
   { key: "pontos", label: "Pts", nome: "Pontos" },
-  { key: "lancamentosFalhados", label: "LF", nome: "Lançamentos falhados" },
-  { key: "ressaltos", label: "Res", nome: "Ressaltos" },
+  { key: "ressaltosOfensivos", label: "RO", nome: "Ressaltos ofensivos" },
+  { key: "ressaltosDefensivos", label: "RD", nome: "Ressaltos defensivos" },
   { key: "assistencias", label: "Ass", nome: "Assistências" },
   { key: "roubos", label: "Rou", nome: "Roubos de bola" },
   { key: "perdas", label: "PdB", nome: "Perdas de bola" },
   { key: "bloqueios", label: "Blq", nome: "Bloqueios" },
   { key: "faltas", label: "Flt", nome: "Faltas cometidas" },
 ];
-// Botões de registo rápido para o ecrã de estatísticas ao vivo — cada um soma
-// "delta" ao campo "key" da jogadora tocada (ver ESTATISTICAS_CAMPOS acima).
+// Tipos de lançamento no ecrã de estatísticas ao vivo — cada um regista um par
+// de contadores (convertidos/falhados); "pontos" soma automaticamente quando
+// se marca um lançamento convertido.
+const LIVE_SHOT_TYPES = [
+  { id: "2pt", label: "2PT", madeKey: "lancamentos2Convertidos", missKey: "lancamentos2Falhados", pontos: 2 },
+  { id: "3pt", label: "3PT", madeKey: "lancamentos3Convertidos", missKey: "lancamentos3Falhados", pontos: 3 },
+  { id: "ll", label: "LL", madeKey: "lancesLivresConvertidos", missKey: "lancesLivresFalhados", pontos: 1 },
+];
+// Restantes botões de registo rápido — cada um soma "delta" ao campo "key" da
+// jogadora tocada (ver ESTATISTICAS_CAMPOS acima).
 const LIVE_STAT_BUTTONS = [
-  { key: "pontos", delta: 2, label: "2PT", group: "scoring" },
-  { key: "pontos", delta: 3, label: "3PT", group: "scoring" },
-  { key: "pontos", delta: 1, label: "LL", group: "scoring" },
-  { key: "lancamentosFalhados", delta: 1, label: "Falhou", group: "scoring" },
-  { key: "ressaltos", delta: 1, label: "Ressalto", group: "other" },
-  { key: "assistencias", delta: 1, label: "Assist.", group: "other" },
-  { key: "roubos", delta: 1, label: "Roubo", group: "other" },
-  { key: "bloqueios", delta: 1, label: "Bloqueio", group: "other" },
-  { key: "faltas", delta: 1, label: "Falta", group: "other" },
-  { key: "perdas", delta: 1, label: "Perda", group: "other" },
+  { key: "ressaltosOfensivos", delta: 1, label: "Res. Of." },
+  { key: "ressaltosDefensivos", delta: 1, label: "Res. Def." },
+  { key: "assistencias", delta: 1, label: "Assist." },
+  { key: "roubos", delta: 1, label: "Roubo" },
+  { key: "bloqueios", delta: 1, label: "Bloqueio" },
+  { key: "faltas", delta: 1, label: "Falta" },
+  { key: "perdas", delta: 1, label: "Perda" },
 ];
 const emptyLibraryItem = { nome: "", categoria: HABILIDADES[0].id, duracaoPadrao: "", descricao: "", diagramas: [] };
 const ARROW_TYPES = [
@@ -219,6 +224,7 @@ export {
   emptySession,
   emptyJogo,
   ESTATISTICAS_CAMPOS,
+  LIVE_SHOT_TYPES,
   LIVE_STAT_BUTTONS,
   emptyLibraryItem,
   ARROW_TYPES,

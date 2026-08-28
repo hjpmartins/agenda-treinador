@@ -1,35 +1,39 @@
 import { useState } from "react";
 import { X, Undo2 } from "lucide-react";
-import { LIVE_STAT_BUTTONS, ESTATISTICAS_CAMPOS } from "../../data";
+import { LIVE_SHOT_TYPES, LIVE_STAT_BUTTONS } from "../../data";
 import { formatDateFull } from "../../utils";
 
 function LiveStatsView({ jogo, players, onClose, onSave }) {
   const [stats, setStats] = useState(jogo.estatisticas || {});
-  const [history, setHistory] = useState([]); // pilha de { playerId, key, delta } para desfazer
+  const [history, setHistory] = useState([]); // pilha de { playerId, deltas: [{ key, delta }] } para desfazer
 
-  const bump = (playerId, key, delta) => {
-    setStats((prev) => ({
-      ...prev,
-      [playerId]: { ...(prev[playerId] || {}), [key]: (Number((prev[playerId] || {})[key]) || 0) + delta },
-    }));
-    setHistory((prev) => [...prev, { playerId, key, delta }]);
+  // deltas: um ou mais { key, delta } aplicados de uma vez (ex: lançamento
+  // convertido soma ao contador do tipo de lançamento E aos pontos).
+  const bump = (playerId, deltas) => {
+    setStats((prev) => {
+      const playerStats = { ...(prev[playerId] || {}) };
+      deltas.forEach(({ key, delta }) => {
+        playerStats[key] = (Number(playerStats[key]) || 0) + delta;
+      });
+      return { ...prev, [playerId]: playerStats };
+    });
+    setHistory((prev) => [...prev, { playerId, deltas }]);
   };
 
   const undo = () => {
     if (history.length === 0) return;
     const last = history[history.length - 1];
-    setStats((prev) => ({
-      ...prev,
-      [last.playerId]: { ...(prev[last.playerId] || {}), [last.key]: (Number((prev[last.playerId] || {})[last.key]) || 0) - last.delta },
-    }));
+    setStats((prev) => {
+      const playerStats = { ...(prev[last.playerId] || {}) };
+      last.deltas.forEach(({ key, delta }) => {
+        playerStats[key] = (Number(playerStats[key]) || 0) - delta;
+      });
+      return { ...prev, [last.playerId]: playerStats };
+    });
     setHistory((prev) => prev.slice(0, -1));
   };
 
   const finish = () => onSave(stats);
-
-  const scoringButtons = LIVE_STAT_BUTTONS.filter((b) => b.group === "scoring");
-  const otherButtons = LIVE_STAT_BUTTONS.filter((b) => b.group === "other");
-  const pontosCampo = ESTATISTICAS_CAMPOS.find((c) => c.key === "pontos");
 
   return (
     <div className="fixed inset-0 z-50 bg-[#14181F] overflow-y-auto">
@@ -62,31 +66,51 @@ function LiveStatsView({ jogo, players, onClose, onSave }) {
           const s = stats[p.id] || {};
           return (
             <div key={p.id} className="bg-[#1E242E] border border-[#2E3644] rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-1">
                 <div style={{ fontFamily: "'Oswald', sans-serif" }} className="font-semibold uppercase tracking-wide text-sm truncate">
                   {p.numero ? `${p.numero} · ` : ""}{p.nome}
                 </div>
-                <div style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-lg font-bold text-[#EA5B13] shrink-0" title={pontosCampo?.nome}>
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-lg font-bold text-[#EA5B13] shrink-0">
                   {s.pontos || 0}
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-1.5 mb-1.5">
-                {scoringButtons.map((b, i) => (
+              <div style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-[10px] text-[#8A93A3] mb-2">
+                {LIVE_SHOT_TYPES.map((t) => {
+                  const made = Number(s[t.madeKey]) || 0;
+                  const missed = Number(s[t.missKey]) || 0;
+                  return `${t.label} ${made}/${made + missed}`;
+                }).join("  ·  ")}
+              </div>
+
+              <div className="grid grid-cols-3 gap-1.5 mb-1.5">
+                {LIVE_SHOT_TYPES.map((t) => (
                   <button
-                    key={i}
-                    onClick={() => bump(p.id, b.key, b.delta)}
-                    className="bg-[#14181F] hover:bg-[#2E3644] border border-[#2E3644] text-[#F2EDE3] text-xs font-medium rounded-md py-2 transition-colors"
+                    key={t.id}
+                    onClick={() => bump(p.id, [{ key: t.madeKey, delta: 1 }, { key: "pontos", delta: t.pontos }])}
+                    className="bg-[#14181F] hover:bg-[#4C9A6A]/20 border border-[#4C9A6A]/40 text-[#4C9A6A] text-xs font-medium rounded-md py-2 transition-colors"
                   >
-                    {b.label}
+                    {t.label}
                   </button>
                 ))}
               </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {otherButtons.map((b, i) => (
+              <div className="grid grid-cols-3 gap-1.5 mb-1.5">
+                {LIVE_SHOT_TYPES.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => bump(p.id, [{ key: t.missKey, delta: 1 }])}
+                    className="bg-[#14181F] hover:bg-[#D64545]/20 border border-[#D64545]/40 text-[#D64545] text-xs font-medium rounded-md py-2 transition-colors"
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-4 gap-1.5">
+                {LIVE_STAT_BUTTONS.map((b, i) => (
                   <button
                     key={i}
-                    onClick={() => bump(p.id, b.key, b.delta)}
+                    onClick={() => bump(p.id, [b])}
                     className="bg-[#14181F] hover:bg-[#2E3644] border border-[#2E3644] text-[#8A93A3] hover:text-[#F2EDE3] text-[11px] rounded-md py-1.5 transition-colors"
                   >
                     {b.label} <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{s[b.key] || 0}</span>

@@ -8,7 +8,7 @@ function Sidebar({ tab, setTab, playerCount, sessionCount, realizadosCount, jogo
     { id: "realizados", label: "Realizados", icon: CheckCircle2, count: realizadosCount },
     { id: "jogos", label: "Jogos", icon: Swords, count: jogosCount },
     { id: "biblioteca", label: "Biblioteca", icon: BookOpen, count: libraryCount },
-    { id: "biblioteca-publica", label: "Biblioteca pública", icon: Globe, count: publicLibraryCount },
+    { id: "biblioteca-publica", label: "Pública", icon: Globe, count: publicLibraryCount },
     { id: "calendario", label: "Calendário", icon: CalendarDays, count: null },
   ];
   return (

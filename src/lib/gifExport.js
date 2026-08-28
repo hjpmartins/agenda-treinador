@@ -63,7 +63,14 @@ async function generateSequenceGif(diagramas, { width = 320, onProgress } = {}) 
   }
 
   return new Promise((resolve, reject) => {
-    gif.on("finished", (blob) => resolve(blob));
+    gif.on("finished", async (blob) => {
+      // gif.js tem um bug conhecido: por vezes corta o último byte do ficheiro,
+      // que é precisamente o "trailer" (0x3B) exigido pelo standard GIF para
+      // marcar o fim do ficheiro. O browser mostra a imagem na mesma, mas apps
+      // mais rigorosas (ex: o WhatsApp) recusam o ficheiro como formato inválido.
+      const lastByte = new Uint8Array(await blob.slice(blob.size - 1).arrayBuffer())[0];
+      resolve(lastByte === 0x3b ? blob : new Blob([blob, new Uint8Array([0x3b])], { type: "image/gif" }));
+    });
     gif.on("abort", () => reject(new Error("A geração do GIF foi interrompida.")));
     gif.render();
   });

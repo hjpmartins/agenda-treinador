@@ -6,7 +6,10 @@ async function callClaudeJSON(promptText) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt: promptText }),
   });
-  if (!response.ok) throw new Error(`A IA não respondeu corretamente (erro ${response.status}). Tenta novamente.`);
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => null);
+    throw new Error(errBody?.error || `A IA não respondeu corretamente (erro ${response.status}). Tenta novamente.`);
+  }
   const data = await response.json();
   const text = (data.content || []).map((b) => (b.type === "text" ? b.text : "")).join("\n");
   const clean = text.replace(/```json|```/g, "").trim();

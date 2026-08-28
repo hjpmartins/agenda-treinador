@@ -19,13 +19,18 @@ const PAUSE_MS = 550; // pausa no fim de cada passo, antes de avançar para o se
 // Gera um GIF animado com a sequência completa de diagramas (do início ao fim),
 // reproduzindo o movimento de cada passo tal como o "Ver sequência" já faz no
 // editor. Devolve uma Promise que resolve com o Blob do ficheiro .gif.
-async function generateSequenceGif(diagramas, { width = 320, onProgress } = {}) {
+async function generateSequenceGif(diagramas, { width: rawWidth = 320, onProgress } = {}) {
   if (!diagramas || diagramas.length === 0) {
     throw new Error("Não há diagramas nesta sequência.");
   }
 
+  // O WhatsApp converte GIFs para vídeo (H.264) antes de os reproduzir inline —
+  // esse codec exige dimensões pares; uma dimensão ímpar faz essa conversão
+  // falhar silenciosamente (o ficheiro chega bem, mas só abre "por fora").
+  const width = rawWidth % 2 === 0 ? rawWidth : rawWidth + 1;
   const vb0 = diagramas[0].court === "campo" ? FULL_VB : HALF_VB;
-  const height = Math.round(width * (vb0.h / vb0.w));
+  const rawHeight = Math.round(width * (vb0.h / vb0.w));
+  const height = rawHeight % 2 === 0 ? rawHeight : rawHeight + 1;
 
   const canvas = document.createElement("canvas");
   canvas.width = width;

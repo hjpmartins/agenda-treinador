@@ -1,5 +1,5 @@
 import { HALF_VB, FULL_VB } from "../../data";
-import { wavyPathD, defaultControlPoint, arrowHead } from "../../utils";
+import { wavyCurvedPathD, defaultControlPoint, arrowHead } from "../../utils";
 
 function HalfMarkings({ flipY = false, w = HALF_VB.w, h = HALF_VB.h }) {
   // Drawn for a court with baseline at bottom (y = h-10), hoop area near baseline, centered on w/2.
@@ -117,11 +117,9 @@ function ArrowShape({ arrow, onMouseDown, selected }) {
   const isShot = arrow.type === "lancamento";
   const isDrible = arrow.type === "drible";
   const control = arrow.control || defaultControlPoint(arrow.type, from, to);
-  let d;
-  if (isDrible) d = wavyPathD(from.x, from.y, to.x, to.y);
-  else d = `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`;
+  const d = isDrible ? wavyCurvedPathD(from, control, to) : `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`;
   // A ponta da seta aponta na direção da tangente da curva (do ponto de controlo até ao fim), não da reta from→to.
-  const tipFrom = isDrible ? from : control;
+  const tipFrom = control;
   return (
     <g onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "pointer" }}>
       <path d={d} stroke={color} strokeWidth="2" fill="none" strokeDasharray={arrow.type === "passe" || isShot ? "6 4" : "none"} />

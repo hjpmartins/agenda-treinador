@@ -1,5 +1,5 @@
 import { FULL_VB, HALF_VB, ESTATISTICAS_CAMPOS, getTipoTeste, habilidadeGroups } from "../data";
-import { escapeHtml, formatDateFull, formatDateShortYear, wavyPathD, defaultControlPoint, arrowHead, calcPresenca, playerChartData } from "../utils";
+import { escapeHtml, formatDateFull, formatDateShortYear, wavyCurvedPathD, defaultControlPoint, arrowHead, calcPresenca, playerChartData } from "../utils";
 
 function svgHalfMarkingsStr(flipY, w, h) {
   const cx = w / 2;
@@ -61,9 +61,9 @@ function svgArrowStr(arrow) {
   const isShot = arrow.type === "lancamento";
   const isDrible = arrow.type === "drible";
   const control = arrow.control || defaultControlPoint(arrow.type, from, to);
-  const d = isDrible ? wavyPathD(from.x, from.y, to.x, to.y) : `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`;
+  const d = isDrible ? wavyCurvedPathD(from, control, to) : `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`;
   const dash = arrow.type === "passe" || isShot ? 'stroke-dasharray="6 4"' : "";
-  const tipFrom = isDrible ? from : control;
+  const tipFrom = control;
   const tip = isShot
     ? `<circle cx="${to.x}" cy="${to.y}" r="6" fill="none" stroke="${color}" stroke-width="2"/><circle cx="${to.x}" cy="${to.y}" r="2" fill="${color}"/>`
     : `<path d="${arrowHead(tipFrom.x, tipFrom.y, to.x, to.y)}" stroke="${color}" stroke-width="2" fill="none"/>`;

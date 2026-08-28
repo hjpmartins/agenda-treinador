@@ -99,26 +99,34 @@ function normalizePlayer(p) {
 function distPt(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
-function wavyPathD(x1, y1, x2, y2, amplitude = 5, segments = 8) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const len = Math.hypot(dx, dy) || 1;
-  const nx = -dy / len;
-  const ny = dx / len;
-  let d = `M ${x1} ${y1}`;
+// Linha ondulada (efeito de "drible") que acompanha uma curva Bezier
+// quadrática em vez de um segmento reto — os desvios em ziguezague seguem
+// a direção local da curva, não a direção direta from→to.
+function wavyCurvedPathD(from, control, to, amplitude = 5, segments = 8) {
+  let d = `M ${from.x} ${from.y}`;
+  let prev = from;
   for (let i = 1; i <= segments; i++) {
     const t = i / segments;
-    const px = x1 + dx * t;
-    const py = y1 + dy * t;
+    const mt = 1 - t;
+    const pt = {
+      x: mt * mt * from.x + 2 * mt * t * control.x + t * t * to.x,
+      y: mt * mt * from.y + 2 * mt * t * control.y + t * t * to.y,
+    };
+    const dx = pt.x - prev.x;
+    const dy = pt.y - prev.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
     const off = i === segments ? 0 : (i % 2 === 0 ? 1 : -1) * amplitude;
-    d += ` L ${px + nx * off} ${py + ny * off}`;
+    d += ` L ${pt.x + nx * off} ${pt.y + ny * off}`;
+    prev = pt;
   }
   return d;
 }
 // Ponto de controlo por defeito para a curva de uma seta (Bezier quadrática).
 // "lancamento" já começa com uma leve curva (como um arco de lançamento);
-// os outros tipos curáveis (passe, corte) começam retos — o treinador pode
-// depois arrastar o ponto de controlo para curvar a linha como quiser.
+// os outros tipos curáveis (passe, corte, drible) começam retos — o
+// treinador pode depois arrastar o ponto de controlo para curvar a linha.
 function defaultControlPoint(type, from, to) {
   const mx = (from.x + to.x) / 2;
   const my = (from.y + to.y) / 2;
@@ -260,7 +268,7 @@ export {
   resizeImageFile,
   normalizePlayer,
   distPt,
-  wavyPathD,
+  wavyCurvedPathD,
   defaultControlPoint,
   arrowHead,
   uid,

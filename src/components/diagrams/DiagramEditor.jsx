@@ -7,9 +7,8 @@ import { Modal, ModalActions } from "../common/Modal";
 import { CourtBackground, TokenShape, ArrowShape } from "./CourtPrimitives";
 
 // Tipos de seta cuja curva pode ser ajustada arrastando um ponto de controlo.
-// "drible" tem a sua própria forma ondulada, e "bloqueio" mantém-se reto (uma
-// parede não se curva) — por isso ficam de fora.
-const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento"]);
+// "bloqueio" mantém-se sempre reto (uma parede não se curva) — por isso fica de fora.
+const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible"]);
 
 // Histórico de estados do diagrama, para permitir desfazer/refazer.
 // "commit" grava um novo ponto no histórico (ações discretas: adicionar/apagar,

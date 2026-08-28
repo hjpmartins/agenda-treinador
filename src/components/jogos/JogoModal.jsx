@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Trash2, Plus } from "lucide-react";
-import { emptyJogo, PERIODOS, ESTATISTICAS_CAMPOS } from "../../data";
+import { emptyJogo, PERIODOS } from "../../data";
 import { uid } from "../../utils";
 import { inputCls } from "../../ui";
 import { Modal, Field, ModalActions } from "../common/Modal";
@@ -24,14 +24,6 @@ function JogoModal({ initial, players, onClose, onSave }) {
     const atual = convocatoria[playerId] || [false, false, false, false];
     const next = atual.map((v, i) => (i === idx ? !v : v));
     setForm({ ...form, convocatoria: { ...convocatoria, [playerId]: next } });
-  };
-
-  const estatisticas = form.estatisticas || {};
-  const updateEstatistica = (playerId, campo, value) => {
-    setForm({
-      ...form,
-      estatisticas: { ...estatisticas, [playerId]: { ...(estatisticas[playerId] || {}), [campo]: value } },
-    });
   };
 
   return (
@@ -127,48 +119,6 @@ function JogoModal({ initial, players, onClose, onSave }) {
                           >
                             {marks[idx] ? "✓" : ""}
                           </button>
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {players && players.length > 0 && (
-        <div className="mt-5 pt-4 border-t border-[#2E3644]">
-          <div className="text-xs uppercase tracking-wide text-[#8A93A3] mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>Estatísticas do jogo</div>
-          <div style={{ maxHeight: 260, overflow: "auto" }} className="border border-[#2E3644] rounded-md">
-            <table className="text-xs" style={{ minWidth: 480 }}>
-              <thead className="sticky top-0 bg-[#1E242E]">
-                <tr className="text-[#8A93A3]">
-                  <th className="text-left px-2 py-1.5 font-normal sticky left-0 bg-[#1E242E]" style={{ minWidth: 110 }}>Jogadora</th>
-                  {ESTATISTICAS_CAMPOS.map((c) => (
-                    <th key={c.key} title={c.nome} className="px-1 py-1.5 font-normal text-center" style={{ minWidth: 44 }}>{c.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {players.map((p) => {
-                  const stats = estatisticas[p.id] || {};
-                  return (
-                    <tr key={p.id} className="border-t border-[#2E3644]">
-                      <td className="px-2 py-1 truncate sticky left-0 bg-[#1E242E]" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
-                        {p.numero ? `${p.numero} · ` : ""}{p.nome}
-                      </td>
-                      {ESTATISTICAS_CAMPOS.map((c) => (
-                        <td key={c.key} className="px-1 py-1">
-                          <input
-                            type="number"
-                            min="0"
-                            value={stats[c.key] || ""}
-                            onChange={(e) => updateEstatistica(p.id, c.key, e.target.value)}
-                            className={inputCls}
-                            style={{ width: 42, textAlign: "center", padding: "4px 2px" }}
-                          />
                         </td>
                       ))}
                     </tr>

@@ -1,9 +1,9 @@
-import { Copy, Printer, Pencil, Trash2 } from "lucide-react";
+import { Copy, Printer, Pencil, Trash2, ListChecks } from "lucide-react";
 import { formatDateShort } from "../../utils";
 import { printJogo } from "../../print";
 import { ViewHeader, EmptyState } from "../common/Modal";
 
-function JogoRow({ s, players, clubLogo, onEdit, onDelete, onTransfer }) {
+function JogoRow({ s, players, clubLogo, onEdit, onDelete, onTransfer, onLiveStats }) {
   return (
     <div className="bg-[#1E242E] border border-[#2E3644] rounded-lg p-4 flex items-start gap-4 group">
       <div className="text-center shrink-0 w-14">
@@ -29,6 +29,9 @@ function JogoRow({ s, players, clubLogo, onEdit, onDelete, onTransfer }) {
         {s.apreciacaoGeral && <div className="text-xs text-[#8A93A3] mt-1.5 line-clamp-2">{s.apreciacaoGeral}</div>}
       </div>
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <button onClick={onLiveStats} title="Registar estatísticas ao vivo" className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
+          <ListChecks size={14} />
+        </button>
         <button onClick={onTransfer} title="Copiar para outra equipa" className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
           <Copy size={14} />
         </button>
@@ -46,7 +49,7 @@ function JogoRow({ s, players, clubLogo, onEdit, onDelete, onTransfer }) {
   );
 }
 
-function JogosView({ sessions, players, clubLogo, onAdd, onEdit, onDelete, onTransfer }) {
+function JogosView({ sessions, players, clubLogo, onAdd, onEdit, onDelete, onTransfer, onLiveStats }) {
   const sorted = [...sessions].sort((a, b) => (a.date < b.date ? 1 : -1));
   return (
     <div>
@@ -56,7 +59,7 @@ function JogosView({ sessions, players, clubLogo, onAdd, onEdit, onDelete, onTra
       ) : (
         <div className="space-y-2">
           {sorted.map((s) => (
-            <JogoRow key={s.id} s={s} players={players} clubLogo={clubLogo} onEdit={() => onEdit(s)} onDelete={() => onDelete(s.id)} onTransfer={() => onTransfer(s)} />
+            <JogoRow key={s.id} s={s} players={players} clubLogo={clubLogo} onEdit={() => onEdit(s)} onDelete={() => onDelete(s.id)} onTransfer={() => onTransfer(s)} onLiveStats={() => onLiveStats(s)} />
           ))}
         </div>
       )}

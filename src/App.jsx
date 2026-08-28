@@ -16,6 +16,7 @@ import { SessionModal } from "./components/sessions/SessionModal";
 import { ImportModal } from "./components/sessions/ImportModal";
 import { JogosView } from "./components/jogos/JogosViews";
 import { JogoModal } from "./components/jogos/JogoModal";
+import { LiveStatsView } from "./components/jogos/LiveStatsView";
 import { LibraryView } from "./components/library/LibraryView";
 import { LibraryModal } from "./components/library/LibraryModal";
 import { PublicLibraryView } from "./components/library/PublicLibraryView";
@@ -49,6 +50,7 @@ export default function App() {
   const [libraryModal, setLibraryModal] = useState(null); // null | 'new' | item
   const [sessionModal, setSessionModal] = useState(null); // null | {date} | session object
   const [jogoModal, setJogoModal] = useState(null); // null | jogo object
+  const [liveStatsModal, setLiveStatsModal] = useState(null); // null | jogo object
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState(null); // {y, m, d} | null
   const [importPreview, setImportPreview] = useState(null); // {parsed, fileName}
@@ -186,6 +188,16 @@ export default function App() {
       setJogoModal(null);
     } catch (e) {
       setError(`Não foi possível guardar (${e.message || e}).`);
+    }
+  };
+
+  const saveLiveStats = async (jogo, estatisticas) => {
+    try {
+      const updated = await db.updateSession(jogo.id, { estatisticas });
+      setSessions(sessions.map((s) => (s.id === updated.id ? updated : s)));
+      setLiveStatsModal(null);
+    } catch (e) {
+      setError(`Não foi possível guardar as estatísticas (${e.message || e}).`);
     }
   };
 
@@ -593,6 +605,7 @@ export default function App() {
                   onEdit={(s) => setJogoModal(s)}
                   onDelete={deleteSession}
                   onTransfer={(s) => setTransferModal(s)}
+                  onLiveStats={(s) => setLiveStatsModal(s)}
                 />
               )}
               {tab === "biblioteca" && (
@@ -655,6 +668,14 @@ export default function App() {
           players={teamPlayers}
           onClose={() => setJogoModal(null)}
           onSave={saveSession}
+        />
+      )}
+      {liveStatsModal && (
+        <LiveStatsView
+          jogo={liveStatsModal}
+          players={teamPlayers}
+          onClose={() => setLiveStatsModal(null)}
+          onSave={(estatisticas) => saveLiveStats(liveStatsModal, estatisticas)}
         />
       )}
       {importModal && (

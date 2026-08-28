@@ -151,11 +151,27 @@ const emptyJogo = {
 };
 const ESTATISTICAS_CAMPOS = [
   { key: "pontos", label: "Pts", nome: "Pontos" },
+  { key: "lancamentosFalhados", label: "LF", nome: "Lançamentos falhados" },
   { key: "ressaltos", label: "Res", nome: "Ressaltos" },
   { key: "assistencias", label: "Ass", nome: "Assistências" },
   { key: "roubos", label: "Rou", nome: "Roubos de bola" },
+  { key: "perdas", label: "PdB", nome: "Perdas de bola" },
   { key: "bloqueios", label: "Blq", nome: "Bloqueios" },
   { key: "faltas", label: "Flt", nome: "Faltas cometidas" },
+];
+// Botões de registo rápido para o ecrã de estatísticas ao vivo — cada um soma
+// "delta" ao campo "key" da jogadora tocada (ver ESTATISTICAS_CAMPOS acima).
+const LIVE_STAT_BUTTONS = [
+  { key: "pontos", delta: 2, label: "2PT", group: "scoring" },
+  { key: "pontos", delta: 3, label: "3PT", group: "scoring" },
+  { key: "pontos", delta: 1, label: "LL", group: "scoring" },
+  { key: "lancamentosFalhados", delta: 1, label: "Falhou", group: "scoring" },
+  { key: "ressaltos", delta: 1, label: "Ressalto", group: "other" },
+  { key: "assistencias", delta: 1, label: "Assist.", group: "other" },
+  { key: "roubos", delta: 1, label: "Roubo", group: "other" },
+  { key: "bloqueios", delta: 1, label: "Bloqueio", group: "other" },
+  { key: "faltas", delta: 1, label: "Falta", group: "other" },
+  { key: "perdas", delta: 1, label: "Perda", group: "other" },
 ];
 const emptyLibraryItem = { nome: "", categoria: HABILIDADES[0].id, duracaoPadrao: "", descricao: "", diagramas: [] };
 const ARROW_TYPES = [
@@ -203,6 +219,7 @@ export {
   emptySession,
   emptyJogo,
   ESTATISTICAS_CAMPOS,
+  LIVE_STAT_BUTTONS,
   emptyLibraryItem,
   ARROW_TYPES,
   HALF_VB,

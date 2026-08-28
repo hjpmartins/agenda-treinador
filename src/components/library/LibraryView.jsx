@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Search, Pencil, Trash2, Share2 } from "lucide-react";
+import { Search, Pencil, Trash2, Share2, Upload, Plus } from "lucide-react";
 import { COMPONENTES, getHabilidade, habilidadeLabel } from "../../data";
 import { inputCls } from "../../ui";
-import { ViewHeader, EmptyState } from "../common/Modal";
+import { EmptyState } from "../common/Modal";
 import { DiagramThumbnail } from "../diagrams/CourtPrimitives";
 
-function LibraryView({ library, onAdd, onEdit, onDelete, onPublish }) {
+function LibraryView({ library, onAdd, onImportClick, onEdit, onDelete, onPublish }) {
   const [search, setSearch] = useState("");
   const [filterFase, setFilterFase] = useState("");
   const [filterComponente, setFilterComponente] = useState("");
@@ -29,7 +29,24 @@ function LibraryView({ library, onAdd, onEdit, onDelete, onPublish }) {
 
   return (
     <div>
-      <ViewHeader title="Biblioteca de exercícios" subtitle={`${library.length} exercício${library.length === 1 ? "" : "s"} guardado${library.length === 1 ? "" : "s"}`} onAdd={onAdd} addLabel="Novo exercício" />
+      <div className="flex items-end justify-between mb-5 gap-3 flex-wrap">
+        <div>
+          <h1 style={{ fontFamily: "'Oswald', sans-serif" }} className="text-2xl font-semibold uppercase tracking-wide">
+            Biblioteca de exercícios
+          </h1>
+          <div className="text-sm text-[#8A93A3] mt-0.5">
+            {library.length} exercício{library.length === 1 ? "" : "s"} guardado{library.length === 1 ? "" : "s"}
+          </div>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={onImportClick} className="flex items-center gap-1.5 border border-[#2E3644] hover:border-[#5A6272] text-[#F2EDE3] text-sm font-medium rounded-md px-3.5 py-2 transition-colors">
+            <Upload size={16} /> Importar
+          </button>
+          <button onClick={onAdd} className="flex items-center gap-1.5 bg-[#EA5B13] hover:bg-[#FF6B1A] text-[#14181F] text-sm font-medium rounded-md px-3.5 py-2 transition-colors">
+            <Plus size={16} /> Novo exercício
+          </button>
+        </div>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="relative flex-1 min-w-[200px]">

@@ -201,6 +201,63 @@ function parseRosterText(text) {
   }
   return parsed;
 }
+// Reconhece o texto de uma (ou várias, coladas seguidas) ficha(s) de
+// exercício copiada(s) da plataforma de treinadores da FIBA — cada exercício
+// começa numa linha "Título: ..." e tem secções "Descrição", "Objetivos /
+// propósito / habilidades", "Variações" e "Dicas / Sugestões / Ênfase".
+// Como a nossa Biblioteca só tem um campo de descrição, as secções são juntas
+// num só texto; a categoria fica por definir (o treinador escolhe depois).
+const FIBA_SECOES = ["Descrição", "Objetivos / propósito / habilidades", "Variações", "Dicas / Sugestões / Ênfase"];
+function parseFibaExercicios(text) {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const blocos = [];
+  let atual = null;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    const tituloMatch = /^T[ií]tulo:\s*(.+)/i.exec(line);
+    if (tituloMatch) {
+      if (atual) blocos.push(atual);
+      atual = { nome: tituloMatch[1].trim(), autor: "", secoes: {}, secaoAtual: null };
+      continue;
+    }
+    if (!atual) continue; // ignora texto antes do primeiro "Título:"
+    const autorMatch = /^Autor:\s*(.+)/i.exec(line);
+    if (autorMatch) {
+      atual.autor = autorMatch[1].trim();
+      atual.secaoAtual = null;
+      continue;
+    }
+    if (/^Gr[áa]fico\s*N/i.test(line) || /^EXERC[ÍI]CIO\b/i.test(line)) {
+      atual.secaoAtual = null;
+      continue;
+    }
+    const secao = FIBA_SECOES.find((s) => s.toLowerCase() === line.toLowerCase());
+    if (secao) {
+      atual.secaoAtual = secao;
+      atual.secoes[secao] = atual.secoes[secao] || [];
+      continue;
+    }
+    if (atual.secaoAtual) atual.secoes[atual.secaoAtual].push(line);
+  }
+  if (atual) blocos.push(atual);
+
+  const semDados = (v) => !v || /^não há dados$/i.test(v);
+  return blocos
+    .filter((b) => b.nome)
+    .map((b) => {
+      const texto = (secao) => (b.secoes[secao] || []).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+      const descricao = texto("Descrição");
+      const objetivos = texto("Objetivos / propósito / habilidades");
+      const variacoes = texto("Variações");
+      const dicas = texto("Dicas / Sugestões / Ênfase");
+      const partes = [descricao];
+      if (!semDados(objetivos)) partes.push(`Objetivos: ${objetivos}`);
+      if (!semDados(variacoes)) partes.push(`Variações: ${variacoes}`);
+      if (!semDados(dicas)) partes.push(`Dicas: ${dicas}`);
+      if (b.autor) partes.push(`Fonte: FIBA Coaching — ${b.autor}`);
+      return { nome: b.nome, descricao: partes.filter(Boolean).join("\n\n") };
+    });
+}
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -285,6 +342,7 @@ export {
   nextTemporadaLabel,
   withTimeout,
   parseRosterText,
+  parseFibaExercicios,
   todayStr,
   calcPresenca,
   countTreinosRealizados,

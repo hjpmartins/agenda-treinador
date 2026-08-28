@@ -190,6 +190,14 @@ async function createLibraryItem(item) {
   return fromDb(LIBRARY_FIELDS, data);
 }
 
+async function createLibraryItems(items) {
+  const userId = await getUserId();
+  const rows = items.map((item) => ({ ...toDb(LIBRARY_FIELDS, item), user_id: userId }));
+  const { data, error } = await supabase.from("library_items").insert(rows).select();
+  if (error) throw error;
+  return data.map((row) => fromDb(LIBRARY_FIELDS, row));
+}
+
 async function updateLibraryItem(id, patch) {
   const { data, error } = await supabase.from("library_items").update(toDb(LIBRARY_FIELDS, patch)).eq("id", id).select().single();
   if (error) throw error;
@@ -317,6 +325,7 @@ export {
   deleteSession,
   listLibrary,
   createLibraryItem,
+  createLibraryItems,
   updateLibraryItem,
   deleteLibraryItem,
   listPublicLibrary,

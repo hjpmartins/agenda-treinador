@@ -19,6 +19,7 @@ import { JogoModal } from "./components/jogos/JogoModal";
 import { LiveStatsView } from "./components/jogos/LiveStatsView";
 import { LibraryView } from "./components/library/LibraryView";
 import { LibraryModal } from "./components/library/LibraryModal";
+import { LibraryImportModal } from "./components/library/LibraryImportModal";
 import { PublicLibraryView } from "./components/library/PublicLibraryView";
 import { CalendarView } from "./components/calendar/CalendarView";
 import { TeamsModal } from "./components/teams/TeamsModal";
@@ -48,6 +49,7 @@ export default function App() {
   const [playerModal, setPlayerModal] = useState(null); // null | 'new' | player object
   const [importModal, setImportModal] = useState(false);
   const [libraryModal, setLibraryModal] = useState(null); // null | 'new' | item
+  const [libraryImportModal, setLibraryImportModal] = useState(false);
   const [sessionModal, setSessionModal] = useState(null); // null | {date} | session object
   const [jogoModal, setJogoModal] = useState(null); // null | jogo object
   const [liveStatsModal, setLiveStatsModal] = useState(null); // null | jogo object
@@ -234,6 +236,17 @@ export default function App() {
       setLibrary(library.filter((l) => l.id !== id));
     } catch (e) {
       setError(`Não foi possível apagar o exercício (${e.message || e}).`);
+    }
+  };
+
+  const importLibraryItems = async (items) => {
+    try {
+      const created = await db.createLibraryItems(items.map((it) => ({ ...emptyLibraryItem, ...it })));
+      setLibrary([...library, ...created]);
+      setLibraryImportModal(false);
+      setImportSuccess(`Importados ${created.length} exercício${created.length === 1 ? "" : "s"} para a biblioteca.`);
+    } catch (e) {
+      setError(`Não foi possível importar os exercícios (${e.message || e}).`);
     }
   };
 
@@ -612,6 +625,7 @@ export default function App() {
                 <LibraryView
                   library={library}
                   onAdd={() => setLibraryModal("new")}
+                  onImportClick={() => setLibraryImportModal(true)}
                   onEdit={(item) => setLibraryModal(item)}
                   onDelete={deleteLibraryItem}
                   onPublish={publishLibraryItem}
@@ -687,6 +701,9 @@ export default function App() {
           onClose={() => setLibraryModal(null)}
           onSave={saveLibraryItem}
         />
+      )}
+      {libraryImportModal && (
+        <LibraryImportModal onClose={() => setLibraryImportModal(false)} onImport={importLibraryItems} />
       )}
       {importPreview && (
         <ImportBackupConfirmModal

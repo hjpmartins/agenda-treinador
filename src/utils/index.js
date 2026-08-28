@@ -104,18 +104,21 @@ function wavyPathD(x1, y1, x2, y2, amplitude = 5, segments = 8) {
   }
   return d;
 }
-// Curva em arco (trajetória de lançamento) entre dois pontos.
-function arcPathD(x1, y1, x2, y2, height = 30) {
-  const mx = (x1 + x2) / 2;
-  const my = (y1 + y2) / 2;
-  const dx = x2 - x1;
-  const dy = y2 - y1;
+// Ponto de controlo por defeito para a curva de uma seta (Bezier quadrática).
+// "lancamento" já começa com uma leve curva (como um arco de lançamento);
+// os outros tipos curáveis (passe, corte) começam retos — o treinador pode
+// depois arrastar o ponto de controlo para curvar a linha como quiser.
+function defaultControlPoint(type, from, to) {
+  const mx = (from.x + to.x) / 2;
+  const my = (from.y + to.y) / 2;
+  if (type !== "lancamento") return { x: mx, y: my };
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
   const len = Math.hypot(dx, dy) || 1;
   const nx = -dy / len;
   const ny = dx / len;
-  const cx = mx + nx * height;
-  const cy = my + ny * height;
-  return `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
+  const height = 30;
+  return { x: mx + nx * height, y: my + ny * height };
 }
 function arrowHead(x1, y1, x2, y2, size = 7) {
   const angle = Math.atan2(y2 - y1, x2 - x1);
@@ -247,7 +250,7 @@ export {
   normalizePlayer,
   distPt,
   wavyPathD,
-  arcPathD,
+  defaultControlPoint,
   arrowHead,
   uid,
   computeTemporadaAtual,

@@ -1,10 +1,15 @@
 import { useState, useRef, useReducer, useEffect, useCallback } from "react";
 import { Trash2, Play, RotateCcw, Undo2, Redo2 } from "lucide-react";
 import { HALF_VB, FULL_VB, ARROW_TYPES } from "../../data";
-import { uid, distPt, emptyDiagram, computeAnimatedPositions } from "../../utils";
+import { uid, distPt, emptyDiagram, computeAnimatedPositions, defaultControlPoint } from "../../utils";
 import { inputCls } from "../../ui";
 import { Modal, ModalActions } from "../common/Modal";
 import { CourtBackground, TokenShape, ArrowShape } from "./CourtPrimitives";
+
+// Tipos de seta cuja curva pode ser ajustada arrastando um ponto de controlo.
+// "drible" tem a sua própria forma ondulada, e "bloqueio" mantém-se reto (uma
+// parede não se curva) — por isso ficam de fora.
+const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento"]);
 
 // Histórico de estados do diagrama, para permitir desfazer/refazer.
 // "commit" grava um novo ponto no histórico (ações discretas: adicionar/apagar,
@@ -41,6 +46,7 @@ function DiagramEditor({ initial, onClose, onSave }) {
 
   const [mode, setMode] = useState("mover"); // 'mover' | arrow type id
   const [dragId, setDragId] = useState(null);
+  const [dragControlId, setDragControlId] = useState(null); // id da seta cujo ponto de curva está a ser arrastado
   const [drawing, setDrawing] = useState(null); // {type, from:{x,y,tokenId}, to:{x,y,tokenId}}
   const [selectedId, setSelectedId] = useState(null);
   const [animPositions, setAnimPositions] = useState(null);
@@ -66,10 +72,14 @@ function DiagramEditor({ initial, onClose, onSave }) {
   const vb = diagram.court === "campo" ? FULL_VB : HALF_VB;
   const SNAP_DIST = 14;
 
+  // Aceita tanto eventos de rato como de touch (telemóvel/tablet).
   const getPoint = (e) => {
     const rect = wrapRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * vb.w;
-    const y = ((e.clientY - rect.top) / rect.height) * vb.h;
+    const touch = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
+    const clientX = touch ? touch.clientX : e.clientX;
+    const clientY = touch ? touch.clientY : e.clientY;
+    const x = ((clientX - rect.left) / rect.width) * vb.w;
+    const y = ((clientY - rect.top) / rect.height) * vb.h;
     return { x: Math.max(4, Math.min(vb.w - 4, x)), y: Math.max(4, Math.min(vb.h - 4, y)) };
   };
 
@@ -116,6 +126,7 @@ function DiagramEditor({ initial, onClose, onSave }) {
   // ---- Pointer down: start dragging a token, or start drawing an arrow (bloqueio incluído) ----
   const startFromToken = (e, tokenId) => {
     e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
     const token = diagram.tokens.find((t) => t.id === tokenId);
     if (mode === "mover") {
       commit((d) => d); // ponto de partida no histórico, antes do arrasto começar
@@ -126,7 +137,16 @@ function DiagramEditor({ initial, onClose, onSave }) {
     }
   };
 
+  // Arrastar o ponto de controlo de uma curva já desenhada (só disponível em modo "Mover", com a seta selecionada).
+  const startControlDrag = (e, arrowId) => {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    commit((d) => d);
+    setDragControlId(arrowId);
+  };
+
   const startFromCanvas = (e) => {
+    if (e.cancelable) e.preventDefault();
     const pt = getPoint(e);
     if (mode === "mover") {
       setSelectedId(null);
@@ -138,11 +158,19 @@ function DiagramEditor({ initial, onClose, onSave }) {
   // ---- Pointer move: update drag or live preview of the arrow being drawn ----
   const handleMouseMove = (e) => {
     if (dragId) {
+      if (e.cancelable) e.preventDefault();
       const pt = getPoint(e);
       replaceCurrent((d) => ({ ...d, tokens: d.tokens.map((t) => (t.id === dragId ? { ...t, x: pt.x, y: pt.y } : t)) }));
       return;
     }
+    if (dragControlId) {
+      if (e.cancelable) e.preventDefault();
+      const pt = getPoint(e);
+      replaceCurrent((d) => ({ ...d, arrows: d.arrows.map((a) => (a.id === dragControlId ? { ...a, control: pt } : a)) }));
+      return;
+    }
     if (drawing) {
+      if (e.cancelable) e.preventDefault();
       let raw = getPoint(e);
       const near = nearestToken(raw);
       let pt = near ? { x: near.x, y: near.y } : raw;
@@ -157,9 +185,15 @@ function DiagramEditor({ initial, onClose, onSave }) {
       setDragId(null);
       return;
     }
+    if (dragControlId) {
+      setDragControlId(null);
+      return;
+    }
     if (drawing) {
       const isTiny = distPt(drawing.from, drawing.to) < 6;
       if (!isTiny) {
+        const from = { x: drawing.from.x, y: drawing.from.y };
+        const to = { x: drawing.to.x, y: drawing.to.y };
         commit((d) => ({
           ...d,
           arrows: [
@@ -167,8 +201,9 @@ function DiagramEditor({ initial, onClose, onSave }) {
             {
               id: uid(),
               type: drawing.type,
-              from: { x: drawing.from.x, y: drawing.from.y },
-              to: { x: drawing.to.x, y: drawing.to.y },
+              from,
+              to,
+              control: CURVABLE_TYPES.has(drawing.type) ? defaultControlPoint(drawing.type, from, to) : undefined,
               tokenId: drawing.from.tokenId || drawing.to.tokenId || null,
             },
           ],
@@ -210,6 +245,7 @@ function DiagramEditor({ initial, onClose, onSave }) {
         <button onClick={() => addToken("defense")} className="text-xs px-2.5 py-1.5 rounded border border-[#2E3644] hover:border-[#5A6272]">+ Defesa</button>
         <button onClick={() => addToken("ball")} className="text-xs px-2.5 py-1.5 rounded border border-[#2E3644] hover:border-[#5A6272]">+ Bola</button>
         <button onClick={() => addToken("cone")} className="text-xs px-2.5 py-1.5 rounded border border-[#2E3644] hover:border-[#5A6272]">+ Cone</button>
+        <button onClick={() => addToken("treinador")} className="text-xs px-2.5 py-1.5 rounded border border-[#2E3644] hover:border-[#5A6272]">+ Treinador</button>
         <div className="w-px h-6 bg-[#2E3644]" />
         <button onClick={deleteSelected} disabled={!selectedId} className="text-xs px-2.5 py-1.5 rounded border border-[#2E3644] hover:border-[#D64545] hover:text-[#D64545] disabled:opacity-30">
           <Trash2 size={13} className="inline -mt-0.5 mr-1" /> Apagar selecionado
@@ -239,6 +275,7 @@ function DiagramEditor({ initial, onClose, onSave }) {
             {mode === "passe" && <> · <b className="text-[#F2EDE3]">Passe</b> não desloca o jogador, só a bola — usa Corte para o movimento do passador</>}
             {mode === "lancamento" && <> · <b className="text-[#F2EDE3]">Lançamento</b> desloca só a bola, terminando no alvo (ex: o cesto)</>}
             {mode === "bloqueio" && <> · o traço fica orientado na direção que arrastares</>}
+            {CURVABLE_TYPES.has(mode) && <> · depois de desenhada, seleciona-a em <b className="text-[#F2EDE3]">Mover</b> e arrasta o ponto do meio para curvar</>}
           </span>
         )}
       </div>
@@ -250,12 +287,35 @@ function DiagramEditor({ initial, onClose, onSave }) {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onTouchMove={handleMouseMove}
+        onTouchEnd={handleMouseUp}
+        onTouchCancel={handleMouseUp}
       >
-        <svg viewBox={`0 0 ${vb.w} ${vb.h}`} className="w-full h-full select-none" onMouseDown={startFromCanvas}>
+        <svg viewBox={`0 0 ${vb.w} ${vb.h}`} className="w-full h-full select-none" onMouseDown={startFromCanvas} onTouchStart={startFromCanvas}>
           <CourtBackground court={diagram.court} vb={vb} />
-          {diagram.arrows.map((a) => (
-            <ArrowShape key={a.id} arrow={a} selected={selectedId === a.id} onMouseDown={(e) => { e.stopPropagation(); if (mode === "mover") setSelectedId(a.id); }} />
-          ))}
+          {diagram.arrows.map((a) => {
+            const onSelect = (e) => { e.stopPropagation(); if (mode === "mover") setSelectedId(a.id); };
+            const isSelectedCurvable = mode === "mover" && selectedId === a.id && CURVABLE_TYPES.has(a.type);
+            const control = isSelectedCurvable ? a.control || defaultControlPoint(a.type, a.from, a.to) : null;
+            return (
+              <g key={a.id}>
+                <ArrowShape arrow={a} selected={selectedId === a.id} onMouseDown={onSelect} />
+                {isSelectedCurvable && (
+                  <circle
+                    cx={control.x}
+                    cy={control.y}
+                    r="6"
+                    fill="#EA5B13"
+                    stroke="#F2EDE3"
+                    strokeWidth="1.5"
+                    style={{ cursor: "grab" }}
+                    onMouseDown={(e) => startControlDrag(e, a.id)}
+                    onTouchStart={(e) => startControlDrag(e, a.id)}
+                  />
+                )}
+              </g>
+            );
+          })}
           {drawing && (
             <ArrowShape arrow={{ type: drawing.type, from: drawing.from, to: drawing.to }} selected={false} />
           )}

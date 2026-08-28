@@ -1,5 +1,5 @@
 import { FULL_VB, HALF_VB, ESTATISTICAS_CAMPOS, getTipoTeste, habilidadeGroups } from "../data";
-import { escapeHtml, formatDateFull, formatDateShortYear, wavyPathD, arcPathD, arrowHead, calcPresenca, playerChartData } from "../utils";
+import { escapeHtml, formatDateFull, formatDateShortYear, wavyPathD, defaultControlPoint, arrowHead, calcPresenca, playerChartData } from "../utils";
 
 function svgHalfMarkingsStr(flipY, w, h) {
   const cx = w / 2;
@@ -36,6 +36,9 @@ function svgTokenStr(token) {
   if (type === "cone") {
     return `<g transform="translate(${x} ${y})"><path d="M 0 -9 L 8 8 L -8 8 Z" fill="#E0A800" stroke="#14181F" stroke-width="1" stroke-linejoin="round"/></g>`;
   }
+  if (type === "treinador") {
+    return `<g transform="translate(${x} ${y})"><rect x="-10" y="-10" width="20" height="20" rx="3" fill="#fff" stroke="#14181F" stroke-width="1.5"/><text text-anchor="middle" dy="4" font-size="11" fill="#14181F" font-family="Arial" font-weight="700">T</text></g>`;
+  }
   const isDef = type === "defense";
   return `<g transform="translate(${x} ${y})">
     <circle r="12" fill="${isDef ? "transparent" : "#EA5B13"}" stroke="${isDef ? "#D64545" : "#14181F"}" stroke-width="${isDef ? 2.5 : 1.5}" ${isDef ? 'stroke-dasharray="3 2"' : ""}/>
@@ -56,14 +59,14 @@ function svgArrowStr(arrow) {
   }
   const { from, to } = arrow;
   const isShot = arrow.type === "lancamento";
-  let d;
-  if (arrow.type === "drible") d = wavyPathD(from.x, from.y, to.x, to.y);
-  else if (isShot) d = arcPathD(from.x, from.y, to.x, to.y);
-  else d = `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+  const isDrible = arrow.type === "drible";
+  const control = arrow.control || defaultControlPoint(arrow.type, from, to);
+  const d = isDrible ? wavyPathD(from.x, from.y, to.x, to.y) : `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`;
   const dash = arrow.type === "passe" || isShot ? 'stroke-dasharray="6 4"' : "";
+  const tipFrom = isDrible ? from : control;
   const tip = isShot
     ? `<circle cx="${to.x}" cy="${to.y}" r="6" fill="none" stroke="${color}" stroke-width="2"/><circle cx="${to.x}" cy="${to.y}" r="2" fill="${color}"/>`
-    : `<path d="${arrowHead(from.x, from.y, to.x, to.y)}" stroke="${color}" stroke-width="2" fill="none"/>`;
+    : `<path d="${arrowHead(tipFrom.x, tipFrom.y, to.x, to.y)}" stroke="${color}" stroke-width="2" fill="none"/>`;
   return `<path d="${d}" stroke="${color}" stroke-width="2" fill="none" ${dash}/>${tip}`;
 }
 

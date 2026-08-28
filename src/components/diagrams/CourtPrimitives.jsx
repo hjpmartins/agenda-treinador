@@ -1,5 +1,5 @@
 import { HALF_VB, FULL_VB } from "../../data";
-import { wavyPathD, arcPathD, arrowHead } from "../../utils";
+import { wavyPathD, defaultControlPoint, arrowHead } from "../../utils";
 
 function HalfMarkings({ flipY = false, w = HALF_VB.w, h = HALF_VB.h }) {
   // Drawn for a court with baseline at bottom (y = h-10), hoop area near baseline, centered on w/2.
@@ -60,7 +60,7 @@ function TokenShape({ token, onMouseDown, selected }) {
   const { x, y, type, number } = token;
   if (type === "ball") {
     return (
-      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} style={{ cursor: "grab" }}>
+      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
         <circle r="7" fill="#EA5B13" stroke={selected ? "#F2EDE3" : "none"} strokeWidth="2" />
         <path d="M -5 0 L 5 0 M 0 -5 L 0 5" stroke="#14181F" strokeWidth="1" />
       </g>
@@ -68,14 +68,24 @@ function TokenShape({ token, onMouseDown, selected }) {
   }
   if (type === "cone") {
     return (
-      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} style={{ cursor: "grab" }}>
+      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
         <path d="M 0 -9 L 8 8 L -8 8 Z" fill="#F2C744" stroke={selected ? "#F2EDE3" : "#14181F"} strokeWidth={selected ? 2 : 1} strokeLinejoin="round" />
+      </g>
+    );
+  }
+  if (type === "treinador") {
+    return (
+      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
+        <rect x="-10" y="-10" width="20" height="20" rx="3" fill="#F2EDE3" stroke={selected ? "#EA5B13" : "#14181F"} strokeWidth={selected ? 2.5 : 1.5} />
+        <text textAnchor="middle" dy="4" fontSize="11" fill="#14181F" fontFamily="'IBM Plex Mono', monospace" fontWeight="700">
+          T
+        </text>
       </g>
     );
   }
   const isDef = type === "defense";
   return (
-    <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} style={{ cursor: "grab" }}>
+    <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
       <circle r="12" fill={isDef ? "transparent" : "#EA5B13"} stroke={isDef ? "#D64545" : selected ? "#F2EDE3" : "#14181F"} strokeWidth={isDef ? 2.5 : selected ? 2.5 : 1.5} strokeDasharray={isDef ? "3 2" : "none"} />
       <text textAnchor="middle" dy="4" fontSize="11" fill={isDef ? "#D64545" : "#14181F"} fontFamily="'IBM Plex Mono', monospace" fontWeight="600">
         {number}
@@ -91,26 +101,29 @@ function ArrowShape({ arrow, onMouseDown, selected }) {
     if (arrow.at) {
       const { x, y } = arrow.at;
       return (
-        <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} style={{ cursor: "pointer" }}>
+        <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "pointer" }}>
           <line x1="-9" y1="0" x2="9" y2="0" stroke={color} strokeWidth="4" />
         </g>
       );
     }
     const { from, to } = arrow;
     return (
-      <g onMouseDown={onMouseDown} style={{ cursor: "pointer" }}>
+      <g onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "pointer" }}>
         <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke={color} strokeWidth="4" strokeLinecap="round" />
       </g>
     );
   }
   const { from, to } = arrow;
   const isShot = arrow.type === "lancamento";
+  const isDrible = arrow.type === "drible";
+  const control = arrow.control || defaultControlPoint(arrow.type, from, to);
   let d;
-  if (arrow.type === "drible") d = wavyPathD(from.x, from.y, to.x, to.y);
-  else if (isShot) d = arcPathD(from.x, from.y, to.x, to.y);
-  else d = `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+  if (isDrible) d = wavyPathD(from.x, from.y, to.x, to.y);
+  else d = `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`;
+  // A ponta da seta aponta na direção da tangente da curva (do ponto de controlo até ao fim), não da reta from→to.
+  const tipFrom = isDrible ? from : control;
   return (
-    <g onMouseDown={onMouseDown} style={{ cursor: "pointer" }}>
+    <g onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "pointer" }}>
       <path d={d} stroke={color} strokeWidth="2" fill="none" strokeDasharray={arrow.type === "passe" || isShot ? "6 4" : "none"} />
       {isShot ? (
         <g transform={`translate(${to.x} ${to.y})`}>
@@ -118,7 +131,7 @@ function ArrowShape({ arrow, onMouseDown, selected }) {
           <circle r="2" fill={color} />
         </g>
       ) : (
-        <path d={arrowHead(from.x, from.y, to.x, to.y)} stroke={color} strokeWidth="2" fill="none" />
+        <path d={arrowHead(tipFrom.x, tipFrom.y, to.x, to.y)} stroke={color} strokeWidth="2" fill="none" />
       )}
     </g>
   );

@@ -154,6 +154,7 @@ const emptyJogo = {
 // — ver estatisticaNumero/somaEstatistica mais abaixo. Os restantes campos
 // guardam um único número em "key".
 const ESTATISTICAS_CAMPOS = [
+  { key: "minutos", label: "Min", nome: "Minutos jogados" },
   { key: "pontos", label: "Pts", nome: "Pontos" },
   { key: "lancamentos2", label: "2PT", nome: "Lançamentos de 2 (convertidos/tentados)", madeKey: "lancamentos2Convertidos", missKey: "lancamentos2Falhados" },
   { key: "lancamentos3", label: "3PT", nome: "Lançamentos de 3 (convertidos/tentados)", madeKey: "lancamentos3Convertidos", missKey: "lancamentos3Falhados" },

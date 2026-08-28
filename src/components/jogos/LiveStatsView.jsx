@@ -33,6 +33,10 @@ function LiveStatsView({ jogo, players, onClose, onSave }) {
     setHistory((prev) => prev.slice(0, -1));
   };
 
+  const setMinutos = (playerId, value) => {
+    setStats((prev) => ({ ...prev, [playerId]: { ...(prev[playerId] || {}), minutos: value } }));
+  };
+
   const finish = () => onSave(stats);
 
   return (
@@ -66,13 +70,26 @@ function LiveStatsView({ jogo, players, onClose, onSave }) {
           const s = stats[p.id] || {};
           return (
             <div key={p.id} className="bg-[#1E242E] border border-[#2E3644] rounded-lg p-3">
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1 gap-2">
                 <div style={{ fontFamily: "'Oswald', sans-serif" }} className="font-semibold uppercase tracking-wide text-sm truncate">
                   {p.numero ? `${p.numero} · ` : ""}{p.nome}
                 </div>
                 <div style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-lg font-bold text-[#EA5B13] shrink-0">
                   {s.pontos || 0}
                 </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-[10px] uppercase tracking-wide text-[#8A93A3]">Min. jogados</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={s.minutos || ""}
+                  onChange={(e) => setMinutos(p.id, e.target.value)}
+                  placeholder="0"
+                  style={{ fontFamily: "'IBM Plex Mono', monospace", width: 44 }}
+                  className="bg-[#14181F] border border-[#2E3644] rounded px-1.5 py-0.5 text-xs text-[#F2EDE3] text-center"
+                />
               </div>
 
               <div style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-[10px] text-[#8A93A3] mb-2">

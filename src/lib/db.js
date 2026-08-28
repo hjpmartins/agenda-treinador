@@ -33,6 +33,10 @@ const TEAM_FIELDS = {
   temporadaAtual: "temporada_atual",
 };
 
+// Colunas do tipo "date" no Postgres não aceitam string vazia (só uma data
+// válida ou null) — ao contrário das colunas de texto, onde "" é normal.
+const DATE_FIELDS = ["nascimento", "date"];
+
 function toDb(fieldMap, obj) {
   const row = {};
   for (const [key, value] of Object.entries(obj)) {
@@ -40,7 +44,7 @@ function toDb(fieldMap, obj) {
     // .eq("id", ...) em updates, ou reposto explicitamente em replaceAllData.
     if (key === "id") continue;
     const dbKey = fieldMap[key] || key;
-    row[dbKey] = value;
+    row[dbKey] = DATE_FIELDS.includes(key) && value === "" ? null : value;
   }
   return row;
 }
@@ -50,7 +54,7 @@ function fromDb(fieldMap, row) {
   const obj = {};
   for (const [key, value] of Object.entries(row)) {
     const jsKey = reverseMap[key] || key;
-    obj[jsKey] = value;
+    obj[jsKey] = DATE_FIELDS.includes(jsKey) && value === null ? "" : value;
   }
   return obj;
 }

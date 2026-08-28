@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
-import { Play, RotateCcw, X, Plus, Copy } from "lucide-react";
+import { Play, RotateCcw, X, Plus, Copy, Download, Loader2 } from "lucide-react";
 import { HALF_VB, FULL_VB } from "../../data";
 import { computeAnimatedPositions, resolveFinalDiagram, emptyDiagram } from "../../utils";
+import { generateSequenceGif } from "../../lib/gifExport";
 import { Modal } from "../common/Modal";
 import { CourtBackground, TokenShape, ArrowShape, DiagramThumbnail } from "./CourtPrimitives";
 import { DiagramEditor } from "./DiagramEditor";
@@ -10,6 +11,9 @@ function SequencePlayerModal({ diagramas, onClose }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [overrides, setOverrides] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadError, setDownloadError] = useState(null);
   const stopRef = useRef(false);
 
   const current = diagramas[stepIndex] || diagramas[0];
@@ -52,6 +56,27 @@ function SequencePlayerModal({ diagramas, onClose }) {
     setOverrides(null);
   };
 
+  const downloadGif = async () => {
+    setDownloadError(null);
+    setDownloading(true);
+    setDownloadProgress(0);
+    try {
+      const blob = await generateSequenceGif(diagramas, { onProgress: setDownloadProgress });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `sequencia-${diagramas.length}-passos.gif`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setDownloadError(e.message || "Não foi possível gerar o ficheiro.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <Modal onClose={onClose} title="Sequência completa" wide>
       <div className="flex items-center gap-1.5 mb-3">
@@ -83,6 +108,29 @@ function SequencePlayerModal({ diagramas, onClose }) {
           </button>
         </div>
       </div>
+
+      <div className="mt-3 pt-3 border-t border-[#2E3644] flex items-center justify-between gap-3 flex-wrap">
+        <div className="text-[11px] text-[#5A6272]">Descarrega a sequência completa como um ficheiro GIF, para enviar aos jogadores.</div>
+        <button
+          onClick={downloadGif}
+          disabled={downloading}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded bg-[#EA5B13] hover:bg-[#FF6B1A] disabled:opacity-60 text-[#14181F] font-medium shrink-0"
+        >
+          {downloading ? (
+            <>
+              <Loader2 size={13} className="animate-spin" /> A gerar... {Math.round(downloadProgress * 100)}%
+            </>
+          ) : (
+            <>
+              <Download size={13} /> Descarregar filme (GIF)
+            </>
+          )}
+        </button>
+      </div>
+      {downloadError && (
+        <div className="mt-2 text-xs text-[#D64545] bg-[#D64545]/10 border border-[#D64545]/30 rounded px-3 py-2">{downloadError}</div>
+      )}
+
       <div className="flex justify-end mt-5">
         <button onClick={onClose} className="px-4 py-2 text-sm text-[#8A93A3] hover:text-[#F2EDE3]">Fechar</button>
       </div>

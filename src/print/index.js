@@ -70,10 +70,14 @@ function svgArrowStr(arrow) {
   return `<path d="${d}" stroke="${color}" stroke-width="2" fill="none" ${dash}/>${tip}`;
 }
 
-function diagramToSvgString(diagram, width = 150) {
+// "positionOverrides" (opcional, mapa id → {x,y}) permite desenhar os tokens numa
+// posição intermédia da animação, em vez da posição base do diagrama — usado para
+// gerar os frames do GIF da sequência (ver src/lib/gifExport.js).
+function diagramToSvgString(diagram, width = 150, positionOverrides = null) {
   const vb = diagram.court === "campo" ? FULL_VB : HALF_VB;
   const height = Math.round(width * (vb.h / vb.w));
-  const inner = svgCourtBackgroundStr(diagram.court, vb) + diagram.arrows.map(svgArrowStr).join("") + diagram.tokens.map(svgTokenStr).join("");
+  const tokens = positionOverrides ? diagram.tokens.map((t) => positionOverrides[t.id] || t) : diagram.tokens;
+  const inner = svgCourtBackgroundStr(diagram.court, vb) + diagram.arrows.map(svgArrowStr).join("") + tokens.map(svgTokenStr).join("");
   return `<svg viewBox="0 0 ${vb.w} ${vb.h}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" style="background:#fff;border:1px solid #ddd;border-radius:4px;">${inner}</svg>`;
 }
 

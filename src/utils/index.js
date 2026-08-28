@@ -96,6 +96,14 @@ function resizeImageFile(file, maxDim = 320, quality = 0.82) {
 function normalizePlayer(p) {
   return { ...emptyPlayer, ...p, lesoes: p.lesoes || [], avaliacoes: p.avaliacoes || [], testesFisicos: p.testesFisicos || [] };
 }
+// Primeiro + último nome, para exibição compacta em listas (ex: cartões do plantel).
+// O nome completo continua guardado e é usado na ficha do jogador e nos relatórios.
+function shortName(nome) {
+  if (!nome) return nome;
+  const parts = nome.trim().split(/\s+/);
+  if (parts.length <= 1) return nome.trim();
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
 function distPt(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
@@ -267,6 +275,7 @@ export {
   normalizeDiagramas,
   resizeImageFile,
   normalizePlayer,
+  shortName,
   distPt,
   wavyCurvedPathD,
   defaultControlPoint,

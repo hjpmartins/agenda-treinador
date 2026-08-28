@@ -1,5 +1,5 @@
 import { Upload, Plus, ArrowRightLeft, Printer, Pencil, Trash2 } from "lucide-react";
-import { countTreinosRealizados, calcPresenca } from "../../utils";
+import { countTreinosRealizados, calcPresenca, shortName } from "../../utils";
 import { printPlayer } from "../../print";
 import { EmptyState } from "../common/Modal";
 
@@ -57,8 +57,8 @@ function PlayersView({ players, sessions, clubLogo, onAdd, onImportClick, onEdit
                       )}
                     </div>
                     <div className="min-w-0">
-                      <div style={{ fontFamily: "'Oswald', sans-serif" }} className="text-base font-semibold uppercase tracking-wide leading-tight">
-                        {p.nome || "Sem nome"}
+                      <div title={p.nome} style={{ fontFamily: "'Oswald', sans-serif" }} className="text-base font-semibold uppercase tracking-wide leading-tight">
+                        {shortName(p.nome) || "Sem nome"}
                       </div>
                       <div className="text-xs text-[#8A93A3] truncate">{p.posicao}{p.nascimento ? ` · ${p.nascimento}` : ""}</div>
                     </div>

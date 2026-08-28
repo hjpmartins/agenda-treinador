@@ -1,6 +1,6 @@
-import { Home, Users, Dumbbell, CheckCircle2, Swords, BookOpen, CalendarDays } from "lucide-react";
+import { Home, Users, Dumbbell, CheckCircle2, Swords, BookOpen, Globe, CalendarDays } from "lucide-react";
 
-function Sidebar({ tab, setTab, playerCount, sessionCount, realizadosCount, jogosCount, libraryCount }) {
+function Sidebar({ tab, setTab, playerCount, sessionCount, realizadosCount, jogosCount, libraryCount, publicLibraryCount }) {
   const items = [
     { id: "inicio", label: "Início", icon: Home, count: null },
     { id: "jogadores", label: "Plantel", icon: Users, count: playerCount },
@@ -8,6 +8,7 @@ function Sidebar({ tab, setTab, playerCount, sessionCount, realizadosCount, jogo
     { id: "realizados", label: "Realizados", icon: CheckCircle2, count: realizadosCount },
     { id: "jogos", label: "Jogos", icon: Swords, count: jogosCount },
     { id: "biblioteca", label: "Biblioteca", icon: BookOpen, count: libraryCount },
+    { id: "biblioteca-publica", label: "Biblioteca pública", icon: Globe, count: publicLibraryCount },
     { id: "calendario", label: "Calendário", icon: CalendarDays, count: null },
   ];
   return (

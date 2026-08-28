@@ -1,16 +1,16 @@
 import { useState } from "react";
-import { Search, Pencil, Trash2, Share2 } from "lucide-react";
+import { Search, Download, Trash2, Globe } from "lucide-react";
 import { COMPONENTES, getHabilidade, habilidadeLabel } from "../../data";
 import { inputCls } from "../../ui";
 import { ViewHeader, EmptyState } from "../common/Modal";
 import { DiagramThumbnail } from "../diagrams/CourtPrimitives";
 
-function LibraryView({ library, onAdd, onEdit, onDelete, onPublish }) {
+function PublicLibraryView({ publicLibrary, currentUserId, onCopyToLibrary, onUnpublish }) {
   const [search, setSearch] = useState("");
   const [filterFase, setFilterFase] = useState("");
   const [filterComponente, setFilterComponente] = useState("");
 
-  const filtered = library.filter((ex) => {
+  const filtered = publicLibrary.filter((ex) => {
     const h = getHabilidade(ex.categoria);
     if (filterFase && (!h || h.fase !== filterFase)) return false;
     if (filterComponente && (!h || h.componente !== filterComponente)) return false;
@@ -19,7 +19,8 @@ function LibraryView({ library, onAdd, onEdit, onDelete, onPublish }) {
       const inNome = (ex.nome || "").toLowerCase().includes(q);
       const inHab = h && h.nome.toLowerCase().includes(q);
       const inDesc = (ex.descricao || "").toLowerCase().includes(q);
-      if (!inNome && !inHab && !inDesc) return false;
+      const inAutor = (ex.authorLabel || "").toLowerCase().includes(q);
+      if (!inNome && !inHab && !inDesc && !inAutor) return false;
     }
     return true;
   });
@@ -29,7 +30,10 @@ function LibraryView({ library, onAdd, onEdit, onDelete, onPublish }) {
 
   return (
     <div>
-      <ViewHeader title="Biblioteca de exercícios" subtitle={`${library.length} exercício${library.length === 1 ? "" : "s"} guardado${library.length === 1 ? "" : "s"}`} onAdd={onAdd} addLabel="Novo exercício" />
+      <ViewHeader
+        title="Biblioteca pública"
+        subtitle={`${publicLibrary.length} exercício${publicLibrary.length === 1 ? "" : "s"} partilhado${publicLibrary.length === 1 ? "" : "s"} por treinadores`}
+      />
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="relative flex-1 min-w-[200px]">
@@ -37,7 +41,7 @@ function LibraryView({ library, onAdd, onEdit, onDelete, onPublish }) {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Pesquisar por nome, habilidade ou descrição..."
+            placeholder="Pesquisar por nome, habilidade, descrição ou autor..."
             className={inputCls + " pl-8"}
           />
         </div>
@@ -61,12 +65,12 @@ function LibraryView({ library, onAdd, onEdit, onDelete, onPublish }) {
 
       {hasFilters && (
         <div className="text-xs text-[#8A93A3] mb-3">
-          {filtered.length} resultado{filtered.length === 1 ? "" : "s"} de {library.length}
+          {filtered.length} resultado{filtered.length === 1 ? "" : "s"} de {publicLibrary.length}
         </div>
       )}
 
-      {library.length === 0 ? (
-        <EmptyState text="Ainda não tens exercícios guardados. Cria o primeiro, ou guarda um diretamente a partir de um treino." />
+      {publicLibrary.length === 0 ? (
+        <EmptyState text="Ainda não há exercícios partilhados por treinadores. Vai à tua Biblioteca e usa o botão de partilhar num exercício." />
       ) : filtered.length === 0 ? (
         <EmptyState text="Nenhum exercício corresponde a esta pesquisa." />
       ) : (
@@ -90,15 +94,14 @@ function LibraryView({ library, onAdd, onEdit, onDelete, onPublish }) {
                       {ex.nome || "Sem nome"}
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                      <button onClick={() => onPublish(ex)} title="Partilhar na biblioteca pública" className="p-1 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
-                        <Share2 size={13} />
+                      <button onClick={() => onCopyToLibrary(ex)} title="Carregar para a minha biblioteca" className="p-1 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
+                        <Download size={13} />
                       </button>
-                      <button onClick={() => onEdit(ex)} className="p-1 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
-                        <Pencil size={13} />
-                      </button>
-                      <button onClick={() => onDelete(ex.id)} className="p-1 rounded hover:bg-[#D64545]/20 text-[#8A93A3] hover:text-[#D64545]">
-                        <Trash2 size={13} />
-                      </button>
+                      {ex.userId === currentUserId && (
+                        <button onClick={() => onUnpublish(ex.id)} title="Remover da biblioteca pública" className="p-1 rounded hover:bg-[#D64545]/20 text-[#8A93A3] hover:text-[#D64545]">
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mb-0.5 flex-wrap">
@@ -126,7 +129,12 @@ function LibraryView({ library, onAdd, onEdit, onDelete, onPublish }) {
                       return h ? `${h.componente} · ${h.nome}` : habilidadeLabel(ex.categoria);
                     })()}
                   </div>
-                  {ex.descricao && <div className="text-xs text-[#8A93A3] line-clamp-3">{ex.descricao}</div>}
+                  {ex.descricao && <div className="text-xs text-[#8A93A3] line-clamp-3 mb-1.5">{ex.descricao}</div>}
+                  {ex.authorLabel && (
+                    <div className="flex items-center gap-1 text-[10px] text-[#5A6272]">
+                      <Globe size={10} /> Partilhado por {ex.authorLabel}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -137,5 +145,4 @@ function LibraryView({ library, onAdd, onEdit, onDelete, onPublish }) {
   );
 }
 
-export { LibraryView };
-
+export { PublicLibraryView };

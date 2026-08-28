@@ -18,6 +18,7 @@ import { JogosView } from "./components/jogos/JogosViews";
 import { JogoModal } from "./components/jogos/JogoModal";
 import { LibraryView } from "./components/library/LibraryView";
 import { LibraryModal } from "./components/library/LibraryModal";
+import { PublicLibraryView } from "./components/library/PublicLibraryView";
 import { CalendarView } from "./components/calendar/CalendarView";
 import { TeamsModal } from "./components/teams/TeamsModal";
 import { TransferModal, MovePlayerModal } from "./components/teams/TransferModals";
@@ -31,6 +32,7 @@ export default function App() {
   const [players, setPlayers] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [library, setLibrary] = useState([]);
+  const [publicLibrary, setPublicLibrary] = useState([]);
   const [teams, setTeams] = useState([]);
   const [clubLogo, setClubLogo] = useState("");
   const [activeTeamId, setActiveTeamId] = useState(null);
@@ -79,6 +81,7 @@ export default function App() {
       setPlayers([]);
       setSessions([]);
       setLibrary([]);
+      setPublicLibrary([]);
       setTeams([]);
       setClubLogo("");
       setActiveTeamId(null);
@@ -107,6 +110,7 @@ export default function App() {
         setPlayers(loadedPlayers);
         setSessions(loadedSessions);
         setLibrary(result.library.map(normalizeDiagramas));
+        setPublicLibrary(result.publicLibrary.map(normalizeDiagramas));
         setClubLogo(result.clubLogo || "");
         setActiveTeamId(resolvedActiveTeamId);
         setViewingTemporada((loadedTeams.find((t) => t.id === resolvedActiveTeamId) || loadedTeams[0]).temporadaAtual);
@@ -228,6 +232,37 @@ export default function App() {
       setLibrary([...library, created]);
     } catch (e) {
       setError(`Não foi possível guardar o exercício na biblioteca (${e.message || e}).`);
+    }
+  };
+
+  const publishLibraryItem = async (item) => {
+    try {
+      const authorLabel = (activeTeam && activeTeam.nome) || user.email;
+      const published = await db.publishLibraryItem(item, authorLabel);
+      setPublicLibrary([published, ...publicLibrary]);
+      setImportSuccess(`"${item.nome}" partilhado na biblioteca pública.`);
+    } catch (e) {
+      setError(`Não foi possível partilhar o exercício (${e.message || e}).`);
+    }
+  };
+
+  const unpublishLibraryItem = async (id) => {
+    try {
+      await db.unpublishLibraryItem(id);
+      setPublicLibrary(publicLibrary.filter((l) => l.id !== id));
+    } catch (e) {
+      setError(`Não foi possível remover o exercício da biblioteca pública (${e.message || e}).`);
+    }
+  };
+
+  const copyPublicItemToLibrary = async (item) => {
+    try {
+      const { id, userId, authorLabel, createdAt, ...rest } = item;
+      const created = await db.createLibraryItem(rest);
+      setLibrary([...library, created]);
+      setImportSuccess(`"${item.nome}" adicionado à tua biblioteca.`);
+    } catch (e) {
+      setError(`Não foi possível carregar este exercício para a tua biblioteca (${e.message || e}).`);
     }
   };
 
@@ -485,6 +520,7 @@ export default function App() {
           realizadosCount={seasonSessions.filter((s) => s.type === "treino" && s.realizado === true).length}
           jogosCount={seasonSessions.filter((s) => s.type === "jogo").length}
           libraryCount={library.length}
+          publicLibraryCount={publicLibrary.length}
         />
         <main className="flex-1 p-5 md:p-8 max-w-5xl">
           {!ready ? (
@@ -565,6 +601,15 @@ export default function App() {
                   onAdd={() => setLibraryModal("new")}
                   onEdit={(item) => setLibraryModal(item)}
                   onDelete={deleteLibraryItem}
+                  onPublish={publishLibraryItem}
+                />
+              )}
+              {tab === "biblioteca-publica" && (
+                <PublicLibraryView
+                  publicLibrary={publicLibrary}
+                  currentUserId={user.id}
+                  onCopyToLibrary={copyPublicItemToLibrary}
+                  onUnpublish={unpublishLibraryItem}
                 />
               )}
               {tab === "calendario" && (

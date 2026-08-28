@@ -29,6 +29,13 @@ const LIBRARY_FIELDS = {
   duracaoPadrao: "duracao_padrao",
 };
 
+const PUBLIC_LIBRARY_FIELDS = {
+  duracaoPadrao: "duracao_padrao",
+  authorLabel: "author_label",
+  userId: "user_id",
+  createdAt: "created_at",
+};
+
 const TEAM_FIELDS = {
   temporadaAtual: "temporada_atual",
 };
@@ -194,6 +201,33 @@ async function deleteLibraryItem(id) {
   if (error) throw error;
 }
 
+// ---------------- Biblioteca pública (partilhada entre treinadores) ----------------
+
+async function listPublicLibrary() {
+  const { data, error } = await supabase.from("public_library_items").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return data.map((row) => fromDb(PUBLIC_LIBRARY_FIELDS, row));
+}
+
+// Publica uma cópia independente de um exercício da biblioteca privada — editar
+// o original depois não afeta a versão pública, nem o que outros já carregaram.
+async function publishLibraryItem(item, authorLabel) {
+  const userId = await getUserId();
+  const { nome, categoria, duracaoPadrao, descricao, diagramas } = item;
+  const { data, error } = await supabase
+    .from("public_library_items")
+    .insert({ ...toDb(PUBLIC_LIBRARY_FIELDS, { nome, categoria, duracaoPadrao, descricao, diagramas, authorLabel }), user_id: userId })
+    .select()
+    .single();
+  if (error) throw error;
+  return fromDb(PUBLIC_LIBRARY_FIELDS, data);
+}
+
+async function unpublishLibraryItem(id) {
+  const { error } = await supabase.from("public_library_items").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ---------------- Definições (logótipo, equipa ativa) ----------------
 
 async function getSettings() {
@@ -215,14 +249,15 @@ async function saveSettings(patch) {
 // ---------------- Carregar tudo de uma vez / importar cópia de segurança ----------------
 
 async function loadAll() {
-  const [teams, players, sessions, library, settings] = await Promise.all([
+  const [teams, players, sessions, library, publicLibrary, settings] = await Promise.all([
     listTeams(),
     listPlayers(),
     listSessions(),
     listLibrary(),
+    listPublicLibrary(),
     getSettings(),
   ]);
-  return { teams, players, sessions, library, ...settings };
+  return { teams, players, sessions, library, publicLibrary, ...settings };
 }
 
 // Substitui TODOS os dados do utilizador pelos de uma cópia de segurança importada.
@@ -284,6 +319,9 @@ export {
   createLibraryItem,
   updateLibraryItem,
   deleteLibraryItem,
+  listPublicLibrary,
+  publishLibraryItem,
+  unpublishLibraryItem,
   getSettings,
   saveSettings,
 };

@@ -150,6 +150,33 @@ create policy "utilizadores apagam da sua biblioteca"
   on library_items for delete using (auth.uid() = user_id);
 
 -- ============================================================
+-- BIBLIOTECA PÚBLICA (exercícios partilhados entre treinadores)
+-- Cada linha é uma cópia independente de um exercício, publicada por um
+-- treinador a partir da sua biblioteca privada. Visível a todos os
+-- utilizadores com sessão iniciada; só o autor pode apagar a sua publicação.
+-- ============================================================
+create table if not exists public_library_items (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  author_label text default '',
+  nome text not null default '',
+  categoria text default '',
+  duracao_padrao text default '',
+  descricao text default '',
+  diagramas jsonb not null default '[]',
+  created_at timestamptz not null default now()
+);
+
+alter table public_library_items enable row level security;
+
+create policy "utilizadores com sessão iniciada veem a biblioteca pública"
+  on public_library_items for select using (auth.role() = 'authenticated');
+create policy "utilizadores publicam os seus próprios exercícios"
+  on public_library_items for insert with check (auth.uid() = user_id);
+create policy "utilizadores apagam o que publicaram"
+  on public_library_items for delete using (auth.uid() = user_id);
+
+-- ============================================================
 -- DEFINIÇÕES DA APP (logótipo do clube, equipa ativa)
 -- Uma linha por utilizador.
 -- ============================================================

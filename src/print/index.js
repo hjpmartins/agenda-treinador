@@ -1,4 +1,4 @@
-import { FULL_VB, HALF_VB, ESTATISTICAS_CAMPOS, getTipoTeste, habilidadeGroups } from "../data";
+import { FULL_VB, HALF_VB, ESTATISTICAS_CAMPOS, estatisticaNumero, somaEstatistica, getTipoTeste, habilidadeGroups } from "../data";
 import { escapeHtml, formatDateFull, formatDateShortYear, wavyCurvedPathD, defaultControlPoint, arrowHead, calcPresenca, playerChartData } from "../utils";
 
 function svgHalfMarkingsStr(flipY, w, h) {
@@ -210,14 +210,14 @@ function buildJogoPrintContent(jogo, players, clubLogo) {
 
   const estatisticas = jogo.estatisticas || {};
   const estatisticasRows = (players || [])
-    .filter((p) => estatisticas[p.id] && ESTATISTICAS_CAMPOS.some((c) => estatisticas[p.id][c.key]))
+    .filter((p) => estatisticas[p.id] && ESTATISTICAS_CAMPOS.some((c) => estatisticaNumero(c, estatisticas[p.id]) > 0))
     .map((p) => {
       const stats = estatisticas[p.id] || {};
-      return `<tr><td>${escapeHtml(p.numero || "")}</td><td>${escapeHtml(p.nome)}</td>${ESTATISTICAS_CAMPOS.map((c) => `<td style="text-align:center;">${escapeHtml(stats[c.key] || "0")}</td>`).join("")}</tr>`;
+      return `<tr><td>${escapeHtml(p.numero || "")}</td><td>${escapeHtml(p.nome)}</td>${ESTATISTICAS_CAMPOS.map((c) => `<td style="text-align:center;">${escapeHtml(somaEstatistica(c, [stats]))}</td>`).join("")}</tr>`;
     })
     .join("");
   const totaisEstatisticas = ESTATISTICAS_CAMPOS.map((c) => {
-    const total = (players || []).reduce((sum, p) => sum + (Number((estatisticas[p.id] || {})[c.key]) || 0), 0);
+    const total = somaEstatistica(c, (players || []).map((p) => estatisticas[p.id] || {}));
     return `<td style="text-align:center;font-weight:700;">${total}</td>`;
   }).join("");
 
@@ -403,15 +403,15 @@ function buildPlayerPrintContent(player, sessions, clubLogo) {
     .sort((a, b) => (a.data < b.data ? -1 : 1));
   ESTATISTICAS_CAMPOS.forEach((c) => {
     const pontos = jogosComEstatisticas
-      .filter((s) => s.estatisticas[player.id][c.key] !== "" && s.estatisticas[player.id][c.key] != null)
-      .map((s) => ({ dataLabel: formatDateShortYear(s.date), valor: Number(s.estatisticas[player.id][c.key]) }));
+      .filter((s) => c.madeKey || (s.estatisticas[player.id][c.key] !== "" && s.estatisticas[player.id][c.key] != null))
+      .map((s) => ({ dataLabel: formatDateShortYear(s.date), valor: estatisticaNumero(c, s.estatisticas[player.id]) }));
     if (pontos.length >= 2) chartsHtml.push({ titulo: c.nome, svg: svgLineChartString(pontos, { unit: "" }) });
   });
 
   const estatisticasJogoTableRows = jogosComEstatisticas
     .map((s) => {
       const stats = s.estatisticas[player.id];
-      return `<tr><td>${formatDateFull(s.date)}</td><td>vs ${escapeHtml(s.adversario || "?")}</td>${ESTATISTICAS_CAMPOS.map((c) => `<td style="text-align:center;">${escapeHtml(stats[c.key] || "0")}</td>`).join("")}</tr>`;
+      return `<tr><td>${formatDateFull(s.date)}</td><td>vs ${escapeHtml(s.adversario || "?")}</td>${ESTATISTICAS_CAMPOS.map((c) => `<td style="text-align:center;">${escapeHtml(somaEstatistica(c, [stats]))}</td>`).join("")}</tr>`;
     })
     .join("");
   const estatisticasJogoTableHtml = estatisticasJogoTableRows
@@ -564,41 +564,39 @@ function buildSeasonReportContent(team, players, sessions, library, clubLogo) {
     .join("");
 
   // Estatísticas gerais da equipa (somas e médias por jogo, agregando todas as jogadoras)
-  const totaisEquipa = {};
-  ESTATISTICAS_CAMPOS.forEach((c) => (totaisEquipa[c.key] = 0));
   let jogosComDados = 0;
-  const totalPorJogador = {};
+  const statsEquipa = []; // todos os registos de estatísticas de todas as jogadoras em todos os jogos
+  const statsPorJogador = {}; // playerId -> lista de registos (um por jogo)
   jogos.forEach((j) => {
     const estat = j.estatisticas || {};
     if (Object.keys(estat).length === 0) return;
     jogosComDados += 1;
     Object.entries(estat).forEach(([playerId, stats]) => {
-      ESTATISTICAS_CAMPOS.forEach((c) => {
-        const v = Number(stats[c.key]) || 0;
-        totaisEquipa[c.key] += v;
-        totalPorJogador[playerId] = totalPorJogador[playerId] || {};
-        totalPorJogador[playerId][c.key] = (totalPorJogador[playerId][c.key] || 0) + v;
-      });
+      statsEquipa.push(stats);
+      statsPorJogador[playerId] = statsPorJogador[playerId] || [];
+      statsPorJogador[playerId].push(stats);
     });
   });
+  const somaNumero = (campo, statsList) => statsList.reduce((sum, s) => sum + estatisticaNumero(campo, s), 0);
+  const pontosCampo = ESTATISTICAS_CAMPOS.find((c) => c.key === "pontos");
 
   const estatisticasCardsHtml = ESTATISTICAS_CAMPOS.map((c) => {
-    const total = totaisEquipa[c.key];
-    const media = jogosComDados ? (total / jogosComDados).toFixed(1) : "0";
+    const total = somaEstatistica(c, statsEquipa);
+    const media = jogosComDados ? (somaNumero(c, statsEquipa) / jogosComDados).toFixed(1) : "0";
     return `<div class="stat-card"><div class="num">${total}</div><div class="lbl">${escapeHtml(c.nome)} · ${media}/jogo</div></div>`;
   }).join("");
 
   const statsPorJogadorRows = players
     .map((p) => {
-      const tot = totalPorJogador[p.id];
-      if (!tot) return null;
-      const jogosJogados = jogos.filter((j) => j.estatisticas && j.estatisticas[p.id]).length;
+      const statsList = statsPorJogador[p.id];
+      if (!statsList) return null;
+      const jogosJogados = statsList.length;
       const cells = ESTATISTICAS_CAMPOS.map((c) => {
-        const total = tot[c.key] || 0;
-        const media = jogosJogados ? (total / jogosJogados).toFixed(1) : "0";
+        const total = somaEstatistica(c, statsList);
+        const media = jogosJogados ? (somaNumero(c, statsList) / jogosJogados).toFixed(1) : "0";
         return `<td style="text-align:center;">${total} <span style="color:#999;font-size:11px;">(${media})</span></td>`;
       }).join("");
-      return { pontos: tot.pontos || 0, html: `<tr><td>${escapeHtml(p.nome)}</td><td style="text-align:center;">${jogosJogados}</td>${cells}</tr>` };
+      return { pontos: somaNumero(pontosCampo, statsList), html: `<tr><td>${escapeHtml(p.nome)}</td><td style="text-align:center;">${jogosJogados}</td>${cells}</tr>` };
     })
     .filter(Boolean)
     .sort((a, b) => b.pontos - a.pontos)

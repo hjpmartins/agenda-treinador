@@ -149,16 +149,44 @@ const emptyJogo = {
   apreciacaoGeral: "",
   estatisticas: {}, // { playerId: { pontos, ressaltosOfensivos, ressaltosDefensivos, assistencias, roubos, bloqueios, faltas, perdas, lancamentos2Convertidos, ... } }
 };
+// Campos "de lançamento" (com madeKey/missKey) guardam convertidos e falhados
+// em duas chaves separadas e são apresentados como fração "convertidos/tentados"
+// — ver estatisticaNumero/somaEstatistica mais abaixo. Os restantes campos
+// guardam um único número em "key".
 const ESTATISTICAS_CAMPOS = [
   { key: "pontos", label: "Pts", nome: "Pontos" },
+  { key: "lancamentos2", label: "2PT", nome: "Lançamentos de 2 (convertidos/tentados)", madeKey: "lancamentos2Convertidos", missKey: "lancamentos2Falhados" },
+  { key: "lancamentos3", label: "3PT", nome: "Lançamentos de 3 (convertidos/tentados)", madeKey: "lancamentos3Convertidos", missKey: "lancamentos3Falhados" },
+  { key: "lancesLivres", label: "LL", nome: "Lances livres (convertidos/tentados)", madeKey: "lancesLivresConvertidos", missKey: "lancesLivresFalhados" },
   { key: "ressaltosOfensivos", label: "RO", nome: "Ressaltos ofensivos" },
   { key: "ressaltosDefensivos", label: "RD", nome: "Ressaltos defensivos" },
   { key: "assistencias", label: "Ass", nome: "Assistências" },
   { key: "roubos", label: "Rou", nome: "Roubos de bola" },
   { key: "perdas", label: "PdB", nome: "Perdas de bola" },
-  { key: "bloqueios", label: "Blq", nome: "Bloqueios" },
+  { key: "bloqueios", label: "BLK", nome: "Block" },
   { key: "faltas", label: "Flt", nome: "Faltas cometidas" },
 ];
+// Devolve o número relevante de um campo de estatística para um único registo
+// — nos campos de lançamento é o nº de convertidos, nos restantes é o valor
+// guardado. Usado para gráficos de evolução e para médias por jogo.
+function estatisticaNumero(campo, stats) {
+  if (!stats) return 0;
+  if (campo.madeKey) return Number(stats[campo.madeKey]) || 0;
+  return Number(stats[campo.key]) || 0;
+}
+// Soma um campo de estatística ao longo de vários registos (jogadoras ou
+// jogos) e devolve já formatado para apresentação — fração
+// "convertidos/tentados" nos campos de lançamento, número simples nos
+// restantes.
+function somaEstatistica(campo, statsList) {
+  if (campo.madeKey) {
+    const made = statsList.reduce((sum, s) => sum + (Number((s || {})[campo.madeKey]) || 0), 0);
+    const missed = statsList.reduce((sum, s) => sum + (Number((s || {})[campo.missKey]) || 0), 0);
+    return `${made}/${made + missed}`;
+  }
+  const total = statsList.reduce((sum, s) => sum + (Number((s || {})[campo.key]) || 0), 0);
+  return String(total);
+}
 // Tipos de lançamento no ecrã de estatísticas ao vivo — cada um regista um par
 // de contadores (convertidos/falhados); "pontos" soma automaticamente quando
 // se marca um lançamento convertido.
@@ -174,7 +202,7 @@ const LIVE_STAT_BUTTONS = [
   { key: "ressaltosDefensivos", delta: 1, label: "Res. Def." },
   { key: "assistencias", delta: 1, label: "Assist." },
   { key: "roubos", delta: 1, label: "Roubo" },
-  { key: "bloqueios", delta: 1, label: "Bloqueio" },
+  { key: "bloqueios", delta: 1, label: "Block" },
   { key: "faltas", delta: 1, label: "Falta" },
   { key: "perdas", delta: 1, label: "Perda" },
 ];
@@ -224,6 +252,8 @@ export {
   emptySession,
   emptyJogo,
   ESTATISTICAS_CAMPOS,
+  estatisticaNumero,
+  somaEstatistica,
   LIVE_SHOT_TYPES,
   LIVE_STAT_BUTTONS,
   emptyLibraryItem,

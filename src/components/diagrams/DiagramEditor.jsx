@@ -214,7 +214,7 @@ function DiagramEditor({ initial, onClose, onSave }) {
   };
 
   const playAnimation = () => {
-    const hasMovement = diagram.arrows.some((a) => a.tokenId && a.type !== "bloqueio");
+    const hasMovement = diagram.arrows.some((a) => a.tokenId && a.to);
     if (!hasMovement) return;
     setIsPlaying(true);
     const duration = 1400;
@@ -251,12 +251,14 @@ function DiagramEditor({ initial, onClose, onSave }) {
           <Trash2 size={13} className="inline -mt-0.5 mr-1" /> Apagar selecionado
         </button>
         <div className="w-px h-6 bg-[#2E3644]" />
-        <button onClick={undo} disabled={!canUndo} title="Desfazer (Ctrl+Z)" className="text-xs px-2 py-1.5 rounded border border-[#2E3644] hover:border-[#5A6272] disabled:opacity-30">
-          <Undo2 size={14} />
-        </button>
-        <button onClick={redo} disabled={!canRedo} title="Refazer (Ctrl+Y)" className="text-xs px-2 py-1.5 rounded border border-[#2E3644] hover:border-[#5A6272] disabled:opacity-30">
-          <Redo2 size={14} />
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={undo} disabled={!canUndo} title="Desfazer (Ctrl+Z)" className="text-xs px-2 py-1.5 rounded border border-[#2E3644] hover:border-[#5A6272] disabled:opacity-30">
+            <Undo2 size={14} />
+          </button>
+          <button onClick={redo} disabled={!canRedo} title="Refazer (Ctrl+Y)" className="text-xs px-2 py-1.5 rounded border border-[#2E3644] hover:border-[#5A6272] disabled:opacity-30">
+            <Redo2 size={14} />
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 mb-3">
@@ -274,56 +276,58 @@ function DiagramEditor({ initial, onClose, onSave }) {
             Arrasta para desenhar · segura <b className="text-[#F2EDE3]">Shift</b> para linha reta
             {mode === "passe" && <> · <b className="text-[#F2EDE3]">Passe</b> não desloca o jogador, só a bola — usa Corte para o movimento do passador</>}
             {mode === "lancamento" && <> · <b className="text-[#F2EDE3]">Lançamento</b> desloca só a bola, terminando no alvo (ex: o cesto)</>}
-            {mode === "bloqueio" && <> · o traço fica orientado na direção que arrastares</>}
+            {mode === "bloqueio" && <> · o traço fica orientado na direção que arrastares, e ao reproduzir o jogador desloca-se até ao fim da linha e para lá</>}
             {CURVABLE_TYPES.has(mode) && <> · depois de desenhada, seleciona-a em <b className="text-[#F2EDE3]">Mover</b> e arrasta o ponto do meio para curvar</>}
           </span>
         )}
       </div>
 
-      <div
-        ref={wrapRef}
-        className="bg-[#0F1319] rounded-lg overflow-hidden touch-none"
-        style={{ aspectRatio: `${vb.w} / ${vb.h}`, maxHeight: "50vh" }}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchMove={handleMouseMove}
-        onTouchEnd={handleMouseUp}
-        onTouchCancel={handleMouseUp}
-      >
-        <svg viewBox={`0 0 ${vb.w} ${vb.h}`} className="w-full h-full select-none" onMouseDown={startFromCanvas} onTouchStart={startFromCanvas}>
-          <CourtBackground court={diagram.court} vb={vb} />
-          {diagram.arrows.map((a) => {
-            const onSelect = (e) => { e.stopPropagation(); if (mode === "mover") setSelectedId(a.id); };
-            const isSelectedCurvable = mode === "mover" && selectedId === a.id && CURVABLE_TYPES.has(a.type);
-            const control = isSelectedCurvable ? a.control || defaultControlPoint(a.type, a.from, a.to) : null;
-            return (
-              <g key={a.id}>
-                <ArrowShape arrow={a} selected={selectedId === a.id} onMouseDown={onSelect} />
-                {isSelectedCurvable && (
-                  <circle
-                    cx={control.x}
-                    cy={control.y}
-                    r="6"
-                    fill="#EA5B13"
-                    stroke="#F2EDE3"
-                    strokeWidth="1.5"
-                    style={{ cursor: "grab" }}
-                    onMouseDown={(e) => startControlDrag(e, a.id)}
-                    onTouchStart={(e) => startControlDrag(e, a.id)}
-                  />
-                )}
-              </g>
-            );
-          })}
-          {drawing && (
-            <ArrowShape arrow={{ type: drawing.type, from: drawing.from, to: drawing.to }} selected={false} />
-          )}
-          {diagram.tokens.map((t) => {
-            const pos = (animPositions && animPositions[t.id]) || t;
-            return <TokenShape key={t.id} token={pos} selected={selectedId === t.id} onMouseDown={(e) => startFromToken(e, t.id)} />;
-          })}
-        </svg>
+      <div className="flex justify-center">
+        <div
+          ref={wrapRef}
+          className="bg-[#0F1319] rounded-lg overflow-hidden touch-none"
+          style={{ aspectRatio: `${vb.w} / ${vb.h}`, maxHeight: diagram.court === "campo" ? "70vh" : "50vh", maxWidth: "100%" }}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onTouchMove={handleMouseMove}
+          onTouchEnd={handleMouseUp}
+          onTouchCancel={handleMouseUp}
+        >
+          <svg viewBox={`0 0 ${vb.w} ${vb.h}`} className="w-full h-full select-none" onMouseDown={startFromCanvas} onTouchStart={startFromCanvas}>
+            <CourtBackground court={diagram.court} vb={vb} />
+            {diagram.arrows.map((a) => {
+              const onSelect = (e) => { e.stopPropagation(); if (mode === "mover") setSelectedId(a.id); };
+              const isSelectedCurvable = mode === "mover" && selectedId === a.id && CURVABLE_TYPES.has(a.type);
+              const control = isSelectedCurvable ? a.control || defaultControlPoint(a.type, a.from, a.to) : null;
+              return (
+                <g key={a.id}>
+                  <ArrowShape arrow={a} selected={selectedId === a.id} onMouseDown={onSelect} />
+                  {isSelectedCurvable && (
+                    <circle
+                      cx={control.x}
+                      cy={control.y}
+                      r="6"
+                      fill="#EA5B13"
+                      stroke="#F2EDE3"
+                      strokeWidth="1.5"
+                      style={{ cursor: "grab" }}
+                      onMouseDown={(e) => startControlDrag(e, a.id)}
+                      onTouchStart={(e) => startControlDrag(e, a.id)}
+                    />
+                  )}
+                </g>
+              );
+            })}
+            {drawing && (
+              <ArrowShape arrow={{ type: drawing.type, from: drawing.from, to: drawing.to }} selected={false} />
+            )}
+            {diagram.tokens.map((t) => {
+              const pos = (animPositions && animPositions[t.id]) || t;
+              return <TokenShape key={t.id} token={pos} selected={selectedId === t.id} onMouseDown={(e) => startFromToken(e, t.id)} />;
+            })}
+          </svg>
+        </div>
       </div>
 
       <div className="flex items-center justify-between mt-3 flex-wrap gap-2">

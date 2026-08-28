@@ -22,24 +22,35 @@ function normalizeJogo(s) {
 function emptyDiagram(court = "meio") {
   return { court, tokens: [], arrows: [] };
 }
+// Posição ao longo de uma seta num instante t (0..1): segue a curva Bezier
+// quadrática (from, control, to) quando há um ponto de controlo definido,
+// ou uma linha reta caso contrário.
+function positionOnArrow(a, t) {
+  if (a.control) {
+    const mt = 1 - t;
+    return {
+      x: mt * mt * a.from.x + 2 * mt * t * a.control.x + t * t * a.to.x,
+      y: mt * mt * a.from.y + 2 * mt * t * a.control.y + t * t * a.to.y,
+    };
+  }
+  return { x: a.from.x + (a.to.x - a.from.x) * t, y: a.from.y + (a.to.y - a.from.y) * t };
+}
+
 function computeAnimatedPositions(diagram, t) {
   const overrides = {};
   diagram.arrows.forEach((a) => {
-    if (!a.tokenId || a.type === "bloqueio") return;
+    // Bloqueios antigos (ponto único, sem tokenId) ficam de fora — não há para onde mover.
+    if (!a.tokenId || !a.to) return;
     const token = diagram.tokens.find((tk) => tk.id === a.tokenId);
     if (!token) return;
     if ((a.type === "passe" || a.type === "lancamento") && token.type !== "ball") return;
-    overrides[a.tokenId] = { ...token, x: a.from.x + (a.to.x - a.from.x) * t, y: a.from.y + (a.to.y - a.from.y) * t };
+    overrides[a.tokenId] = { ...token, ...positionOnArrow(a, t) };
   });
   const dribbleArrow = diagram.arrows.find((a) => a.type === "drible" && a.tokenId);
   if (dribbleArrow) {
     const ball = diagram.tokens.find((tk) => tk.type === "ball");
     if (ball) {
-      overrides[ball.id] = {
-        ...ball,
-        x: dribbleArrow.from.x + (dribbleArrow.to.x - dribbleArrow.from.x) * t,
-        y: dribbleArrow.from.y + (dribbleArrow.to.y - dribbleArrow.from.y) * t,
-      };
+      overrides[ball.id] = { ...ball, ...positionOnArrow(dribbleArrow, t) };
     }
   }
   return overrides;

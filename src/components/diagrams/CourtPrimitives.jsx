@@ -1,5 +1,5 @@
 import { HALF_VB, FULL_VB } from "../../data";
-import { wavyPathD, arrowHead } from "../../utils";
+import { wavyPathD, arcPathD, arrowHead } from "../../utils";
 
 function HalfMarkings({ flipY = false, w = HALF_VB.w, h = HALF_VB.h }) {
   // Drawn for a court with baseline at bottom (y = h-10), hoop area near baseline, centered on w/2.
@@ -66,6 +66,13 @@ function TokenShape({ token, onMouseDown, selected }) {
       </g>
     );
   }
+  if (type === "cone") {
+    return (
+      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} style={{ cursor: "grab" }}>
+        <path d="M 0 -9 L 8 8 L -8 8 Z" fill="#F2C744" stroke={selected ? "#F2EDE3" : "#14181F"} strokeWidth={selected ? 2 : 1} strokeLinejoin="round" />
+      </g>
+    );
+  }
   const isDef = type === "defense";
   return (
     <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} style={{ cursor: "grab" }}>
@@ -88,13 +95,22 @@ function ArrowShape({ arrow, onMouseDown, selected }) {
     );
   }
   const { from, to } = arrow;
+  const isShot = arrow.type === "lancamento";
   let d;
   if (arrow.type === "drible") d = wavyPathD(from.x, from.y, to.x, to.y);
+  else if (isShot) d = arcPathD(from.x, from.y, to.x, to.y);
   else d = `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
   return (
     <g onMouseDown={onMouseDown} style={{ cursor: "pointer" }}>
-      <path d={d} stroke={color} strokeWidth="2" fill="none" strokeDasharray={arrow.type === "passe" ? "6 4" : "none"} />
-      <path d={arrowHead(from.x, from.y, to.x, to.y)} stroke={color} strokeWidth="2" fill="none" />
+      <path d={d} stroke={color} strokeWidth="2" fill="none" strokeDasharray={arrow.type === "passe" || isShot ? "6 4" : "none"} />
+      {isShot ? (
+        <g transform={`translate(${to.x} ${to.y})`}>
+          <circle r="6" fill="none" stroke={color} strokeWidth="2" />
+          <circle r="2" fill={color} />
+        </g>
+      ) : (
+        <path d={arrowHead(from.x, from.y, to.x, to.y)} stroke={color} strokeWidth="2" fill="none" />
+      )}
     </g>
   );
 }

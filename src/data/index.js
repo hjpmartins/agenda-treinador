@@ -163,6 +163,7 @@ const ARROW_TYPES = [
   { id: "drible", label: "Drible", desc: "linha ondulada" },
   { id: "corte", label: "Corte", desc: "linha contínua" },
   { id: "bloqueio", label: "Bloqueio", desc: "clique único" },
+  { id: "lancamento", label: "Lançamento", desc: "arco pontilhado até ao alvo" },
 ];
 const HALF_VB = { w: 300, h: 320 };
 const FULL_VB = { w: 300, h: 560 };

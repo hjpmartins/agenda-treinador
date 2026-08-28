@@ -1,5 +1,5 @@
 import { FULL_VB, HALF_VB, ESTATISTICAS_CAMPOS, getTipoTeste, habilidadeGroups } from "../data";
-import { escapeHtml, formatDateFull, formatDateShortYear, wavyPathD, arrowHead, calcPresenca, playerChartData } from "../utils";
+import { escapeHtml, formatDateFull, formatDateShortYear, wavyPathD, arcPathD, arrowHead, calcPresenca, playerChartData } from "../utils";
 
 function svgHalfMarkingsStr(flipY, w, h) {
   const cx = w / 2;
@@ -33,6 +33,9 @@ function svgTokenStr(token) {
   if (type === "ball") {
     return `<g transform="translate(${x} ${y})"><circle r="7" fill="#EA5B13"/><path d="M -5 0 L 5 0 M 0 -5 L 0 5" stroke="#14181F" stroke-width="1"/></g>`;
   }
+  if (type === "cone") {
+    return `<g transform="translate(${x} ${y})"><path d="M 0 -9 L 8 8 L -8 8 Z" fill="#E0A800" stroke="#14181F" stroke-width="1" stroke-linejoin="round"/></g>`;
+  }
   const isDef = type === "defense";
   return `<g transform="translate(${x} ${y})">
     <circle r="12" fill="${isDef ? "transparent" : "#EA5B13"}" stroke="${isDef ? "#D64545" : "#14181F"}" stroke-width="${isDef ? 2.5 : 1.5}" ${isDef ? 'stroke-dasharray="3 2"' : ""}/>
@@ -47,9 +50,16 @@ function svgArrowStr(arrow) {
     return `<g transform="translate(${x} ${y})"><line x1="-9" y1="0" x2="9" y2="0" stroke="${color}" stroke-width="4"/></g>`;
   }
   const { from, to } = arrow;
-  const d = arrow.type === "drible" ? wavyPathD(from.x, from.y, to.x, to.y) : `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
-  const dash = arrow.type === "passe" ? 'stroke-dasharray="6 4"' : "";
-  return `<path d="${d}" stroke="${color}" stroke-width="2" fill="none" ${dash}/><path d="${arrowHead(from.x, from.y, to.x, to.y)}" stroke="${color}" stroke-width="2" fill="none"/>`;
+  const isShot = arrow.type === "lancamento";
+  let d;
+  if (arrow.type === "drible") d = wavyPathD(from.x, from.y, to.x, to.y);
+  else if (isShot) d = arcPathD(from.x, from.y, to.x, to.y);
+  else d = `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+  const dash = arrow.type === "passe" || isShot ? 'stroke-dasharray="6 4"' : "";
+  const tip = isShot
+    ? `<circle cx="${to.x}" cy="${to.y}" r="6" fill="none" stroke="${color}" stroke-width="2"/><circle cx="${to.x}" cy="${to.y}" r="2" fill="${color}"/>`
+    : `<path d="${arrowHead(from.x, from.y, to.x, to.y)}" stroke="${color}" stroke-width="2" fill="none"/>`;
+  return `<path d="${d}" stroke="${color}" stroke-width="2" fill="none" ${dash}/>${tip}`;
 }
 
 function diagramToSvgString(diagram, width = 150) {

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Play, RotateCcw, X, Plus } from "lucide-react";
+import { Play, RotateCcw, X, Plus, Copy } from "lucide-react";
 import { HALF_VB, FULL_VB } from "../../data";
 import { computeAnimatedPositions, resolveFinalDiagram, emptyDiagram } from "../../utils";
 import { Modal } from "../common/Modal";
@@ -112,6 +112,18 @@ function DiagramStepsRow({ diagramas, onChange }) {
     onChange(steps.filter((_, idx) => idx !== i));
   };
 
+  // Insere uma cópia do passo i logo a seguir a ele, para o treinador variar
+  // só uma parte da jogada sem ter de a redesenhar do zero.
+  const duplicateStep = (i, e) => {
+    e.stopPropagation();
+    const copy = {
+      court: steps[i].court,
+      tokens: steps[i].tokens.map((t) => ({ ...t })),
+      arrows: steps[i].arrows.map((a) => ({ ...a })),
+    };
+    onChange([...steps.slice(0, i + 1), copy, ...steps.slice(i + 1)]);
+  };
+
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {steps.map((d, i) => (
@@ -128,6 +140,13 @@ function DiagramStepsRow({ diagramas, onChange }) {
             className="absolute -top-1.5 -right-1.5 bg-[#D64545] text-white rounded-full w-4 h-4 hidden group-hover/step:flex items-center justify-center"
           >
             <X size={10} />
+          </span>
+          <span
+            onClick={(e) => duplicateStep(i, e)}
+            title="Duplicar este passo"
+            className="absolute -bottom-1.5 -right-1.5 bg-[#2E3644] border border-[#5A6272] text-[#F2EDE3] rounded-full w-4 h-4 hidden group-hover/step:flex items-center justify-center"
+          >
+            <Copy size={9} />
           </span>
         </button>
       ))}

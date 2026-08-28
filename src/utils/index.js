@@ -28,7 +28,7 @@ function computeAnimatedPositions(diagram, t) {
     if (!a.tokenId || a.type === "bloqueio") return;
     const token = diagram.tokens.find((tk) => tk.id === a.tokenId);
     if (!token) return;
-    if (a.type === "passe" && token.type !== "ball") return;
+    if ((a.type === "passe" || a.type === "lancamento") && token.type !== "ball") return;
     overrides[a.tokenId] = { ...token, x: a.from.x + (a.to.x - a.from.x) * t, y: a.from.y + (a.to.y - a.from.y) * t };
   });
   const dribbleArrow = diagram.arrows.find((a) => a.type === "drible" && a.tokenId);
@@ -103,6 +103,19 @@ function wavyPathD(x1, y1, x2, y2, amplitude = 5, segments = 8) {
     d += ` L ${px + nx * off} ${py + ny * off}`;
   }
   return d;
+}
+// Curva em arco (trajetória de lançamento) entre dois pontos.
+function arcPathD(x1, y1, x2, y2, height = 30) {
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+  const cx = mx + nx * height;
+  const cy = my + ny * height;
+  return `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
 }
 function arrowHead(x1, y1, x2, y2, size = 7) {
   const angle = Math.atan2(y2 - y1, x2 - x1);
@@ -234,6 +247,7 @@ export {
   normalizePlayer,
   distPt,
   wavyPathD,
+  arcPathD,
   arrowHead,
   uid,
   computeTemporadaAtual,

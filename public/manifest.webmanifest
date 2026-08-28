@@ -1,0 +1,17 @@
+{
+  "name": "Agenda do Treinador",
+  "short_name": "Agenda",
+  "description": "Gestão de equipas de basquetebol — jogadores, treinos, jogos e biblioteca de exercícios.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#14181F",
+  "theme_color": "#14181F",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

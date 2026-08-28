@@ -2,7 +2,9 @@
 
 App de gestão de equipas de basquetebol (jogadores, treinos, jogos, biblioteca de exercícios, diagramas de campo e sugestões de treino com IA).
 
-**Publicada em:** https://agenda-treinador-3fmbzkm7k-hjpm.vercel.app
+**Publicada em:** https://agenda-treinador-murex.vercel.app
+
+> Usa sempre este link (o domínio de produção do projeto). Os links com um código aleatório no meio (ex: `agenda-treinador-xxxxx-hjpm.vercel.app`) apontam para um deploy específico e fixo no tempo — nunca atualizam sozinhos.
 
 ## Estado atual
 

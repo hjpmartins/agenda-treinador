@@ -87,10 +87,19 @@ function TokenShape({ token, onMouseDown, selected }) {
 function ArrowShape({ arrow, onMouseDown, selected }) {
   const color = selected ? "#F2EDE3" : "#C7CDD8";
   if (arrow.type === "bloqueio") {
-    const { x, y } = arrow.at;
+    // Compatibilidade com bloqueios antigos (ponto único, sempre na horizontal).
+    if (arrow.at) {
+      const { x, y } = arrow.at;
+      return (
+        <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} style={{ cursor: "pointer" }}>
+          <line x1="-9" y1="0" x2="9" y2="0" stroke={color} strokeWidth="4" />
+        </g>
+      );
+    }
+    const { from, to } = arrow;
     return (
-      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} style={{ cursor: "pointer" }}>
-        <line x1="-9" y1="0" x2="9" y2="0" stroke={color} strokeWidth="4" />
+      <g onMouseDown={onMouseDown} style={{ cursor: "pointer" }}>
+        <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke={color} strokeWidth="4" strokeLinecap="round" />
       </g>
     );
   }

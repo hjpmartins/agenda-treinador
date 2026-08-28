@@ -113,7 +113,7 @@ function DiagramEditor({ initial, onClose, onSave }) {
     setSelectedId(null);
   };
 
-  // ---- Pointer down: start dragging a token, start drawing an arrow, or place a bloqueio ----
+  // ---- Pointer down: start dragging a token, or start drawing an arrow (bloqueio incluído) ----
   const startFromToken = (e, tokenId) => {
     e.stopPropagation();
     const token = diagram.tokens.find((t) => t.id === tokenId);
@@ -121,8 +121,6 @@ function DiagramEditor({ initial, onClose, onSave }) {
       commit((d) => d); // ponto de partida no histórico, antes do arrasto começar
       setDragId(tokenId);
       setSelectedId(tokenId);
-    } else if (mode === "bloqueio") {
-      // bloqueio placed on empty canvas only
     } else {
       setDrawing({ type: mode, from: { x: token.x, y: token.y, tokenId: token.id }, to: { x: token.x, y: token.y, tokenId: null } });
     }
@@ -132,10 +130,6 @@ function DiagramEditor({ initial, onClose, onSave }) {
     const pt = getPoint(e);
     if (mode === "mover") {
       setSelectedId(null);
-      return;
-    }
-    if (mode === "bloqueio") {
-      commit((d) => ({ ...d, arrows: [...d.arrows, { id: uid(), type: "bloqueio", at: pt }] }));
       return;
     }
     setDrawing({ type: mode, from: { ...pt, tokenId: null }, to: { ...pt, tokenId: null } });
@@ -239,11 +233,12 @@ function DiagramEditor({ initial, onClose, onSave }) {
             {a.label}
           </button>
         ))}
-        {mode !== "mover" && mode !== "bloqueio" && (
+        {mode !== "mover" && (
           <span className="text-[11px] text-[#8A93A3] ml-1">
             Arrasta para desenhar · segura <b className="text-[#F2EDE3]">Shift</b> para linha reta
             {mode === "passe" && <> · <b className="text-[#F2EDE3]">Passe</b> não desloca o jogador, só a bola — usa Corte para o movimento do passador</>}
             {mode === "lancamento" && <> · <b className="text-[#F2EDE3]">Lançamento</b> desloca só a bola, terminando no alvo (ex: o cesto)</>}
+            {mode === "bloqueio" && <> · o traço fica orientado na direção que arrastares</>}
           </span>
         )}
       </div>
@@ -262,7 +257,7 @@ function DiagramEditor({ initial, onClose, onSave }) {
             <ArrowShape key={a.id} arrow={a} selected={selectedId === a.id} onMouseDown={(e) => { e.stopPropagation(); if (mode === "mover") setSelectedId(a.id); }} />
           ))}
           {drawing && (
-            <ArrowShape arrow={{ type: drawing.type, from: drawing.from, to: drawing.to, at: drawing.to }} selected={false} />
+            <ArrowShape arrow={{ type: drawing.type, from: drawing.from, to: drawing.to }} selected={false} />
           )}
           {diagram.tokens.map((t) => {
             const pos = (animPositions && animPositions[t.id]) || t;

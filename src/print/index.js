@@ -46,8 +46,13 @@ function svgTokenStr(token) {
 function svgArrowStr(arrow) {
   const color = "#555";
   if (arrow.type === "bloqueio") {
-    const { x, y } = arrow.at;
-    return `<g transform="translate(${x} ${y})"><line x1="-9" y1="0" x2="9" y2="0" stroke="${color}" stroke-width="4"/></g>`;
+    // Compatibilidade com bloqueios antigos (ponto único, sempre na horizontal).
+    if (arrow.at) {
+      const { x, y } = arrow.at;
+      return `<g transform="translate(${x} ${y})"><line x1="-9" y1="0" x2="9" y2="0" stroke="${color}" stroke-width="4"/></g>`;
+    }
+    const { from, to } = arrow;
+    return `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke="${color}" stroke-width="4" stroke-linecap="round"/>`;
   }
   const { from, to } = arrow;
   const isShot = arrow.type === "lancamento";

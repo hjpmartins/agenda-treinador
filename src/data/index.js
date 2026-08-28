@@ -162,7 +162,7 @@ const ARROW_TYPES = [
   { id: "passe", label: "Passe", desc: "linha tracejada" },
   { id: "drible", label: "Drible", desc: "linha ondulada" },
   { id: "corte", label: "Corte", desc: "linha contínua" },
-  { id: "bloqueio", label: "Bloqueio", desc: "clique único" },
+  { id: "bloqueio", label: "Bloqueio", desc: "traço grosso, arrasta na direção do bloqueio" },
   { id: "lancamento", label: "Lançamento", desc: "arco pontilhado até ao alvo" },
 ];
 const HALF_VB = { w: 300, h: 320 };

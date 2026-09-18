@@ -193,13 +193,26 @@ export default function App() {
     }
   };
 
-  const saveLiveStats = async (jogo, estatisticas) => {
+  const saveLiveStats = async (jogo, estatisticas, resultado) => {
     try {
-      const updated = await db.updateSession(jogo.id, { estatisticas });
+      const patch = resultado !== undefined ? { estatisticas, resultado } : { estatisticas };
+      const updated = await db.updateSession(jogo.id, patch);
       setSessions(sessions.map((s) => (s.id === updated.id ? updated : s)));
       setLiveStatsModal(null);
     } catch (e) {
       setError(`Não foi possível guardar as estatísticas (${e.message || e}).`);
+    }
+  };
+
+  // Gravação silenciosa em segundo plano enquanto se regista ao vivo — evita
+  // perder os dados se o ecrã fechar inesperadamente (ex: gesto de "voltar
+  // atrás" no telemóvel) antes de se tocar em "Concluir".
+  const autoSaveLiveStats = async (jogo, estatisticas) => {
+    try {
+      const updated = await db.updateSession(jogo.id, { estatisticas });
+      setSessions(sessions.map((s) => (s.id === updated.id ? updated : s)));
+    } catch (e) {
+      // falha silenciosa: o utilizador continua a registar e "Concluir" tenta gravar de novo
     }
   };
 
@@ -689,7 +702,8 @@ export default function App() {
           jogo={liveStatsModal}
           players={teamPlayers}
           onClose={() => setLiveStatsModal(null)}
-          onSave={(estatisticas) => saveLiveStats(liveStatsModal, estatisticas)}
+          onSave={(estatisticas, resultado) => saveLiveStats(liveStatsModal, estatisticas, resultado)}
+          onAutoSave={(estatisticas) => autoSaveLiveStats(liveStatsModal, estatisticas)}
         />
       )}
       {importModal && (

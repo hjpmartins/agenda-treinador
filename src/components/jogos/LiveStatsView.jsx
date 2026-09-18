@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Undo2, Plus } from "lucide-react";
 import { LIVE_SHOT_TYPES, LIVE_STAT_BUTTONS } from "../../data";
 import { formatDateFull, shortName } from "../../utils";
 import { EmptyState } from "../common/Modal";
 
-function LiveStatsView({ jogo, players, onClose, onSave }) {
+// Chave "fantasma" dentro de `stats` (que normalmente é indexado por id de
+// jogadora) para guardar os pontos do adversário — nunca colide com um id
+// real e é ignorada por todo o código que lê estatísticas por jogadora.
+const OPPONENT_MARKER_ID = "_adversario";
+
+function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
   const [stats, setStats] = useState(jogo.estatisticas || {});
   const [history, setHistory] = useState([]); // pilha de { playerId, deltas: [{ key, delta }] } para desfazer
   const [onCourtIds, setOnCourtIds] = useState([]); // até 5 ids — quem está em campo agora
@@ -40,7 +45,61 @@ function LiveStatsView({ jogo, players, onClose, onSave }) {
     setStats((prev) => ({ ...prev, [playerId]: { ...(prev[playerId] || {}), minutos: value } }));
   };
 
-  const finish = () => onSave(stats);
+  const placarNos = (players || []).reduce((sum, p) => sum + (Number(stats[p.id]?.pontos) || 0), 0);
+  const placarAdversario = Number(stats[OPPONENT_MARKER_ID]?.pontos) || 0;
+
+  const finish = () => {
+    const jaTemResultado = (jogo.resultado || "").trim() !== "";
+    const resultado = !jaTemResultado && (placarNos > 0 || placarAdversario > 0) ? `${placarNos} - ${placarAdversario}` : undefined;
+    onSave(stats, resultado);
+  };
+
+  // Gravação automática em segundo plano: sempre que os dados mudam, grava
+  // (com um pequeno atraso) para não perder nada se o ecrã fechar sem se
+  // tocar em "Concluir" (ex: gesto de arrastar para trás no telemóvel).
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    if (!onAutoSave) return;
+    const timer = setTimeout(() => onAutoSave(stats), 1000);
+    return () => clearTimeout(timer);
+  }, [stats, onAutoSave]);
+
+  // No telemóvel, o gesto de arrastar o dedo para trás normalmente fecha a
+  // página inteira (não há navegação por rotas nesta app), o que fazia este
+  // ecrã "desaparecer" e perder tudo o que ainda não tinha sido gravado.
+  // Ao criar uma entrada extra no histórico, esse gesto passa a disparar
+  // "popstate" em vez de sair da app — apanhamo-lo e tratamo-lo como um
+  // "Concluir" normal (grava e fecha).
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+  useEffect(() => {
+    window.history.pushState({ liveStatsGuard: true }, "");
+    let backTriggered = false;
+    const handlePopState = () => {
+      backTriggered = true;
+      finishRef.current();
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      if (!backTriggered) window.history.back();
+    };
+  }, []);
+
+  // Aviso extra caso se tente fechar o separador ou recarregar a página
+  // enquanto o registo ao vivo está aberto.
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
   const addToCourt = (id) => {
     if (onCourtIds.includes(id) || onCourtIds.length >= 5) return;
@@ -85,6 +144,34 @@ function LiveStatsView({ jogo, players, onClose, onSave }) {
       </div>
 
       <div className="p-4 sm:p-6 max-w-2xl mx-auto">
+        <div className="mb-4 bg-[#1E242E] border border-[#2E3644] rounded-lg p-3 flex items-center gap-3">
+          <div className="flex-1 text-center">
+            <div className="text-[10px] uppercase tracking-wide text-[#8A93A3] mb-1 truncate">Nós</div>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-3xl font-bold text-[#F2EDE3] leading-none mb-1.5">
+              {placarNos}
+            </div>
+            <div className="text-[9px] text-[#5A6272] uppercase tracking-wide py-1">Soma das jogadoras</div>
+          </div>
+          <div className="text-[#5A6272] text-sm font-bold shrink-0">—</div>
+          <div className="flex-1 text-center">
+            <div className="text-[10px] uppercase tracking-wide text-[#8A93A3] mb-1 truncate">{jogo.adversario || "Adversário"}</div>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-3xl font-bold text-[#F2EDE3] leading-none mb-1.5">
+              {placarAdversario}
+            </div>
+            <div className="flex items-center justify-center gap-1">
+              {[1, 2, 3].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => bump(OPPONENT_MARKER_ID, [{ key: "pontos", delta: n }])}
+                  className="bg-[#14181F] hover:bg-[#D64545]/20 border border-[#D64545]/40 text-[#D64545] text-xs font-medium rounded px-2 py-1 transition-colors"
+                >
+                  +{n}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="mb-4">
           <div className="text-xs uppercase tracking-wide text-[#8A93A3] mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>
             Em campo ({onCourt.length}/5)

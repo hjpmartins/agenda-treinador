@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Undo2, Plus } from "lucide-react";
+import { X, Undo2, Plus, Trash2 } from "lucide-react";
 import { LIVE_SHOT_TYPES, LIVE_STAT_BUTTONS } from "../../data";
 import { formatDateFull, shortName } from "../../utils";
 import { EmptyState } from "../common/Modal";
@@ -43,6 +43,18 @@ function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
 
   const setMinutos = (playerId, value) => {
     setStats((prev) => ({ ...prev, [playerId]: { ...(prev[playerId] || {}), minutos: value } }));
+  };
+
+  // Limpa todas as estatísticas registadas (jogadoras + marcador) para
+  // recomeçar o registo do zero — o jogo em si mantém-se, só isto é apagado.
+  const clearStats = () => {
+    if (Object.keys(stats).length === 0) return;
+    const ok = window.confirm(
+      "Isto apaga todas as estatísticas já registadas neste jogo (jogadoras e marcador). O jogo não é apagado. Continuar?"
+    );
+    if (!ok) return;
+    setStats({});
+    setHistory([]);
   };
 
   const placarNos = (players || []).reduce((sum, p) => sum + (Number(stats[p.id]?.pontos) || 0), 0);
@@ -127,6 +139,14 @@ function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
           <div className="text-xs text-[#8A93A3]">{jogo.date ? formatDateFull(jogo.date) : ""}</div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={clearStats}
+            disabled={Object.keys(stats).length === 0}
+            title="Limpar todas as estatísticas registadas (não apaga o jogo)"
+            className="p-2 rounded hover:bg-[#D64545]/20 disabled:opacity-40 disabled:hover:bg-transparent text-[#8A93A3] hover:text-[#D64545] transition-colors"
+          >
+            <Trash2 size={16} />
+          </button>
           <button
             onClick={undo}
             disabled={history.length === 0}

@@ -1,5 +1,5 @@
 import { useState, useRef, useReducer, useEffect, useCallback } from "react";
-import { X, Trash2, Play, RotateCcw, Undo2, Redo2, Pencil } from "lucide-react";
+import { X, Trash2, Play, RotateCcw, Undo2, Redo2, Pencil, Eraser } from "lucide-react";
 import { HALF_VB, FULL_VB, ARROW_TYPES } from "../../data";
 import { uid, distPt, emptyDiagram, computeAnimatedPositions, defaultControlPoint } from "../../utils";
 import { inputCls } from "../../ui";
@@ -32,6 +32,7 @@ function StrokeShape({ points }) {
 // ser usado, em vez de preso ao tamanho de uma modal.
 
 const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible"]);
+const ERASE_RADIUS = 16;
 
 function historyReducer(state, action) {
   const current = state.history[state.index];
@@ -66,6 +67,8 @@ function WhiteboardView({ onClose }) {
   const [dragControlId, setDragControlId] = useState(null);
   const [drawing, setDrawing] = useState(null);
   const [drawingStroke, setDrawingStroke] = useState(null); // pontos do traço de caneta a ser desenhado agora
+  const [erasing, setErasing] = useState(false);
+  const [eraserPos, setEraserPos] = useState(null); // posição atual da borracha, só para mostrar o círculo
   const [selectedId, setSelectedId] = useState(null);
   const [animPositions, setAnimPositions] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -179,11 +182,30 @@ function WhiteboardView({ onClose }) {
     setDrawingStroke([getPoint(e)]);
   };
 
+  // Apaga qualquer traço de caneta que passe perto do ponto dado.
+  const eraseAt = (pt) => {
+    setEraserPos(pt);
+    replaceCurrent((d) => {
+      const strokes = (d.strokes || []).filter((s) => !s.points.some((p) => distPt(p, pt) < ERASE_RADIUS));
+      return strokes.length === (d.strokes || []).length ? d : { ...d, strokes };
+    });
+  };
+
+  const beginErase = (e) => {
+    commit((d) => d); // ponto de partida — o arrasto inteiro da borracha desfaz-se de uma vez com "Desfazer"
+    setErasing(true);
+    eraseAt(getPoint(e));
+  };
+
   const startFromToken = (e, tokenId) => {
     e.stopPropagation();
     if (e.cancelable) e.preventDefault();
     if (mode === "caneta") {
       beginStroke(e);
+      return;
+    }
+    if (mode === "borracha") {
+      beginErase(e);
       return;
     }
     const token = diagram.tokens.find((t) => t.id === tokenId);
@@ -207,6 +229,10 @@ function WhiteboardView({ onClose }) {
     if (e.cancelable) e.preventDefault();
     if (mode === "caneta") {
       beginStroke(e);
+      return;
+    }
+    if (mode === "borracha") {
+      beginErase(e);
       return;
     }
     const pt = getPoint(e);
@@ -236,6 +262,11 @@ function WhiteboardView({ onClose }) {
       setDrawingStroke((prev) => [...prev, pt]);
       return;
     }
+    if (erasing) {
+      if (e.cancelable) e.preventDefault();
+      eraseAt(getPoint(e));
+      return;
+    }
     if (drawing) {
       if (e.cancelable) e.preventDefault();
       let raw = getPoint(e);
@@ -258,6 +289,11 @@ function WhiteboardView({ onClose }) {
     if (drawingStroke) {
       commit((d) => ({ ...d, strokes: [...(d.strokes || []), { id: uid(), points: drawingStroke }] }));
       setDrawingStroke(null);
+      return;
+    }
+    if (erasing) {
+      setErasing(false);
+      setEraserPos(null);
       return;
     }
     if (drawing) {
@@ -359,6 +395,9 @@ function WhiteboardView({ onClose }) {
         <button onClick={() => setMode("caneta")} title="Escrever ou desenhar livremente com a caneta ou o dedo" className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded ${mode === "caneta" ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
           <Pencil size={12} /> Caneta
         </button>
+        <button onClick={() => setMode("borracha")} title="Apagar o que foi desenhado à mão — arrasta por cima para apagar" className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded ${mode === "borracha" ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
+          <Eraser size={12} /> Borracha
+        </button>
         {ARROW_TYPES.map((a) => (
           <button key={a.id} onClick={() => setMode(a.id)} title={a.desc} className={`text-xs px-2.5 py-1 rounded ${mode === a.id ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
             {a.label}
@@ -367,7 +406,10 @@ function WhiteboardView({ onClose }) {
         {mode === "caneta" && (
           <span className="text-[11px] text-[#8A93A3] ml-1 hidden sm:inline">Arrasta com o dedo ou a caneta para escrever ou desenhar</span>
         )}
-        {mode !== "mover" && mode !== "caneta" && (
+        {mode === "borracha" && (
+          <span className="text-[11px] text-[#8A93A3] ml-1 hidden sm:inline">Arrasta por cima do que desenhaste com a caneta para apagar</span>
+        )}
+        {mode !== "mover" && mode !== "caneta" && mode !== "borracha" && (
           <span className="text-[11px] text-[#8A93A3] ml-1 hidden sm:inline">
             Arrasta para desenhar · segura <b className="text-[#F2EDE3]">Shift</b> para linha reta
           </span>
@@ -430,6 +472,9 @@ function WhiteboardView({ onClose }) {
               <StrokeShape key={s.id} points={s.points} />
             ))}
             {drawingStroke && <StrokeShape points={drawingStroke} />}
+            {erasing && eraserPos && (
+              <circle cx={eraserPos.x} cy={eraserPos.y} r={ERASE_RADIUS} fill="#D64545" fillOpacity="0.25" stroke="#D64545" strokeWidth="1" />
+            )}
           </svg>
         </div>
       </div>

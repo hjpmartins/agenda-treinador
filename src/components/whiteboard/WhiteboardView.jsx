@@ -33,6 +33,27 @@ function StrokeShape({ points }) {
 
 const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible"]);
 const ERASE_RADIUS = 7;
+
+// Distância de um ponto ao segmento [a,b] — usada para apagar um traço
+// tocando em qualquer sítio da linha desenhada, não só perto de um dos
+// pontos amostrados (um arrasto rápido só regista alguns pontos, por isso
+// tocar a meio de um troço entre dois deles também tem de contar).
+function distToSegment(p, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return distPt(p, a);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  return distPt(p, { x: a.x + t * dx, y: a.y + t * dy });
+}
+
+function strokeNearPoint(stroke, pt) {
+  if (stroke.points.length < 2) return distPt(stroke.points[0], pt) < ERASE_RADIUS;
+  for (let i = 0; i < stroke.points.length - 1; i++) {
+    if (distToSegment(pt, stroke.points[i], stroke.points[i + 1]) < ERASE_RADIUS) return true;
+  }
+  return false;
+}
 // Espaço extra à volta das linhas do campo, para colocar jogadoras fora de
 // campo (ex: jogadas de bola parada / reposições de linha lateral ou fundo).
 const COURT_MARGIN = 40;
@@ -197,7 +218,7 @@ function WhiteboardView({ onClose }) {
   const eraseAt = (pt) => {
     setEraserPos(pt);
     replaceCurrent((d) => {
-      const strokes = (d.strokes || []).filter((s) => !s.points.some((p) => distPt(p, pt) < ERASE_RADIUS));
+      const strokes = (d.strokes || []).filter((s) => !strokeNearPoint(s, pt));
       return strokes.length === (d.strokes || []).length ? d : { ...d, strokes };
     });
   };

@@ -18,6 +18,7 @@ import { ImportModal } from "./components/sessions/ImportModal";
 import { JogosView } from "./components/jogos/JogosViews";
 import { JogoModal } from "./components/jogos/JogoModal";
 import { LiveStatsView } from "./components/jogos/LiveStatsView";
+import { WhiteboardView } from "./components/whiteboard/WhiteboardView";
 import { LibraryView } from "./components/library/LibraryView";
 import { LibraryModal } from "./components/library/LibraryModal";
 import { LibraryImportModal } from "./components/library/LibraryImportModal";
@@ -55,6 +56,7 @@ export default function App() {
   const [sessionModal, setSessionModal] = useState(null); // null | {date} | session object
   const [jogoModal, setJogoModal] = useState(null); // null | jogo object
   const [liveStatsModal, setLiveStatsModal] = useState(null); // null | jogo object
+  const [whiteboardOpen, setWhiteboardOpen] = useState(false);
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState(null); // {y, m, d} | null
   const [importPreview, setImportPreview] = useState(null); // {parsed, fileName}
@@ -566,6 +568,7 @@ export default function App() {
           jogosCount={seasonSessions.filter((s) => s.type === "jogo").length}
           libraryCount={library.length}
           publicLibraryCount={publicLibrary.length}
+          onOpenWhiteboard={() => setWhiteboardOpen(true)}
         />
         <main className="flex-1 p-5 md:p-8 max-w-5xl">
           {!ready ? (
@@ -711,8 +714,10 @@ export default function App() {
           onClose={() => setLiveStatsModal(null)}
           onSave={(estatisticas, resultado) => saveLiveStats(liveStatsModal, estatisticas, resultado)}
           onAutoSave={(estatisticas) => autoSaveLiveStats(liveStatsModal, estatisticas)}
+          onOpenWhiteboard={() => setWhiteboardOpen(true)}
         />
       )}
+      {whiteboardOpen && <WhiteboardView onClose={() => setWhiteboardOpen(false)} />}
       {importModal && (
         <ImportModal onClose={() => setImportModal(false)} onImport={importPlayers} />
       )}

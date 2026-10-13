@@ -1,6 +1,6 @@
-import { Home, Users, Dumbbell, CheckCircle2, Swords, BookOpen, Globe, CalendarDays } from "lucide-react";
+import { Home, Users, Dumbbell, CheckCircle2, Swords, BookOpen, Globe, CalendarDays, PenTool } from "lucide-react";
 
-function Sidebar({ tab, setTab, playerCount, sessionCount, realizadosCount, jogosCount, libraryCount, publicLibraryCount }) {
+function Sidebar({ tab, setTab, playerCount, sessionCount, realizadosCount, jogosCount, libraryCount, publicLibraryCount, onOpenWhiteboard }) {
   const items = [
     { id: "inicio", label: "Início", icon: Home, count: null },
     { id: "jogadores", label: "Plantel", icon: Users, count: playerCount },
@@ -10,17 +10,21 @@ function Sidebar({ tab, setTab, playerCount, sessionCount, realizadosCount, jogo
     { id: "biblioteca", label: "Biblioteca", icon: BookOpen, count: libraryCount },
     { id: "biblioteca-publica", label: "Pública", icon: Globe, count: publicLibraryCount },
     { id: "calendario", label: "Calendário", icon: CalendarDays, count: null },
+    // Não é um separador normal (não muda `tab`) — abre o quadro tático em
+    // ecrã inteiro por cima de tudo, para poder usar-se a meio de qualquer
+    // outro ecrã (ex: durante o registo de estatísticas ao vivo).
+    { id: "quadro", label: "Quadro tático", icon: PenTool, count: null, action: onOpenWhiteboard },
   ];
   return (
     <aside style={{ width: 208, flexShrink: 0 }} className="bg-[#1E242E] border-r border-[#2E3644]">
       <nav style={{ display: "flex", flexDirection: "column" }}>
         {items.map((it) => {
           const Icon = it.icon;
-          const active = tab === it.id;
+          const active = !it.action && tab === it.id;
           return (
             <button
               key={it.id}
-              onClick={() => setTab(it.id)}
+              onClick={() => (it.action ? it.action() : setTab(it.id))}
               style={{ display: "flex", alignItems: "center" }}
               className={`gap-2.5 px-4 py-3 text-sm transition-colors border-l-2 ${
                 active

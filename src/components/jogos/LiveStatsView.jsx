@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Undo2, Plus, Trash2 } from "lucide-react";
+import { X, Undo2, Plus, Trash2, PenTool } from "lucide-react";
 import { LIVE_SHOT_TYPES, LIVE_STAT_BUTTONS } from "../../data";
 import { formatDateFull, shortName } from "../../utils";
 import { EmptyState } from "../common/Modal";
@@ -9,7 +9,7 @@ import { EmptyState } from "../common/Modal";
 // real e é ignorada por todo o código que lê estatísticas por jogadora.
 const OPPONENT_MARKER_ID = "_adversario";
 
-function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
+function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave, onOpenWhiteboard }) {
   const [stats, setStats] = useState(jogo.estatisticas || {});
   const [history, setHistory] = useState([]); // pilha de { playerId, deltas: [{ key, delta }] } para desfazer
   const [onCourtIds, setOnCourtIds] = useState([]); // até 5 ids — quem está em campo agora
@@ -207,6 +207,15 @@ function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
           <div className="text-xs text-[#8A93A3]">{jogo.date ? formatDateFull(jogo.date) : ""}</div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {onOpenWhiteboard && (
+            <button
+              onClick={onOpenWhiteboard}
+              title="Abrir quadro tático (ex: para um desconto de tempo) — as estatísticas continuam aqui quando voltares"
+              className="p-2 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3] transition-colors"
+            >
+              <PenTool size={16} />
+            </button>
+          )}
           <button
             onClick={clearStats}
             disabled={Object.keys(stats).length === 0}

@@ -6,6 +6,7 @@ import { buildSeasonReportContent } from "./print";
 import { getSession, onAuthStateChange, signOut } from "./lib/auth";
 import * as db from "./lib/db";
 import { AuthScreen } from "./components/auth/AuthScreen";
+import { ResetPasswordScreen } from "./components/auth/ResetPasswordScreen";
 import { TopBar } from "./components/layout/TopBar";
 import { Sidebar } from "./components/layout/Sidebar";
 import { DashboardView } from "./components/dashboard/DashboardView";
@@ -29,6 +30,7 @@ import { ImportBackupConfirmModal } from "./components/common/Modal";
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   const [tab, setTab] = useState("inicio");
   const [players, setPlayers] = useState([]);
@@ -69,8 +71,9 @@ export default function App() {
       .catch(() => {
         if (active) setAuthLoading(false);
       });
-    const unsubscribe = onAuthStateChange((session) => {
+    const unsubscribe = onAuthStateChange((event, session) => {
       setUser(session?.user || null);
+      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
     });
     return () => {
       active = false;
@@ -527,6 +530,10 @@ export default function App() {
         <Loader2 className="animate-spin text-[#8A93A3]" size={22} />
       </div>
     );
+  }
+
+  if (passwordRecovery) {
+    return <ResetPasswordScreen onDone={() => setPasswordRecovery(false)} />;
   }
 
   if (!user) {

@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Search, Pencil, Trash2, Share2, Upload, Plus } from "lucide-react";
+import { Search, Pencil, Trash2, Share2, Upload, Plus, Copy } from "lucide-react";
 import { COMPONENTES, getHabilidade, habilidadeLabel } from "../../data";
 import { inputCls } from "../../ui";
 import { EmptyState } from "../common/Modal";
 import { DiagramThumbnail } from "../diagrams/CourtPrimitives";
 
-function LibraryView({ library, onAdd, onImportClick, onEdit, onDelete, onPublish }) {
+function LibraryView({ library, onAdd, onImportClick, onEdit, onDelete, onPublish, onDuplicate }) {
   const [search, setSearch] = useState("");
   const [filterFase, setFilterFase] = useState("");
   const [filterComponente, setFilterComponente] = useState("");
@@ -109,6 +109,9 @@ function LibraryView({ library, onAdd, onImportClick, onEdit, onDelete, onPublis
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                       <button onClick={() => onPublish(ex)} title="Partilhar na biblioteca pública" className="p-1 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
                         <Share2 size={13} />
+                      </button>
+                      <button onClick={() => onDuplicate(ex)} title="Duplicar — cria uma cópia independente para editar (ex: uma versão mais completa)" className="p-1 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
+                        <Copy size={13} />
                       </button>
                       <button onClick={() => onEdit(ex)} className="p-1 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
                         <Pencil size={13} />

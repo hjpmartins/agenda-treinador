@@ -248,6 +248,20 @@ export default function App() {
     }
   };
 
+  // Abre o modal já preenchido com os dados do exercício, mas sem id — ao
+  // gravar fica um exercício novo e independente, o original não é tocado.
+  // Serve para partir de um exercício simples e acabar com dois gravados:
+  // o original e uma versão mais completa.
+  const duplicateLibraryItem = (item) => {
+    setLibraryModal({
+      nome: `${item.nome} (cópia)`,
+      categoria: item.categoria,
+      duracaoPadrao: item.duracaoPadrao,
+      descricao: item.descricao,
+      diagramas: item.diagramas || [],
+    });
+  };
+
   const deleteLibraryItem = async (id) => {
     try {
       await db.deleteLibraryItem(id);
@@ -652,6 +666,7 @@ export default function App() {
                   onEdit={(item) => setLibraryModal(item)}
                   onDelete={deleteLibraryItem}
                   onPublish={publishLibraryItem}
+                  onDuplicate={duplicateLibraryItem}
                 />
               )}
               {tab === "biblioteca-publica" && (

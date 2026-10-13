@@ -1,9 +1,28 @@
 import { useState, useRef, useReducer, useEffect, useCallback } from "react";
-import { X, Trash2, Play, RotateCcw, Undo2, Redo2 } from "lucide-react";
+import { X, Trash2, Play, RotateCcw, Undo2, Redo2, Pencil } from "lucide-react";
 import { HALF_VB, FULL_VB, ARROW_TYPES } from "../../data";
 import { uid, distPt, emptyDiagram, computeAnimatedPositions, defaultControlPoint } from "../../utils";
 import { inputCls } from "../../ui";
 import { CourtBackground, TokenShape, ArrowShape } from "../diagrams/CourtPrimitives";
+
+// Traço livre (caneta/dedo) — para escrever ou desenhar à mão, sem ficar
+// preso aos tipos de seta predefinidos. Um único ponto (toque rápido, ex:
+// um pingo de um "í") desenha-se como um pontinho em vez de uma linha.
+function StrokeShape({ points }) {
+  if (points.length < 2) {
+    return <circle cx={points[0].x} cy={points[0].y} r="1.6" fill="#F2EDE3" />;
+  }
+  return (
+    <polyline
+      points={points.map((p) => `${p.x},${p.y}`).join(" ")}
+      fill="none"
+      stroke="#F2EDE3"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  );
+}
 
 // Quadro tático em ecrã inteiro para desenhar uma jogada num instante (ex:
 // num desconto de tempo, durante o jogo) — sem gravar em lado nenhum, só
@@ -33,7 +52,7 @@ function historyReducer(state, action) {
 }
 
 function WhiteboardView({ onClose }) {
-  const [historyState, dispatchHistory] = useReducer(historyReducer, { history: [emptyDiagram()], index: 0 });
+  const [historyState, dispatchHistory] = useReducer(historyReducer, { history: [{ ...emptyDiagram(), strokes: [] }], index: 0 });
   const diagram = historyState.history[historyState.index];
   const canUndo = historyState.index > 0;
   const canRedo = historyState.index < historyState.history.length - 1;
@@ -46,6 +65,7 @@ function WhiteboardView({ onClose }) {
   const [dragId, setDragId] = useState(null);
   const [dragControlId, setDragControlId] = useState(null);
   const [drawing, setDrawing] = useState(null);
+  const [drawingStroke, setDrawingStroke] = useState(null); // pontos do traço de caneta a ser desenhado agora
   const [selectedId, setSelectedId] = useState(null);
   const [animPositions, setAnimPositions] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -149,15 +169,23 @@ function WhiteboardView({ onClose }) {
   };
 
   const clearAll = () => {
-    if (diagram.tokens.length === 0 && diagram.arrows.length === 0) return;
+    if (diagram.tokens.length === 0 && diagram.arrows.length === 0 && (diagram.strokes || []).length === 0) return;
     if (!window.confirm("Limpar tudo o que está desenhado no quadro?")) return;
-    commit((d) => ({ ...d, tokens: [], arrows: [] }));
+    commit((d) => ({ ...d, tokens: [], arrows: [], strokes: [] }));
     setSelectedId(null);
+  };
+
+  const beginStroke = (e) => {
+    setDrawingStroke([getPoint(e)]);
   };
 
   const startFromToken = (e, tokenId) => {
     e.stopPropagation();
     if (e.cancelable) e.preventDefault();
+    if (mode === "caneta") {
+      beginStroke(e);
+      return;
+    }
     const token = diagram.tokens.find((t) => t.id === tokenId);
     if (mode === "mover") {
       commit((d) => d);
@@ -177,6 +205,10 @@ function WhiteboardView({ onClose }) {
 
   const startFromCanvas = (e) => {
     if (e.cancelable) e.preventDefault();
+    if (mode === "caneta") {
+      beginStroke(e);
+      return;
+    }
     const pt = getPoint(e);
     if (mode === "mover") {
       setSelectedId(null);
@@ -198,6 +230,12 @@ function WhiteboardView({ onClose }) {
       replaceCurrent((d) => ({ ...d, arrows: d.arrows.map((a) => (a.id === dragControlId ? { ...a, control: pt } : a)) }));
       return;
     }
+    if (drawingStroke) {
+      if (e.cancelable) e.preventDefault();
+      const pt = getPoint(e);
+      setDrawingStroke((prev) => [...prev, pt]);
+      return;
+    }
     if (drawing) {
       if (e.cancelable) e.preventDefault();
       let raw = getPoint(e);
@@ -215,6 +253,11 @@ function WhiteboardView({ onClose }) {
     }
     if (dragControlId) {
       setDragControlId(null);
+      return;
+    }
+    if (drawingStroke) {
+      commit((d) => ({ ...d, strokes: [...(d.strokes || []), { id: uid(), points: drawingStroke }] }));
+      setDrawingStroke(null);
       return;
     }
     if (drawing) {
@@ -270,7 +313,7 @@ function WhiteboardView({ onClose }) {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={clearAll}
-            disabled={diagram.tokens.length === 0 && diagram.arrows.length === 0}
+            disabled={diagram.tokens.length === 0 && diagram.arrows.length === 0 && (diagram.strokes || []).length === 0}
             title="Limpar tudo"
             className="p-2 rounded hover:bg-[#D64545]/20 disabled:opacity-40 disabled:hover:bg-transparent text-[#8A93A3] hover:text-[#D64545] transition-colors"
           >
@@ -313,12 +356,18 @@ function WhiteboardView({ onClose }) {
         <button onClick={() => setMode("mover")} className={`text-xs px-2.5 py-1 rounded ${mode === "mover" ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
           Mover
         </button>
+        <button onClick={() => setMode("caneta")} title="Escrever ou desenhar livremente com a caneta ou o dedo" className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded ${mode === "caneta" ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
+          <Pencil size={12} /> Caneta
+        </button>
         {ARROW_TYPES.map((a) => (
           <button key={a.id} onClick={() => setMode(a.id)} title={a.desc} className={`text-xs px-2.5 py-1 rounded ${mode === a.id ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
             {a.label}
           </button>
         ))}
-        {mode !== "mover" && (
+        {mode === "caneta" && (
+          <span className="text-[11px] text-[#8A93A3] ml-1 hidden sm:inline">Arrasta com o dedo ou a caneta para escrever ou desenhar</span>
+        )}
+        {mode !== "mover" && mode !== "caneta" && (
           <span className="text-[11px] text-[#8A93A3] ml-1 hidden sm:inline">
             Arrasta para desenhar · segura <b className="text-[#F2EDE3]">Shift</b> para linha reta
           </span>
@@ -377,6 +426,10 @@ function WhiteboardView({ onClose }) {
               const pos = (animPositions && animPositions[t.id]) || t;
               return <TokenShape key={t.id} token={pos} selected={selectedId === t.id} onMouseDown={(e) => startFromToken(e, t.id)} />;
             })}
+            {(diagram.strokes || []).map((s) => (
+              <StrokeShape key={s.id} points={s.points} />
+            ))}
+            {drawingStroke && <StrokeShape points={drawingStroke} />}
           </svg>
         </div>
       </div>

@@ -173,7 +173,11 @@ function SessionModal({ initial, library, players, onSaveToLibrary, onClose, onS
                         >
                           <Star size={13} fill={savedIds[ex.id] ? "currentColor" : "none"} />
                         </button>
-                        <button type="button" onClick={() => removeExercise(ex.id)} className="p-1 text-[#5A6272] hover:text-[#D64545]">
+                        <button
+                          type="button"
+                          onClick={() => { if (window.confirm("Remover este exercício do treino?")) removeExercise(ex.id); }}
+                          className="p-1 text-[#5A6272] hover:text-[#D64545]"
+                        >
                           <Trash2 size={13} />
                         </button>
                       </div>

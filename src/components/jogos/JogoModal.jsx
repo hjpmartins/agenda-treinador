@@ -73,7 +73,11 @@ function JogoModal({ initial, players, onClose, onSave }) {
               <div key={d.id} className="flex items-center gap-2">
                 <input value={d.nome} onChange={(e) => updateDirigente(d.id, "nome", e.target.value)} className={inputCls} style={{ flex: "1 1 auto", minWidth: 0 }} placeholder="Nome do dirigente" />
                 <input value={d.licenca} onChange={(e) => updateDirigente(d.id, "licenca", e.target.value)} className={inputCls} style={{ flex: "0 0 100px" }} placeholder="Nº licença" />
-                <button type="button" onClick={() => removeDirigente(d.id)} className="p-1.5 text-[#5A6272] hover:text-[#D64545] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { if (window.confirm("Apagar este dirigente?")) removeDirigente(d.id); }}
+                  className="p-1.5 text-[#5A6272] hover:text-[#D64545] shrink-0"
+                >
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -137,7 +141,11 @@ function JogoModal({ initial, players, onClose, onSave }) {
             <div key={o.id} className="flex items-center gap-2">
               <span style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-xs text-[#5A6272] w-4 shrink-0">{i + 1}</span>
               <input value={o.texto} onChange={(e) => updateObjetivo(o.id, e.target.value)} className={inputCls + " flex-1"} placeholder="Ex: Privilegiar o passe em vez de drible" />
-              <button type="button" onClick={() => removeObjetivo(o.id)} className="p-1.5 text-[#5A6272] hover:text-[#D64545] shrink-0">
+              <button
+                type="button"
+                onClick={() => { if (window.confirm("Apagar este objetivo?")) removeObjetivo(o.id); }}
+                className="p-1.5 text-[#5A6272] hover:text-[#D64545] shrink-0"
+              >
                 <Trash2 size={14} />
               </button>
             </div>

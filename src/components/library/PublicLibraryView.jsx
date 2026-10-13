@@ -98,7 +98,11 @@ function PublicLibraryView({ publicLibrary, currentUserId, onCopyToLibrary, onUn
                         <Download size={13} />
                       </button>
                       {ex.userId === currentUserId && (
-                        <button onClick={() => onUnpublish(ex.id)} title="Remover da biblioteca pública" className="p-1 rounded hover:bg-[#D64545]/20 text-[#8A93A3] hover:text-[#D64545]">
+                        <button
+                          onClick={() => { if (window.confirm(`Remover "${ex.nome || "este exercício"}" da biblioteca pública?`)) onUnpublish(ex.id); }}
+                          title="Remover da biblioteca pública"
+                          className="p-1 rounded hover:bg-[#D64545]/20 text-[#8A93A3] hover:text-[#D64545]"
+                        >
                           <Trash2 size={13} />
                         </button>
                       )}

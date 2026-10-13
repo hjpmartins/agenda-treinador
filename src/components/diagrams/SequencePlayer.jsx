@@ -157,6 +157,7 @@ function DiagramStepsRow({ diagramas, onChange }) {
 
   const deleteStep = (i, e) => {
     e.stopPropagation();
+    if (!window.confirm(`Apagar o passo ${i + 1}?`)) return;
     onChange(steps.filter((_, idx) => idx !== i));
   };
 

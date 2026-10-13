@@ -113,7 +113,10 @@ function LibraryView({ library, onAdd, onImportClick, onEdit, onDelete, onPublis
                       <button onClick={() => onEdit(ex)} className="p-1 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
                         <Pencil size={13} />
                       </button>
-                      <button onClick={() => onDelete(ex.id)} className="p-1 rounded hover:bg-[#D64545]/20 text-[#8A93A3] hover:text-[#D64545]">
+                      <button
+                        onClick={() => { if (window.confirm(`Apagar o exercício "${ex.nome || "sem nome"}"? Esta ação não pode ser desfeita.`)) onDelete(ex.id); }}
+                        className="p-1 rounded hover:bg-[#D64545]/20 text-[#8A93A3] hover:text-[#D64545]"
+                      >
                         <Trash2 size={13} />
                       </button>
                     </div>

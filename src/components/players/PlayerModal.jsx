@@ -144,7 +144,11 @@ function PlayerModal({ initial, sessions, onClose, onSave }) {
               <div key={l.id} className="flex items-center gap-2">
                 <input value={l.ano} onChange={(e) => updateLesao(l.id, "ano", e.target.value)} className={inputCls + " w-24"} placeholder="Ano" />
                 <input value={l.descricao} onChange={(e) => updateLesao(l.id, "descricao", e.target.value)} className={inputCls + " flex-1"} placeholder="Descrição da lesão" />
-                <button type="button" onClick={() => removeLesao(l.id)} className="p-1.5 text-[#5A6272] hover:text-[#D64545] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { if (window.confirm("Apagar esta lesão?")) removeLesao(l.id); }}
+                  className="p-1.5 text-[#5A6272] hover:text-[#D64545] shrink-0"
+                >
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -178,7 +182,11 @@ function PlayerModal({ initial, sessions, onClose, onSave }) {
                 <input value={a.peso} onChange={(e) => updateAvaliacao(a.id, "peso", e.target.value)} className={inputCls} placeholder="Peso (kg)" />
                 <div className="flex gap-1">
                   <input value={a.envergadura} onChange={(e) => updateAvaliacao(a.id, "envergadura", e.target.value)} className={inputCls} placeholder="Envergadura" />
-                  <button type="button" onClick={() => removeAvaliacao(a.id)} className="p-1.5 text-[#5A6272] hover:text-[#D64545] shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => { if (window.confirm("Apagar esta avaliação?")) removeAvaliacao(a.id); }}
+                    className="p-1.5 text-[#5A6272] hover:text-[#D64545] shrink-0"
+                  >
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -221,7 +229,11 @@ function PlayerModal({ initial, sessions, onClose, onSave }) {
                   <input type="date" value={t.data} onChange={(e) => updateTeste(t.id, "data", e.target.value)} className={inputCls} />
                   <div className="flex gap-1">
                     <input value={t.valor} onChange={(e) => updateTeste(t.id, "valor", e.target.value)} className={inputCls} placeholder={`Valor${tipo.unidade ? ` (${tipo.unidade})` : ""}`} />
-                    <button type="button" onClick={() => removeTeste(t.id)} className="p-1.5 text-[#5A6272] hover:text-[#D64545] shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => { if (window.confirm("Apagar este teste físico?")) removeTeste(t.id); }}
+                      className="p-1.5 text-[#5A6272] hover:text-[#D64545] shrink-0"
+                    >
                       <Trash2 size={14} />
                     </button>
                   </div>

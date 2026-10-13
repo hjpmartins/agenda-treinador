@@ -32,7 +32,7 @@ function StrokeShape({ points }) {
 // ser usado, em vez de preso ao tamanho de uma modal.
 
 const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible"]);
-const ERASE_RADIUS = 16;
+const ERASE_RADIUS = 7;
 
 function historyReducer(state, action) {
   const current = state.history[state.index];

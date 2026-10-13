@@ -61,8 +61,10 @@ function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
   const placarAdversario = Number(stats[OPPONENT_MARKER_ID]?.pontos) || 0;
 
   const finish = () => {
-    const jaTemResultado = (jogo.resultado || "").trim() !== "";
-    const resultado = !jaTemResultado && (placarNos > 0 || placarAdversario > 0) ? `${placarNos} - ${placarAdversario}` : undefined;
+    // Enquanto o marcador tiver sido usado, o resultado do jogo acompanha-o
+    // sempre que se grava — incluindo ao continuar o registo depois do
+    // intervalo, para não ficar preso no valor que tinha ao intervalo.
+    const resultado = placarNos > 0 || placarAdversario > 0 ? `${placarNos} - ${placarAdversario}` : undefined;
     onSave(stats, resultado);
   };
 

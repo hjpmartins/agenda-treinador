@@ -33,6 +33,9 @@ function StrokeShape({ points }) {
 
 const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible"]);
 const ERASE_RADIUS = 7;
+// Espaço extra à volta das linhas do campo, para colocar jogadoras fora de
+// campo (ex: jogadas de bola parada / reposições de linha lateral ou fundo).
+const COURT_MARGIN = 40;
 
 function historyReducer(state, action) {
   const current = state.history[state.index];
@@ -94,6 +97,11 @@ function WhiteboardView({ onClose }) {
   }, [undo, redo, onClose]);
 
   const vb = diagram.court === "campo" ? FULL_VB : HALF_VB;
+  // Dimensões do SVG: as linhas do campo mantêm o tamanho de sempre (vb),
+  // mas o viewBox é maior à volta — dá para arrastar jogadoras, bola, etc.
+  // para fora das linhas sem ficarem presas à margem do campo em si.
+  const outerW = vb.w + COURT_MARGIN * 2;
+  const outerH = vb.h + COURT_MARGIN * 2;
   const SNAP_DIST = 14;
 
   // Ajusta o tamanho do campo ao espaço disponível no ecrã (em vez de um
@@ -106,7 +114,7 @@ function WhiteboardView({ onClose }) {
       const availW = el.clientWidth;
       const availH = el.clientHeight;
       if (!availW || !availH) return;
-      const ratio = vb.w / vb.h;
+      const ratio = outerW / outerH;
       let width = availW;
       let height = width / ratio;
       if (height > availH) {
@@ -119,16 +127,19 @@ function WhiteboardView({ onClose }) {
     const ro = new ResizeObserver(compute);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [vb.w, vb.h]);
+  }, [outerW, outerH]);
 
   const getPoint = (e) => {
     const rect = wrapRef.current.getBoundingClientRect();
     const touch = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
     const clientX = touch ? touch.clientX : e.clientX;
     const clientY = touch ? touch.clientY : e.clientY;
-    const x = ((clientX - rect.left) / rect.width) * vb.w;
-    const y = ((clientY - rect.top) / rect.height) * vb.h;
-    return { x: Math.max(4, Math.min(vb.w - 4, x)), y: Math.max(4, Math.min(vb.h - 4, y)) };
+    const x = ((clientX - rect.left) / rect.width) * outerW - COURT_MARGIN;
+    const y = ((clientY - rect.top) / rect.height) * outerH - COURT_MARGIN;
+    return {
+      x: Math.max(4 - COURT_MARGIN, Math.min(vb.w - 4 + COURT_MARGIN, x)),
+      y: Math.max(4 - COURT_MARGIN, Math.min(vb.h - 4 + COURT_MARGIN, y)),
+    };
   };
 
   const nearestToken = (pt) => diagram.tokens.find((t) => distPt(t, pt) < SNAP_DIST);
@@ -436,7 +447,12 @@ function WhiteboardView({ onClose }) {
           onTouchEnd={handleMouseUp}
           onTouchCancel={handleMouseUp}
         >
-          <svg viewBox={`0 0 ${vb.w} ${vb.h}`} className="w-full h-full select-none" onMouseDown={startFromCanvas} onTouchStart={startFromCanvas}>
+          <svg
+            viewBox={`${-COURT_MARGIN} ${-COURT_MARGIN} ${outerW} ${outerH}`}
+            className="w-full h-full select-none"
+            onMouseDown={startFromCanvas}
+            onTouchStart={startFromCanvas}
+          >
             <CourtBackground court={diagram.court} vb={vb} />
             {diagram.arrows.map((a) => {
               const onSelect = (e) => { e.stopPropagation(); if (mode === "mover") setSelectedId(a.id); };

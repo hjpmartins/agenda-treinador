@@ -201,6 +201,26 @@ function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
             </div>
 
             <div className="mb-4">
+              <div className="text-xs uppercase tracking-wide text-[#8A93A3] mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>Banco</div>
+              {bench.length === 0 ? (
+                <div className="text-xs text-[#5A6272]">Todas as jogadoras estão em campo.</div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {bench.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => addToCourt(p.id)}
+                      disabled={onCourt.length >= 5}
+                      className="flex items-center gap-1 bg-[#1E242E] border border-[#2E3644] disabled:opacity-40 hover:border-[#5A6272] text-[#F2EDE3] rounded-md px-2 py-1.5 text-xs transition-colors"
+                    >
+                      <Plus size={11} /> {p.numero ? `${p.numero} · ` : ""}{shortName(p.nome)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mb-4 lg:mb-0">
               <div className="text-xs uppercase tracking-wide text-[#8A93A3] mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>
                 Em campo ({onCourt.length}/5)
               </div>
@@ -236,26 +256,6 @@ function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
                   );
                 })}
               </div>
-            </div>
-
-            <div className="mb-4 lg:mb-0">
-              <div className="text-xs uppercase tracking-wide text-[#8A93A3] mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>Banco</div>
-              {bench.length === 0 ? (
-                <div className="text-xs text-[#5A6272]">Todas as jogadoras estão em campo.</div>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {bench.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => addToCourt(p.id)}
-                      disabled={onCourt.length >= 5}
-                      className="flex items-center gap-1 bg-[#1E242E] border border-[#2E3644] disabled:opacity-40 hover:border-[#5A6272] text-[#F2EDE3] rounded-md px-2 py-1.5 text-xs transition-colors"
-                    >
-                      <Plus size={11} /> {p.numero ? `${p.numero} · ` : ""}{shortName(p.nome)}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 

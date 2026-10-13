@@ -124,6 +124,72 @@ function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
     setOnCourtIds((prev) => prev.filter((x) => x !== id));
     setSelectedId((prev) => (prev === id ? null : prev));
   };
+  const substitute = (benchId, courtId) => {
+    setOnCourtIds((prev) => prev.map((id) => (id === courtId ? benchId : id)));
+    setSelectedId((prev) => (prev === courtId ? benchId : prev));
+  };
+
+  // Arrastar uma jogadora do banco para cima de uma que está em campo troca
+  // as duas (substituição num gesto só); arrastar para uma vaga vazia só
+  // adiciona. Usa Pointer Events (em vez da API de Drag and Drop nativa,
+  // que não funciona bem em ecrãs táteis) para resultar tanto em tablet
+  // como em computador. Um toque simples (sem arrastar) continua a só
+  // adicionar à vaga seguinte, como antes.
+  const dragGhostRef = useRef(null);
+  const dragInfoRef = useRef(null); // { playerId, startX, startY, dragging }
+  const [draggingId, setDraggingId] = useState(null);
+  const [dropTargetId, setDropTargetId] = useState(null); // id em campo, "EMPTY", ou null
+
+  const moveGhost = (x, y) => {
+    if (dragGhostRef.current) {
+      dragGhostRef.current.style.left = `${x}px`;
+      dragGhostRef.current.style.top = `${y}px`;
+    }
+  };
+
+  const endDrag = () => {
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerUp);
+    window.removeEventListener("pointercancel", onPointerUp);
+    dragInfoRef.current = null;
+    setDraggingId(null);
+    setDropTargetId(null);
+  };
+
+  const onPointerMove = (e) => {
+    const info = dragInfoRef.current;
+    if (!info) return;
+    if (!info.dragging && Math.hypot(e.clientX - info.startX, e.clientY - info.startY) > 6) {
+      info.dragging = true;
+      setDraggingId(info.playerId);
+    }
+    if (info.dragging) {
+      moveGhost(e.clientX, e.clientY);
+      const slotEl = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-court-slot]");
+      setDropTargetId(slotEl ? slotEl.dataset.courtSlot : null);
+    }
+  };
+
+  const onPointerUp = (e) => {
+    const info = dragInfoRef.current;
+    if (info?.dragging) {
+      const slotEl = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-court-slot]");
+      const targetId = slotEl?.dataset.courtSlot;
+      if (targetId === "EMPTY") addToCourt(info.playerId);
+      else if (targetId && targetId !== info.playerId) substitute(info.playerId, targetId);
+    } else if (info) {
+      addToCourt(info.playerId);
+    }
+    endDrag();
+  };
+
+  const startDrag = (e, playerId) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    dragInfoRef.current = { playerId, startX: e.clientX, startY: e.clientY, dragging: false };
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+  };
 
   const byId = Object.fromEntries((players || []).map((p) => [p.id, p]));
   const onCourt = onCourtIds.map((id) => byId[id]).filter(Boolean);
@@ -209,9 +275,12 @@ function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
                   {bench.map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => addToCourt(p.id)}
-                      disabled={onCourt.length >= 5}
-                      className="flex items-center gap-1 bg-[#1E242E] border border-[#2E3644] disabled:opacity-40 hover:border-[#5A6272] text-[#F2EDE3] rounded-md px-2 py-1.5 text-xs transition-colors"
+                      onPointerDown={(e) => startDrag(e, p.id)}
+                      title="Toca para pôr em campo, ou arrasta para cima de uma jogadora para a substituir"
+                      style={{ touchAction: "none" }}
+                      className={`flex items-center gap-1 bg-[#1E242E] border border-[#2E3644] hover:border-[#5A6272] text-[#F2EDE3] rounded-md px-2 py-1.5 text-xs transition-colors select-none cursor-grab active:cursor-grabbing ${
+                        draggingId === p.id ? "opacity-30" : onCourt.length >= 5 ? "opacity-70" : ""
+                      }`}
                     >
                       <Plus size={11} /> {p.numero ? `${p.numero} · ` : ""}{shortName(p.nome)}
                     </button>
@@ -229,7 +298,13 @@ function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
                   const p = onCourt[i];
                   if (!p) {
                     return (
-                      <div key={i} className="border border-dashed border-[#2E3644] rounded-lg h-16 flex items-center justify-center text-[#5A6272] text-[10px] uppercase tracking-wide">
+                      <div
+                        key={i}
+                        data-court-slot="EMPTY"
+                        className={`border border-dashed rounded-lg h-16 flex items-center justify-center text-[10px] uppercase tracking-wide transition-colors ${
+                          dropTargetId === "EMPTY" ? "border-[#EA5B13] text-[#EA5B13] bg-[#EA5B13]/10" : "border-[#2E3644] text-[#5A6272]"
+                        }`}
+                      >
                         Vazio
                       </div>
                     );
@@ -238,9 +313,14 @@ function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
                   return (
                     <button
                       key={p.id}
+                      data-court-slot={p.id}
                       onClick={() => setSelectedId(p.id)}
                       className={`relative rounded-lg h-16 flex flex-col items-center justify-center gap-0.5 border-2 transition-colors ${
-                        active ? "border-[#EA5B13] bg-[#EA5B13]/10" : "border-[#2E3644] bg-[#1E242E] hover:border-[#5A6272]"
+                        dropTargetId === p.id
+                          ? "border-[#EA5B13] bg-[#EA5B13]/20"
+                          : active
+                          ? "border-[#EA5B13] bg-[#EA5B13]/10"
+                          : "border-[#2E3644] bg-[#1E242E] hover:border-[#5A6272]"
                       }`}
                     >
                       <span style={{ fontFamily: "'Oswald', sans-serif" }} className="text-lg font-bold leading-none">{p.numero || "—"}</span>
@@ -333,6 +413,15 @@ function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave }) {
           </div>
         </div>
       </div>
+
+      {draggingId && (
+        <div
+          ref={dragGhostRef}
+          className="fixed z-[200] pointer-events-none -translate-x-1/2 -translate-y-1/2 bg-[#EA5B13] text-[#14181F] rounded-lg px-3 py-1.5 shadow-lg text-sm font-bold flex items-center gap-1 whitespace-nowrap"
+        >
+          {byId[draggingId]?.numero ? `${byId[draggingId].numero} · ` : ""}{shortName(byId[draggingId]?.nome || "")}
+        </div>
+      )}
     </div>
   );
 }

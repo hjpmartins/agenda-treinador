@@ -125,6 +125,11 @@ function WhiteboardView({ onClose }) {
   const outerW = vb.w + COURT_MARGIN * 2;
   const outerH = vb.h + COURT_MARGIN * 2;
   const SNAP_DIST = 14;
+  // Distância usada só para detetar "quem tem bola": tem de ser maior que o
+  // SNAP_DIST de arrasto, porque o raio do jogador (12) + o raio da bola (7)
+  // já dá ~19 entre centros quando ficam com as bordas encostadas — com 14
+  // nunca entrava em efeito mesmo com a bola visivelmente ao lado da jogadora.
+  const BALL_HOLD_DIST = 26;
 
   // Ajusta o tamanho do campo ao espaço disponível no ecrã (em vez de um
   // limite fixo em vh, como no editor de diagramas dentro de uma modal) —
@@ -174,7 +179,7 @@ function WhiteboardView({ onClose }) {
   const findBallHolder = () => {
     const ball = diagram.tokens.find((t) => t.type === "ball");
     if (!ball) return null;
-    const holder = diagram.tokens.find((t) => t.type !== "ball" && t.type !== "cone" && t.type !== "treinador" && distPt(t, ball) < SNAP_DIST);
+    const holder = diagram.tokens.find((t) => t.type !== "ball" && t.type !== "cone" && t.type !== "treinador" && distPt(t, ball) < BALL_HOLD_DIST);
     return holder ? { ball, holder } : null;
   };
 

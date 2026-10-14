@@ -47,7 +47,9 @@ function computeAnimatedPositions(diagram, t) {
       // já estar desenhada — nesse caso o tokenId guardado é do jogador, não
       // da bola. Procura-se a bola perto do início da seta, para o passe
       // funcionar sempre, independentemente da ordem em que foi feito.
-      token = diagram.tokens.find((tk) => tk.type === "ball" && Math.hypot(tk.x - a.from.x, tk.y - a.from.y) < 14);
+      // 26: mesma distância usada nos editores para detetar "quem tem bola"
+      // (raio do jogador 12 + raio da bola 7 + margem), não o SNAP_DIST de arrasto.
+      token = diagram.tokens.find((tk) => tk.type === "ball" && Math.hypot(tk.x - a.from.x, tk.y - a.from.y) < 26);
     }
     if (!token) return;
     overrides[token.id] = { ...token, ...positionOnArrow(a, t) };

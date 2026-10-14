@@ -71,6 +71,11 @@ function DiagramEditor({ initial, onClose, onSave }) {
 
   const vb = diagram.court === "campo" ? FULL_VB : HALF_VB;
   const SNAP_DIST = 14;
+  // Distância usada só para detetar "quem tem bola": tem de ser maior que o
+  // SNAP_DIST de arrasto, porque o raio do jogador (12) + o raio da bola (7)
+  // já dá ~19 entre centros quando ficam com as bordas encostadas — com 14
+  // nunca entrava em efeito mesmo com a bola visivelmente ao lado do jogador.
+  const BALL_HOLD_DIST = 26;
 
   // Aceita tanto eventos de rato como de touch (telemóvel/tablet).
   const getPoint = (e) => {
@@ -93,7 +98,7 @@ function DiagramEditor({ initial, onClose, onSave }) {
   const findBallHolder = () => {
     const ball = diagram.tokens.find((t) => t.type === "ball");
     if (!ball) return null;
-    const holder = diagram.tokens.find((t) => t.type !== "ball" && t.type !== "cone" && t.type !== "treinador" && distPt(t, ball) < SNAP_DIST);
+    const holder = diagram.tokens.find((t) => t.type !== "ball" && t.type !== "cone" && t.type !== "treinador" && distPt(t, ball) < BALL_HOLD_DIST);
     return holder ? { ball, holder } : null;
   };
 

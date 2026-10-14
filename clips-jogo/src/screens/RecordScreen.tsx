@@ -96,6 +96,11 @@ export function RecordScreen({ onBack, onClips }: Props) {
     return () => sub.remove();
   }, [recording, finalizing, onBack]);
 
+  // A câmara e o encoder ficam preparados na qualidade escolhida, para o arranque ser imediato.
+  useEffect(() => {
+    if (permission === 'granted' && !recording && !finalizing) engine.setQuality(quality).catch(() => {});
+  }, [engine, permission, quality, recording, finalizing]);
+
   const askPermission = useCallback(async () => {
     const p = await engine.requestPermissionsAsync();
     setPermission(p.granted ? 'granted' : p.canAskAgain ? 'ask' : 'blocked');

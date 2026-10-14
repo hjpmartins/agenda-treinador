@@ -88,6 +88,10 @@ class ClipEngineModule : Module() {
 
     Function("getRecordingTimeMs") { ClipEngine.nowRecUs() / 1000.0 }
 
+    AsyncFunction("setQuality") { quality: String ->
+      ClipEngine.setQuality(quality)
+    }
+
     AsyncFunction("startRecording") { quality: String ->
       ClipEngine.startRecording(quality, displayRotationDegrees())
     }

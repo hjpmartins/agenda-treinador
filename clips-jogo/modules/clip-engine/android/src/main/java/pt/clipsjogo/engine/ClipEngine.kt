@@ -25,7 +25,6 @@ import pt.clipsjogo.engine.media.VideoEncoder
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Motor de gravação contínua + cortes. Um único por processo.
@@ -72,11 +71,13 @@ object ClipEngine {
   private var previewSurface: Surface? = null
 
   private val clock = RecordingClock()
-  /** Detetado no primeiro frame de cada gravação (só usado na thread do encoder). */
+  /** Detetado no primeiro frame de cada encoder (só usado na thread do encoder). */
   private var timebaseOffsetUs: Long? = null
   @Volatile private var session: SessionInfo? = null
-  private var muxer: SegmentMuxer? = null
-  private var videoEncoder: VideoEncoder? = null
+  /** Segmentador ativo (só durante a gravação). Só usado na thread do encoder. */
+  private var activeMuxer: SegmentMuxer? = null
+  private var previewQuality = "1080p"
+  @Volatile private var videoEncoder: VideoEncoder? = null
   private var audioEncoder: AudioEncoder? = null
   @Volatile private var recordingDone = true
   private var lastSession: SessionInfo? = null
@@ -112,17 +113,68 @@ object ClipEngine {
   @Synchronized
   fun setPreviewSurface(surface: Surface?) {
     previewSurface = surface
-    updateCameraSurfaces()
     if (state == STATE_IDLE && surface != null) setState(STATE_PREVIEW)
     if (state == STATE_PREVIEW && surface == null) setState(STATE_IDLE)
+    refreshPipeline()
   }
 
-  private fun updateCameraSurfaces() {
+  /** Muda a qualidade antes de gravar (recria o encoder enquanto só há pré-visualização). */
+  @Synchronized
+  fun setQuality(quality: String) {
+    if (state == STATE_RECORDING || state == STATE_FINALIZING) return
+    if (quality == previewQuality && videoEncoder != null) return
+    previewQuality = quality
+    dropEncoder()
+    refreshPipeline()
+  }
+
+  private val encoderNeeded: Boolean
+    get() = previewSurface != null || state == STATE_RECORDING || state == STATE_FINALIZING
+
+  /**
+   * Liga câmara → (pré-visualização + encoder). O encoder fica ligado durante a
+   * pré-visualização para que começar a gravar não reconfigure a câmara.
+   */
+  private fun refreshPipeline() {
     val cam = cameraOrNull() ?: return
-    val list = mutableListOf<Surface>()
-    previewSurface?.let { list.add(it) }
-    if (state == STATE_RECORDING) videoEncoder?.inputSurface?.let { list.add(it) }
-    cam.setSurfaces(list)
+    if (encoderNeeded && videoEncoder == null) {
+      var config = VideoConfig.forQuality(previewQuality)
+      if (!VideoEncoder.isSupported(config)) config = VideoConfig.forQuality("720p")
+      try {
+        val enc = VideoEncoder(config, encoderHandler, onOutput = ::onVideoFrame, onError = ::emitError)
+        encoderHandler.post { timebaseOffsetUs = null }
+        videoEncoder = enc
+      } catch (e: Exception) {
+        emitError(e.message ?: "Não foi possível iniciar o encoder de vídeo.")
+      }
+    }
+    if (!encoderNeeded) {
+      cam.setSurfaces(emptyList())
+      dropEncoder()
+      return
+    }
+    cam.setSurfaces(listOfNotNull(previewSurface, videoEncoder?.inputSurface))
+  }
+
+  private fun dropEncoder() {
+    val enc = videoEncoder ?: return
+    videoEncoder = null
+    // A câmara tem de largar a Surface do encoder antes de ele ser libertado.
+    camera?.setSurfaces(listOfNotNull(previewSurface))
+    encoderHandler.post { enc.release() }
+  }
+
+  /** Corre na thread do encoder, para cada frame codificado (a gravar ou não). */
+  private fun onVideoFrame(buffer: java.nio.ByteBuffer, info: android.media.MediaCodec.BufferInfo) {
+    val offset = timebaseOffsetUs ?: Timebase.offsetToBootUs(
+      info.presentationTimeUs, SystemClock.elapsedRealtimeNanos() / 1000, System.nanoTime() / 1000
+    ).also {
+      timebaseOffsetUs = it
+      Log.i(TAG, "Relógio da câmara: desvio para BOOTTIME = $it µs")
+    }
+    val m = activeMuxer ?: return
+    if (!m.hasVideoFormat) videoEncoder?.outputFormat?.let { m.onVideoFormat(it) }
+    m.writeVideo(buffer, info, info.presentationTimeUs + offset)
   }
 
   // ---------------------------------------------------------------- gravação
@@ -131,14 +183,20 @@ object ClipEngine {
   fun startRecording(quality: String, displayRotationDegrees: Int): String {
     check(state != STATE_RECORDING && state != STATE_FINALIZING) { "Já está a gravar." }
     val cam = cameraOrNull() ?: throw IllegalStateException("Sem permissão para usar a câmara.")
+    if (quality != previewQuality) setQuality(quality)
 
-    var config = VideoConfig.forQuality(quality)
-    if (!VideoEncoder.isSupported(config)) config = VideoConfig.forQuality("720p")
     val rotation = cam.rotationFor(displayRotationDegrees)
+    val prevState = state
+    setState(STATE_RECORDING)
+    refreshPipeline()
+    val enc = videoEncoder ?: run {
+      setState(prevState)
+      throw IllegalStateException("Não foi possível iniciar o encoder de vídeo.")
+    }
+    val config = enc.config
     val s = storage.newSession(if (config.height >= 1080) "1080p" else "720p", config.width, config.height, rotation)
 
     clock.reset()
-    timebaseOffsetUs = null
     recordingDone = false
     val withAudio = hasPermission(Manifest.permission.RECORD_AUDIO)
     val m = SegmentMuxer(s.segmentsDir, SEGMENT_US, rotation, withAudio, clock) { seg -> onSegmentClosed(s, seg) }
@@ -150,43 +208,23 @@ object ClipEngine {
         onError = { msg -> emitError(msg) }
       )
     } else null
-
-    val video = try {
-      VideoEncoder(
-        config, encoderHandler,
-        ptsToBootUs = { pts ->
-          if (timebaseOffsetUs == null) {
-            timebaseOffsetUs = Timebase.offsetToBootUs(
-              pts, SystemClock.elapsedRealtimeNanos() / 1000, System.nanoTime() / 1000
-            )
-            Log.i(TAG, "Relógio da câmara: desvio para BOOTTIME = ${timebaseOffsetUs} µs")
-          }
-          pts + timebaseOffsetUs!!
-        },
-        muxer = m,
-        onError = { msg -> emitError(msg) },
-        onEndOfStream = { finishWriting(s) }
-      )
-    } catch (e: Exception) {
-      s.dir.deleteRecursively()
-      throw e
-    }
-
     try {
       audio?.start()
     } catch (e: Exception) {
-      video.release()
       s.dir.deleteRecursively()
+      setState(if (previewSurface != null) STATE_PREVIEW else STATE_IDLE)
+      refreshPipeline()
       throw IllegalStateException("Não foi possível usar o microfone: ${e.message}")
     }
 
     session = s
     lastSession = s
-    muxer = m
-    videoEncoder = video
     audioEncoder = audio
-    setState(STATE_RECORDING)
-    updateCameraSurfaces()
+    // A partir daqui os frames passam a ser guardados (a gravação começa no próximo keyframe).
+    encoderHandler.post {
+      activeMuxer = m
+      enc.requestKeyFrame()
+    }
     return s.id
   }
 
@@ -194,28 +232,16 @@ object ClipEngine {
   @Synchronized
   fun stopRecording() {
     if (state != STATE_RECORDING) return
+    val s = session ?: return
     setState(STATE_FINALIZING)
-    session?.status = SessionInfo.STATUS_FINALIZING
-    updateCameraSurfaces() // deixa de enviar frames ao encoder
+    s.status = SessionInfo.STATUS_FINALIZING
+    // Parar o áudio primeiro: o que ele já entregou fica na fila da thread do encoder, antes do fecho.
     audioEncoder?.stop()
     audioEncoder = null
-    val s = session ?: return
-    val video = videoEncoder ?: return finishWriting(s)
-    video.signalEndOfStream()
-    // Alguns encoders nunca entregam o fim de stream: não ficamos à espera para sempre.
-    encoderHandler.postDelayed({ finishWriting(s) }, 3_000)
-  }
-
-  private val finishing = AtomicBoolean(false)
-
-  /** Corre na thread do encoder. */
-  private fun finishWriting(s: SessionInfo) {
-    if (session !== s || !finishing.compareAndSet(false, true)) return
     encoderHandler.post {
-      val end = muxer?.finish() ?: 0L
-      videoEncoder?.release()
-      videoEncoder = null
-      muxer = null
+      val m = activeMuxer
+      activeMuxer = null
+      val end = m?.finish() ?: 0L
       s.durationUs = end
       recordingDone = true
       cutter.execute { finalizeSession(s) }
@@ -332,8 +358,8 @@ object ClipEngine {
     } finally {
       synchronized(this) {
         if (session === s) session = null
-        finishing.set(false)
         setState(if (previewSurface != null) STATE_PREVIEW else STATE_IDLE)
+        refreshPipeline()
       }
     }
   }

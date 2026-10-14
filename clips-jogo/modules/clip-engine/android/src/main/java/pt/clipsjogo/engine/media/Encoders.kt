@@ -10,6 +10,7 @@ import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.media.MediaRecorder
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.SystemClock
 import android.util.Log
@@ -28,17 +29,24 @@ data class VideoConfig(val width: Int, val height: Int, val fps: Int, val bitrat
 /**
  * Encoder H.264 por hardware alimentado diretamente pela câmara (Surface).
  * Um keyframe por segundo, para que os cortes sejam precisos.
+ *
+ * O encoder arranca com a pré-visualização e fica sempre ligado à câmara:
+ * começar a gravar é só passar a guardar o que ele produz. Assim a sessão da
+ * câmara nunca é reconfigurada ao carregar em gravar (o que reiniciava o foco
+ * e a exposição e fazia a imagem "saltar" nos primeiros segundos).
  */
 class VideoEncoder(
   val config: VideoConfig,
   handler: Handler,
-  private val ptsToBootUs: (Long) -> Long,
-  private val muxer: SegmentMuxer,
-  private val onError: (String) -> Unit,
-  private val onEndOfStream: () -> Unit
+  private val onOutput: (ByteBuffer, MediaCodec.BufferInfo) -> Unit,
+  private val onError: (String) -> Unit
 ) {
   private val codec: MediaCodec
   val inputSurface: Surface
+
+  /** Formato de saída (SPS/PPS). Só lido/escrito na thread do encoder. */
+  var outputFormat: MediaFormat? = null
+    private set
 
   init {
     val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, config.width, config.height).apply {
@@ -57,15 +65,12 @@ class VideoEncoder(
       override fun onOutputBufferAvailable(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
         try {
           val buffer = codec.getOutputBuffer(index)
-          if (buffer != null && info.size > 0) {
-            muxer.writeVideo(buffer, info, ptsToBootUs(info.presentationTimeUs))
-          }
+          if (buffer != null && info.size > 0) onOutput(buffer, info)
           codec.releaseOutputBuffer(index, false)
         } catch (e: Exception) {
           Log.e(TAG, "Erro a escrever vídeo", e)
           onError("Erro a escrever o vídeo: ${e.message}")
         }
-        if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) onEndOfStream()
       }
 
       override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
@@ -74,7 +79,7 @@ class VideoEncoder(
       }
 
       override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
-        muxer.onVideoFormat(format)
+        outputFormat = format
       }
     }, handler)
     codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
@@ -82,12 +87,12 @@ class VideoEncoder(
     codec.start()
   }
 
-  fun signalEndOfStream() {
+  /** Pede um keyframe já (para a gravação começar sem esperar até 1 s). */
+  fun requestKeyFrame() {
     try {
-      codec.signalEndOfInputStream()
-    } catch (e: IllegalStateException) {
-      Log.w(TAG, "signalEndOfInputStream falhou", e)
-      onEndOfStream()
+      codec.setParameters(Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0) })
+    } catch (e: Exception) {
+      Log.w(TAG, "Pedido de keyframe falhou", e)
     }
   }
 

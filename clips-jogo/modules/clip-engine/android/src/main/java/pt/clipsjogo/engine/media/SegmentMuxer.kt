@@ -81,6 +81,8 @@ class SegmentMuxer(
   /** Tempo de gravação já escrito (último frame de vídeo). */
   val writtenUntilUs: Long get() = maxOf(0L, lastVideoRecUs)
 
+  val hasVideoFormat: Boolean get() = videoFormat != null
+
   fun onVideoFormat(format: MediaFormat) {
     videoFormat = format
   }

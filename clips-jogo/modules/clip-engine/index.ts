@@ -63,6 +63,8 @@ declare class ClipEngineNative extends NativeModule<Events> {
   getPermissionsAsync(): Promise<PermissionResult>;
   getStatus(): EngineStatus;
   getRecordingTimeMs(): number;
+  /** Prepara a câmara/encoder nesta qualidade (só antes de gravar). */
+  setQuality(quality: Quality): Promise<void>;
   startRecording(quality: Quality): Promise<string>;
   stopRecording(): Promise<void>;
   requestClip(id: string | null, startMs: number, endMs: number, name: string | null): Promise<Clip>;

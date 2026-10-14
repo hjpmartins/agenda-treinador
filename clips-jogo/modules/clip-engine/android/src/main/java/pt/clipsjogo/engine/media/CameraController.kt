@@ -137,6 +137,8 @@ class CameraController(
               set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
               set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
               fpsRange?.let { set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
+              // Num tripé, a estabilização eletrónica só faz a imagem "flutuar" e dar saltos.
+              set(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
             }.build()
             s.setRepeatingRequest(request, null, handler)
           } catch (e: Exception) {

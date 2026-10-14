@@ -90,25 +90,36 @@ function DiagramEditor({ initial, onClose, onSave }) {
 
   const nearestToken = (pt) => diagram.tokens.find((t) => distPt(t, pt) < SNAP_DIST);
 
-  // "Quem tem bola": o jogador mais próximo da bola, dentro de uma distância
-  // curta — usado para que um Passe ou Lançamento iniciado a partir dele saia
-  // sempre da bola (e não do jogador), para a animação funcionar e a seta
-  // começar no sítio certo, sem o treinador ter de acertar exatamente no
-  // ícone pequeno da bola.
-  const findBallHolder = () => {
-    const ball = diagram.tokens.find((t) => t.type === "ball");
-    if (!ball) return null;
-    const holder = diagram.tokens.find((t) => t.type !== "ball" && t.type !== "cone" && t.type !== "treinador" && distPt(t, ball) < BALL_HOLD_DIST);
-    return holder ? { ball, holder } : null;
+  // Bola mais próxima de um jogador, dentro de uma distância curta — "a bola
+  // que ele tem" (pode haver vários jogadores e várias bolas no mesmo diagrama).
+  const ballHeldBy = (token) => {
+    let nearest = null;
+    let nearestDist = Infinity;
+    diagram.tokens.forEach((t) => {
+      if (t.type !== "ball") return;
+      const d = distPt(t, token);
+      if (d < BALL_HOLD_DIST && d < nearestDist) {
+        nearest = t;
+        nearestDist = d;
+      }
+    });
+    return nearest;
   };
 
-  // Para Passe/Lançamento: se o toque/arrasto começar no jogador que tem a
-  // bola, a seta começa mesmo na bola (não no jogador) — ver findBallHolder.
+  // Cada bola só pode ter uma ordem de passe/lançamento à espera.
+  const ballHasPendingPass = (ballId) => diagram.arrows.some((a) => (a.type === "passe" || a.type === "lancamento") && a.tokenId === ballId);
+
+  // Para Passe/Lançamento: a seta tem sempre de começar num jogador que
+  // tenha bola por perto (ver ballHeldBy) e essa bola não pode já ter outra
+  // ordem de passe/lançamento à espera (ballHasPendingPass) — devolve null
+  // para bloquear o gesto nesses casos. A seta fica desenhada sobre o
+  // jogador (não sobre a bola): "id" é o da bola, só para a animação saber
+  // o que mover; "anchorId" é o do jogador, para a seta e o destaque visual.
   const resolveArrowOrigin = (type, token) => {
     if (type !== "passe" && type !== "lancamento") return token;
-    const possession = findBallHolder();
-    if (possession && possession.holder.id === token.id) return possession.ball;
-    return token;
+    const ball = ballHeldBy(token);
+    if (!ball || ballHasPendingPass(ball.id)) return null;
+    return { x: token.x, y: token.y, id: ball.id, anchorId: token.id };
   };
 
   const snapAngle = (from, raw) => {
@@ -128,7 +139,6 @@ function DiagramEditor({ initial, onClose, onSave }) {
   };
 
   const addToken = (type) => {
-    if (type === "ball" && diagram.tokens.some((t) => t.type === "ball")) return;
     const token = {
       id: uid(),
       type,
@@ -182,9 +192,15 @@ function DiagramEditor({ initial, onClose, onSave }) {
       commit((d) => d); // ponto de partida no histórico, antes do arrasto começar
       setDragId(tokenId);
       setSelectedId(tokenId);
+    } else if (pendingFrom) {
+      // Já há uma origem escolhida à espera de destino — este toque é o
+      // destino (ou o cancelamento, se for o mesmo jogador outra vez), não
+      // uma nova origem, por isso não passa pela validação de posse de bola.
+      setDrawing({ type: mode, from: { x: token.x, y: token.y, tokenId: token.id, anchorId: token.id }, to: { x: token.x, y: token.y, tokenId: null } });
     } else {
       const origin = resolveArrowOrigin(mode, token);
-      setDrawing({ type: mode, from: { x: origin.x, y: origin.y, tokenId: origin.id }, to: { x: origin.x, y: origin.y, tokenId: null } });
+      if (!origin) return; // Passe/Lançamento: sem bola por perto, ou essa bola já tem ordem de passe
+      setDrawing({ type: mode, from: { x: origin.x, y: origin.y, tokenId: origin.id, anchorId: origin.anchorId || origin.id }, to: { x: origin.x, y: origin.y, tokenId: null } });
     }
   };
 
@@ -203,6 +219,7 @@ function DiagramEditor({ initial, onClose, onSave }) {
       setSelectedId(null);
       return;
     }
+    if (!pendingFrom && (mode === "passe" || mode === "lancamento")) return; // só pode começar num jogador com bola
     setDrawing({ type: mode, from: { ...pt, tokenId: null }, to: { ...pt, tokenId: null } });
   };
 
@@ -251,8 +268,8 @@ function DiagramEditor({ initial, onClose, onSave }) {
         // guarda-o como ponto de partida — o próximo toque (noutro jogador
         // ou no campo) completa a seta sozinho, sem ser preciso arrastar.
         if (!pendingFrom) {
-          setPendingFrom({ x: drawing.from.x, y: drawing.from.y, tokenId: drawing.from.tokenId });
-        } else if (drawing.from.tokenId === pendingFrom.tokenId) {
+          setPendingFrom({ x: drawing.from.x, y: drawing.from.y, tokenId: drawing.from.tokenId, anchorId: drawing.from.anchorId });
+        } else if (drawing.from.anchorId === pendingFrom.anchorId) {
           setPendingFrom(null); // tocou no mesmo outra vez — cancela a escolha
         } else {
           addArrow(mode, { x: pendingFrom.x, y: pendingFrom.y }, { x: drawing.from.x, y: drawing.from.y }, pendingFrom.tokenId);
@@ -333,8 +350,8 @@ function DiagramEditor({ initial, onClose, onSave }) {
             ) : (
               <>
                 Arrasta para desenhar, ou toca no jogador de partida e depois no de destino · segura <b className="text-[#F2EDE3]">Shift</b> ao arrastar para linha reta
-                {mode === "passe" && <> · <b className="text-[#F2EDE3]">Passe</b> não desloca o jogador, só a bola (sai sempre dela, mesmo tocando no jogador que a tem) — usa Corte para o movimento do passador</>}
-                {mode === "lancamento" && <> · <b className="text-[#F2EDE3]">Lançamento</b> desloca só a bola, terminando no alvo (ex: o cesto) — sai sempre da bola, mesmo tocando no jogador que a tem</>}
+                {mode === "passe" && <> · <b className="text-[#F2EDE3]">Passe</b> só pode começar num jogador com bola por perto, e cada bola só pode ter uma ordem de passe de cada vez — usa Corte para o movimento do passador</>}
+                {mode === "lancamento" && <> · <b className="text-[#F2EDE3]">Lançamento</b> só pode começar num jogador com bola por perto, terminando no alvo (ex: o cesto)</>}
                 {mode === "bloqueio" && <> · o traço fica orientado na direção que arrastares, e ao reproduzir o jogador desloca-se até ao fim da linha e para lá</>}
                 {mode === "handoff" && <> · <b className="text-[#F2EDE3]">Hand-off</b> desloca a jogadora com bola até à companheira — a bola fica com quem recebe</>}
                 {CURVABLE_TYPES.has(mode) && <> · depois de desenhada, seleciona-a em <b className="text-[#F2EDE3]">Mover</b> e arrasta o ponto do meio para curvar</>}
@@ -386,7 +403,7 @@ function DiagramEditor({ initial, onClose, onSave }) {
             )}
             {diagram.tokens.map((t) => {
               const pos = (animPositions && animPositions[t.id]) || t;
-              const isPendingOrigin = pendingFrom && pendingFrom.tokenId === t.id;
+              const isPendingOrigin = pendingFrom && (pendingFrom.anchorId || pendingFrom.tokenId) === t.id;
               return <TokenShape key={t.id} token={pos} selected={selectedId === t.id || isPendingOrigin} onMouseDown={(e) => startFromToken(e, t.id)} />;
             })}
           </svg>

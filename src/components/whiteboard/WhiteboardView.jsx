@@ -171,25 +171,36 @@ function WhiteboardView({ onClose }) {
 
   const nearestToken = (pt) => diagram.tokens.find((t) => distPt(t, pt) < SNAP_DIST);
 
-  // "Quem tem bola": a jogadora mais próxima da bola, dentro de uma distância
-  // curta — usado para que um Passe ou Lançamento iniciado a partir dela saia
-  // sempre da bola (e não da jogadora), para a animação funcionar e a seta
-  // começar no sítio certo, sem o treinador ter de acertar exatamente no
-  // ícone pequeno da bola.
-  const findBallHolder = () => {
-    const ball = diagram.tokens.find((t) => t.type === "ball");
-    if (!ball) return null;
-    const holder = diagram.tokens.find((t) => t.type !== "ball" && t.type !== "cone" && t.type !== "treinador" && distPt(t, ball) < BALL_HOLD_DIST);
-    return holder ? { ball, holder } : null;
+  // Bola mais próxima de uma jogadora, dentro de uma distância curta — "a
+  // bola que ela tem" (pode haver várias jogadoras e várias bolas no mesmo quadro).
+  const ballHeldBy = (token) => {
+    let nearest = null;
+    let nearestDist = Infinity;
+    diagram.tokens.forEach((t) => {
+      if (t.type !== "ball") return;
+      const d = distPt(t, token);
+      if (d < BALL_HOLD_DIST && d < nearestDist) {
+        nearest = t;
+        nearestDist = d;
+      }
+    });
+    return nearest;
   };
 
-  // Para Passe/Lançamento: se o toque/arrasto começar na jogadora que tem a
-  // bola, a seta começa mesmo na bola (não na jogadora) — ver findBallHolder.
+  // Cada bola só pode ter uma ordem de passe/lançamento à espera.
+  const ballHasPendingPass = (ballId) => diagram.arrows.some((a) => (a.type === "passe" || a.type === "lancamento") && a.tokenId === ballId);
+
+  // Para Passe/Lançamento: a seta tem sempre de começar numa jogadora que
+  // tenha bola por perto (ver ballHeldBy) e essa bola não pode já ter outra
+  // ordem de passe/lançamento à espera (ballHasPendingPass) — devolve null
+  // para bloquear o gesto nesses casos. A seta fica desenhada sobre a
+  // jogadora (não sobre a bola): "id" é o da bola, só para a animação saber
+  // o que mover; "anchorId" é o da jogadora, para a seta e o destaque visual.
   const resolveArrowOrigin = (type, token) => {
     if (type !== "passe" && type !== "lancamento") return token;
-    const possession = findBallHolder();
-    if (possession && possession.holder.id === token.id) return possession.ball;
-    return token;
+    const ball = ballHeldBy(token);
+    if (!ball || ballHasPendingPass(ball.id)) return null;
+    return { x: token.x, y: token.y, id: ball.id, anchorId: token.id };
   };
 
   const snapAngle = (from, raw) => {
@@ -209,7 +220,6 @@ function WhiteboardView({ onClose }) {
   };
 
   const addToken = (type) => {
-    if (type === "ball" && diagram.tokens.some((t) => t.type === "ball")) return;
     const token = {
       id: uid(),
       type,
@@ -296,9 +306,15 @@ function WhiteboardView({ onClose }) {
       commit((d) => d);
       setDragId(tokenId);
       setSelectedId(tokenId);
+    } else if (pendingFrom) {
+      // Já há uma origem escolhida à espera de destino — este toque é o
+      // destino (ou o cancelamento, se for a mesma jogadora outra vez), não
+      // uma nova origem, por isso não passa pela validação de posse de bola.
+      setDrawing({ type: mode, from: { x: token.x, y: token.y, tokenId: token.id, anchorId: token.id }, to: { x: token.x, y: token.y, tokenId: null } });
     } else {
       const origin = resolveArrowOrigin(mode, token);
-      setDrawing({ type: mode, from: { x: origin.x, y: origin.y, tokenId: origin.id }, to: { x: origin.x, y: origin.y, tokenId: null } });
+      if (!origin) return; // Passe/Lançamento: sem bola por perto, ou essa bola já tem ordem de passe
+      setDrawing({ type: mode, from: { x: origin.x, y: origin.y, tokenId: origin.id, anchorId: origin.anchorId || origin.id }, to: { x: origin.x, y: origin.y, tokenId: null } });
     }
   };
 
@@ -324,6 +340,7 @@ function WhiteboardView({ onClose }) {
       setSelectedId(null);
       return;
     }
+    if (!pendingFrom && (mode === "passe" || mode === "lancamento")) return; // só pode começar numa jogadora com bola
     setDrawing({ type: mode, from: { ...pt, tokenId: null }, to: { ...pt, tokenId: null } });
   };
 
@@ -391,8 +408,8 @@ function WhiteboardView({ onClose }) {
         // guarda-a como ponto de partida — o próximo toque (noutra jogadora
         // ou no campo) completa a seta sozinho, sem ser preciso arrastar.
         if (!pendingFrom) {
-          setPendingFrom({ x: drawing.from.x, y: drawing.from.y, tokenId: drawing.from.tokenId });
-        } else if (drawing.from.tokenId === pendingFrom.tokenId) {
+          setPendingFrom({ x: drawing.from.x, y: drawing.from.y, tokenId: drawing.from.tokenId, anchorId: drawing.from.anchorId });
+        } else if (drawing.from.anchorId === pendingFrom.anchorId) {
           setPendingFrom(null); // tocou na mesma outra vez — cancela a escolha
         } else {
           addArrow(mode, { x: pendingFrom.x, y: pendingFrom.y }, { x: drawing.from.x, y: drawing.from.y }, pendingFrom.tokenId);
@@ -504,7 +521,7 @@ function WhiteboardView({ onClose }) {
             ) : (
               <>
                 Arrasta para desenhar, ou toca na jogadora de partida e depois na de destino · segura <b className="text-[#F2EDE3]">Shift</b> ao arrastar para linha reta
-                {(mode === "passe" || mode === "lancamento") && <> · sai sempre da bola, mesmo tocando na jogadora que a tem</>}
+                {(mode === "passe" || mode === "lancamento") && <> · só pode começar numa jogadora com bola por perto, e cada bola só pode ter uma ordem de cada vez</>}
               </>
             )}
           </span>
@@ -566,7 +583,7 @@ function WhiteboardView({ onClose }) {
             )}
             {diagram.tokens.map((t) => {
               const pos = (animPositions && animPositions[t.id]) || t;
-              const isPendingOrigin = pendingFrom && pendingFrom.tokenId === t.id;
+              const isPendingOrigin = pendingFrom && (pendingFrom.anchorId || pendingFrom.tokenId) === t.id;
               return <TokenShape key={t.id} token={pos} selected={selectedId === t.id || isPendingOrigin} onMouseDown={(e) => startFromToken(e, t.id)} />;
             })}
             {(diagram.strokes || []).map((s) => (

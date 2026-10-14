@@ -55,10 +55,13 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
     const steps = cleaned();
     if (!steps.length) return;
     const is3D = sceneRef.current?.viewMode === "3d";
+    // Ângulo/inclinação atuais da câmara ao vivo, para o vídeo gravado ficar
+    // virado para o mesmo lado que o treinador tinha deixado.
+    const camera = is3D && sceneRef.current ? { az: sceneRef.current.cam.az, polar: sceneRef.current.cam.polar } : null;
     setExportState({ progress: 0 });
     try {
       const { blob, extension, mimeType } = is3D
-        ? await recordDiagramasVideo3D(steps, { onProgress: (progress) => setExportState({ progress }) })
+        ? await recordDiagramasVideo3D(steps, { camera, onProgress: (progress) => setExportState({ progress }) })
         : await generateSequenceVideo(steps, { onProgress: (progress) => setExportState({ progress }) });
       const filename = `jogada-${steps.length}-passos${is3D ? "-3d" : ""}.${extension}`;
       if (canShareFiles) {

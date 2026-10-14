@@ -13,7 +13,7 @@ const EXPORT_HEIGHT = 540;
 // treinador está a ver (essa fica livre para continuar a ser usada/editada,
 // e o vídeo sai sempre com a mesma qualidade e proporção, seja qual for o
 // aparelho ou o tamanho da janela).
-async function recordDiagramasVideo3D(diagramas, { onProgress } = {}) {
+async function recordDiagramasVideo3D(diagramas, { onProgress, camera } = {}) {
   if (!diagramas || !diagramas.length) {
     throw new Error("Não há diagramas nesta sequência.");
   }
@@ -39,10 +39,21 @@ async function recordDiagramasVideo3D(diagramas, { onProgress } = {}) {
   container.style.height = `${EXPORT_HEIGHT}px`;
   document.body.appendChild(container);
 
-  const scene = new Court3DScene(container, { bloom: true, intro: false });
+  const scene = new Court3DScene(container, { bloom: true, intro: false, preserveDrawingBuffer: true });
   try {
     await scene.ready;
     scene.setSequence(diagramas);
+    // Herda o ângulo e a inclinação da câmara que o treinador tinha na vista
+    // ao vivo (não a distância/zoom — essa depende da proporção do ecrã
+    // onde estava aberta; deixa-se o enquadramento próprio desta cena, já
+    // calculado para o tamanho fixo do vídeo, encarregar-se de caber bem o
+    // campo, só rodado/inclinado como o treinador o tinha deixado).
+    if (camera) {
+      scene.cam.az = camera.az;
+      scene.cam.polar = camera.polar;
+      scene.goal.az = camera.az;
+      scene.goal.polar = camera.polar;
+    }
     // Dá tempo à câmara para assentar no enquadramento inicial antes de
     // começar a gravar (a transição é suave, não instantânea).
     await new Promise((resolve) => setTimeout(resolve, 700));
@@ -55,7 +66,7 @@ async function recordDiagramasVideo3D(diagramas, { onProgress } = {}) {
     const stream = canvas.captureStream(0);
     const track = stream.getVideoTracks()[0];
     const chunks = [];
-    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
     recorder.ondataavailable = (e) => {
       if (e.data && e.data.size) chunks.push(e.data);
     };

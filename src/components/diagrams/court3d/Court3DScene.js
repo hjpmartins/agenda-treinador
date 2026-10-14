@@ -286,7 +286,19 @@ class Court3DScene {
   /* -------------------------------- setup -------------------------------- */
 
   _initRenderer() {
-    const r = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    // preserveDrawingBuffer: só ligado quando se vai gravar vídeo (ver
+    // opts.preserveDrawingBuffer, passado pela exportação de vídeo 3D) — sem
+    // isto, um <canvas> WebGL pode ser limpo pelo navegador logo a seguir a
+    // cada frame desenhado, e o captureStream()/requestFrame() apanha às
+    // vezes um frame já limpo ou a meio da troca de buffers, consoante o
+    // aparelho — dá um ficheiro que ainda parece válido mas que alguns
+    // leitores (como o do WhatsApp) recusam a abrir. Fica desligado na vista
+    // normal (poupa um bocado de desempenho) porque só importa para gravar.
+    const r = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+      preserveDrawingBuffer: !!this.opts.preserveDrawingBuffer,
+    });
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;

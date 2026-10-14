@@ -154,7 +154,7 @@ function SessionModal({ initial, library, players, onSaveToLibrary, onClose, onS
                           placeholder="Descrição / instruções (organização, variantes, critério de sucesso...)"
                         />
                         <div className="col-span-4">
-                          <DiagramStepsRow diagramas={ex.diagramas || []} onChange={(diagramas) => updateExercise(ex.id, "diagramas", diagramas)} />
+                          <DiagramStepsRow diagramas={ex.diagramas || []} onChange={(diagramas) => updateExercise(ex.id, "diagramas", diagramas)} title={ex.nome} />
                         </div>
                       </div>
                       <div className="flex flex-col gap-0.5 shrink-0">

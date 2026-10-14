@@ -38,7 +38,7 @@ function LibraryModal({ initial, onClose, onSave }) {
         </Field>
         <div className="col-span-2 mt-1">
           <span className="block text-xs text-[#8A93A3] mb-1.5">Diagramas (sequência de passos)</span>
-          <DiagramStepsRow diagramas={form.diagramas} onChange={(diagramas) => setForm({ ...form, diagramas })} />
+          <DiagramStepsRow diagramas={form.diagramas} onChange={(diagramas) => setForm({ ...form, diagramas })} title={form.nome} />
         </div>
       </div>
       <ModalActions onCancel={onClose} onSave={() => onSave(form)} disabled={!form.nome.trim()} />

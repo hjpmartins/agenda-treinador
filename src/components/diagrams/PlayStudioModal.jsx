@@ -23,7 +23,7 @@ const isEmptyStep = (d) => !d || (d.tokens.length === 0 && d.arrows.length === 0
 function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = false, onSave, onClose }) {
   const [draft, setDraft] = useState(diagramas || []);
   const [dirty, setDirty] = useState(false);
-  const [exportState, setExportState] = useState(null); // null | {progress} | {error}
+  const [exportState, setExportState] = useState(null); // null | {progress} | {error} | {ready: {blob, filename}}
 
   const cleaned = () => draft.filter((d, i) => !(isEmptyStep(d) && draft.length === 1 && i === 0));
 
@@ -35,26 +35,53 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
   // Vídeo em vez de GIF: ao contrário de uma GIF partilhada de fora da caixa
   // de GIFs do WhatsApp (que muitas vezes chega só como uma imagem parada,
   // limitação do próprio WhatsApp), um vídeo mostra sempre pré-visualização
-  // e repete em loop. Demora o tempo real da jogada a gravar.
-  const shareVideo = async () => {
+  // e repete em loop. Demora o tempo real da jogada a gravar — e por isso não
+  // dá para gerar e partilhar no mesmo toque: o navigator.share só funciona
+  // em reação direta e imediata a um toque, e vários segundos de gravação já
+  // chegam tarde demais. Em telemóvel faz-se em dois tempos: gera-se o
+  // vídeo, e só o toque seguinte ("Partilhar agora") é que ainda conta como
+  // reação ao utilizador. Em computador não há essa restrição, descarrega-se
+  // logo a seguir a gerar, sem precisar de um segundo toque.
+  const prepareVideo = async () => {
     const steps = cleaned();
     if (!steps.length) return;
     setExportState({ progress: 0 });
     try {
-      const { blob, extension } = await generateSequenceVideo(steps, { onProgress: (progress) => setExportState({ progress }) });
+      const { blob, extension, mimeType } = await generateSequenceVideo(steps, { onProgress: (progress) => setExportState({ progress }) });
       const filename = `jogada-${steps.length}-passos.${extension}`;
-      const file = canShareFiles ? new File([blob], filename, { type: blob.type }) : null;
-      if (file && navigator.canShare({ files: [file] })) {
+      if (canShareFiles) {
+        setExportState({ ready: { blob, filename, mimeType } });
+      } else {
+        downloadBlob(blob, filename);
+        setExportState(null);
+      }
+    } catch (e) {
+      setExportState({ error: e.message || "Não foi possível gerar o vídeo." });
+    }
+  };
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Chamado num toque novo (depois do vídeo já estar pronto), para o
+  // navigator.share ainda contar como reação direta ao utilizador.
+  const shareReady = async () => {
+    const ready = exportState?.ready;
+    if (!ready) return;
+    try {
+      const file = new File([ready.blob], ready.filename, { type: ready.mimeType });
+      if (navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: title || "Jogada" });
       } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadBlob(ready.blob, ready.filename);
       }
       setExportState(null);
     } catch (e) {
@@ -62,7 +89,7 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
         setExportState(null); // o utilizador fechou a folha de partilha sem escolher nada
         return;
       }
-      setExportState({ error: e.message || "Não foi possível gerar o vídeo." });
+      setExportState({ error: e.message || "Não foi possível partilhar o vídeo." });
     }
   };
 
@@ -80,18 +107,28 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
         {exportState?.error && <span className="text-xs text-[#D64545]">{exportState.error}</span>}
         <button
           type="button"
-          onClick={shareVideo}
+          onClick={exportState?.ready ? shareReady : prepareVideo}
           disabled={(exportState && "progress" in exportState) || !cleaned().length}
-          title={canShareFiles ? "Partilhar a sequência como vídeo, para enviar às jogadoras" : "Descarregar a sequência como vídeo, para enviar às jogadoras"}
+          title={
+            exportState?.ready
+              ? "Partilhar o vídeo já gerado"
+              : canShareFiles
+                ? "Gerar a sequência em vídeo, para partilhar"
+                : "Descarregar a sequência como vídeo, para enviar às jogadoras"
+          }
           className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-[#2E3644] text-[#C7CDD8] hover:border-[#5A6272] hover:text-[#F2EDE3] disabled:opacity-40"
         >
           {exportState && "progress" in exportState ? (
             <>
               <Loader2 size={13} className="animate-spin" /> {Math.round(exportState.progress * 100)}%
             </>
+          ) : exportState?.ready ? (
+            <>
+              <Share2 size={13} /> Partilhar agora
+            </>
           ) : canShareFiles ? (
             <>
-              <Share2 size={13} /> Partilhar vídeo
+              <Share2 size={13} /> Gerar vídeo
             </>
           ) : (
             <>

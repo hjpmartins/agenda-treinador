@@ -48,6 +48,15 @@ controlo externo), `className`/`style` (tamanho do contentor).
 Um sítio natural para o botão "Ver em 3D" é o `SequencePlayerModal` em
 `../SequencePlayer.jsx`, que já recebe os mesmos `diagramas`.
 
+## Campos novos (opcionais) nas setas
+
+- `waypoints: [{x,y},{x,y}]` — as 2 pegas da curva em S (bloqueio, corte, drible, lançamento).
+- `targetId` — num passe, a jogadora que recebe. O fim do passe acompanha
+  sempre o sítio para onde ela se desloca nesse passo (`syncPasses` em
+  `usePlayEditor.js`).
+
+Ambos são ignorados por código antigo; as jogadas antigas continuam iguais.
+
 ## Controlos
 
 - Arrastar: rodar (horizontal) e inclinar (vertical) · roda do rato / pinça: zoom

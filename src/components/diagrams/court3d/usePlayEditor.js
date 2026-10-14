@@ -76,6 +76,43 @@ function arrowHandles(a) {
   return [];
 }
 
+// Para onde se desloca uma ficha neste passo (fim da sua seta de corte,
+// drible, bloqueio ou hand-off), ou null se fica parada.
+function movementEnd(diagram, tokenId) {
+  let end = null;
+  diagram.arrows.forEach((a) => {
+    if (a.tokenId === tokenId && a.to && a.type !== "passe" && a.type !== "lancamento") end = { x: a.to.x, y: a.to.y };
+  });
+  return end;
+}
+
+// Passes dirigidos a uma jogadora (targetId) apontam sempre para onde ela vai
+// estar no fim do passo: o fim do seu deslocamento, ou a posição dela se não
+// se mexer. Corre depois de cada alteração, por isso acompanha cortes
+// desenhados antes ou depois do passe, e fichas arrastadas.
+function syncPasses(list) {
+  let changed = false;
+  const out = list.map((d) => {
+    let stepChanged = false;
+    const arrows = d.arrows.map((a) => {
+      if (a.type !== "passe" || !a.targetId) return a;
+      const target = d.tokens.find((t) => t.id === a.targetId);
+      if (!target) return a;
+      const end = movementEnd(d, target.id) || { x: target.x, y: target.y };
+      if (Math.abs(end.x - a.to.x) < 0.01 && Math.abs(end.y - a.to.y) < 0.01) return a;
+      // A curva acompanha, se o utilizador ainda não a tiver mexido.
+      const oldDefault = defaultControlPoint(a.type, a.from, a.to);
+      const keepDefault = !a.control || distPt(a.control, oldDefault) < 0.5;
+      stepChanged = true;
+      return { ...a, to: end, control: keepDefault ? defaultControlPoint(a.type, a.from, end) : a.control };
+    });
+    if (!stepChanged) return d;
+    changed = true;
+    return { ...d, arrows };
+  });
+  return changed ? out : list;
+}
+
 function snapAngle(from, raw) {
   const dist = Math.hypot(raw.x - from.x, raw.y - from.y);
   const step = Math.PI / 12;
@@ -114,8 +151,9 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
 
   const dragRef = useRef(null); // {kind: 'token'|'control', id}
 
-  const commit = useCallback((u) => dispatch({ type: "commit", updater: u }), []);
-  const replaceCurrent = useCallback((u) => dispatch({ type: "replaceCurrent", updater: u }), []);
+  const withSync = (u) => (list) => syncPasses(typeof u === "function" ? u(list) : u);
+  const commit = useCallback((u) => dispatch({ type: "commit", updater: withSync(u) }), []);
+  const replaceCurrent = useCallback((u) => dispatch({ type: "replaceCurrent", updater: withSync(u) }), []);
   const undo = useCallback(() => dispatch({ type: "undo" }), []);
   const redo = useCallback(() => dispatch({ type: "redo" }), []);
 
@@ -181,6 +219,25 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     return rim ? { x: rim.x, y: rim.y, hoop: true } : null;
   };
 
+  // Recetora de um passe junto a pt: pela posição atual da jogadora ou pelo
+  // sítio para onde ela se desloca neste passo. Devolve {token, end}.
+  const receiverAt = (pt, ballId) => {
+    let best = null;
+    let bestD = SNAP_DIST + 4;
+    step.tokens.forEach((t) => {
+      if (t.type === "ball" || t.type === "cone" || t.id === ballId) return;
+      const end = movementEnd(step, t.id) || { x: t.x, y: t.y };
+      const d = Math.min(distPt(t, pt), distPt(end, pt));
+      if (d < bestD) {
+        best = { token: t, end };
+        bestD = d;
+      }
+    });
+    // Quem tem a bola não recebe o próprio passe.
+    if (best && ballOf(best.token.id)?.id === ballId) return null;
+    return best;
+  };
+
   const ballBusy = (ballId) => step.arrows.some((a) => (a.type === "passe" || a.type === "lancamento") && a.tokenId === ballId);
 
   // Passe e lançamento movem a bola: se se começa na jogadora, usa a bola dela.
@@ -213,7 +270,7 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     return best;
   };
 
-  const addArrow = (type, from, to, tokenId) => {
+  const addArrow = (type, from, to, tokenId, targetId = null) => {
     if ((type === "passe" || type === "lancamento") && tokenId) {
       const ball = ballOf(tokenId);
       if (ball) {
@@ -231,7 +288,16 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
           ...d.arrows,
           WAYPOINT_TYPES.has(type)
             ? { id, type, from, to, waypoints: defaultWaypoints({ type, from, to }), tokenId: tokenId || null }
-            : { id, type, from, to, control: CURVABLE_TYPES.has(type) ? defaultControlPoint(type, from, to) : undefined, tokenId: tokenId || null },
+            : {
+                id,
+                type,
+                from,
+                to,
+                control: CURVABLE_TYPES.has(type) ? defaultControlPoint(type, from, to) : undefined,
+                tokenId: tokenId || null,
+                // Passe para uma jogadora: segue-a até onde ela se desloca.
+                ...(type === "passe" && targetId ? { targetId } : {}),
+              },
         ],
       }))
     );
@@ -313,6 +379,14 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         setDrawing({ type: mode, from: { x: ball.x, y: ball.y, tokenId: ball.id }, to: { x: ball.x, y: ball.y, tokenId: null } });
         return;
       }
+      // Segundo toque de um passe: aceita a recetora ou o sítio para onde ela vai.
+      if (mode === "passe" && pendingFrom) {
+        const rec = receiverAt(pt, pendingFrom.tokenId);
+        if (rec) {
+          setDrawing({ type: mode, from: { ...rec.end, tokenId: rec.token.id }, to: { ...rec.end, tokenId: null } });
+          return;
+        }
+      }
       const hoopPt = mode === "lancamento" && pendingFrom && !near ? snapToHoop(ev, pt) : null;
       const from = near ? { x: near.x, y: near.y, tokenId: near.id } : { ...(hoopPt || pt), tokenId: null };
       setDrawing({ type: mode, from, to: { x: from.x, y: from.y, tokenId: null } });
@@ -331,6 +405,13 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         updateArrow(drag.id, (a) => ({ ...a, waypoints: a.waypoints.map((w, i) => (i === drag.index ? { x: pt.x, y: pt.y } : w)) }), true);
       } else if (drawing) {
         const hoopPt = drawing.type === "lancamento" ? snapToHoop(ev, pt) : null;
+        if (drawing.type === "passe") {
+          const rec = receiverAt(pt, drawing.from.tokenId);
+          if (rec) {
+            setDrawing({ ...drawing, to: { ...rec.end, tokenId: rec.token.id } });
+            return;
+          }
+        }
         const near = hoopPt ? null : nearestToken(pt);
         let to = hoopPt || (near && near.id !== drawing.from.tokenId ? { x: near.x, y: near.y } : pt);
         if (!near && !hoopPt && ev.shiftKey) to = snapAngle(drawing.from, pt);
@@ -347,14 +428,14 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
       if (!drawing) return;
       const isTiny = distPt(drawing.from, drawing.to) < 6;
       if (!isTiny) {
-        addArrow(drawing.type, { x: drawing.from.x, y: drawing.from.y }, { x: drawing.to.x, y: drawing.to.y }, drawing.from.tokenId || drawing.to.tokenId);
+        addArrow(drawing.type, { x: drawing.from.x, y: drawing.from.y }, { x: drawing.to.x, y: drawing.to.y }, drawing.from.tokenId || drawing.to.tokenId, drawing.to.tokenId);
         setPendingFrom(null);
       } else if (drawing.from.tokenId) {
         // Toque sem arrastar: escolhe a jogadora de partida; o toque seguinte completa a seta.
         if (!pendingFrom) setPendingFrom(drawing.from);
         else if (pendingFrom.tokenId === drawing.from.tokenId || ballOf(drawing.from.tokenId)?.id === pendingFrom.tokenId) setPendingFrom(null);
         else {
-          addArrow(mode, { x: pendingFrom.x, y: pendingFrom.y }, { x: drawing.from.x, y: drawing.from.y }, pendingFrom.tokenId);
+          addArrow(mode, { x: pendingFrom.x, y: pendingFrom.y }, { x: drawing.from.x, y: drawing.from.y }, pendingFrom.tokenId, drawing.from.tokenId);
           setPendingFrom(null);
         }
       } else if (pendingFrom) {

@@ -8,7 +8,7 @@ import { CourtBackground, TokenShape, ArrowShape } from "./CourtPrimitives";
 
 // Tipos de seta cuja curva pode ser ajustada arrastando um ponto de controlo.
 // "bloqueio" mantém-se sempre reto (uma parede não se curva) — por isso fica de fora.
-const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible"]);
+const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible", "handoff"]);
 
 // Histórico de estados do diagrama, para permitir desfazer/refazer.
 // "commit" grava um novo ponto no histórico (ações discretas: adicionar/apagar,
@@ -276,6 +276,7 @@ function DiagramEditor({ initial, onClose, onSave }) {
             {mode === "passe" && <> · <b className="text-[#F2EDE3]">Passe</b> não desloca o jogador, só a bola — usa Corte para o movimento do passador</>}
             {mode === "lancamento" && <> · <b className="text-[#F2EDE3]">Lançamento</b> desloca só a bola, terminando no alvo (ex: o cesto)</>}
             {mode === "bloqueio" && <> · o traço fica orientado na direção que arrastares, e ao reproduzir o jogador desloca-se até ao fim da linha e para lá</>}
+            {mode === "handoff" && <> · <b className="text-[#F2EDE3]">Hand-off</b> desloca a jogadora com bola até à companheira — a bola fica com quem recebe</>}
             {CURVABLE_TYPES.has(mode) && <> · depois de desenhada, seleciona-a em <b className="text-[#F2EDE3]">Mover</b> e arrasta o ponto do meio para curvar</>}
           </span>
         )}

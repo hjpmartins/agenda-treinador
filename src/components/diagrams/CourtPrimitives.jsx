@@ -116,6 +116,7 @@ function ArrowShape({ arrow, onMouseDown, selected }) {
   const { from, to } = arrow;
   const isShot = arrow.type === "lancamento";
   const isDrible = arrow.type === "drible";
+  const isHandoff = arrow.type === "handoff";
   const control = arrow.control || defaultControlPoint(arrow.type, from, to);
   const d = isDrible ? wavyCurvedPathD(from, control, to) : `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`;
   // A ponta da seta aponta na direção da tangente da curva (do ponto de controlo até ao fim), não da reta from→to.
@@ -130,6 +131,20 @@ function ArrowShape({ arrow, onMouseDown, selected }) {
         </g>
       ) : (
         <path d={arrowHead(tipFrom.x, tipFrom.y, to.x, to.y)} stroke={color} strokeWidth="2" fill="none" />
+      )}
+      {/* Marcador de bola a meio da linha — mostra que é um hand-off e não um
+          corte normal. Fica a meio (não no fim) para não ficar escondido
+          atrás do token de quem recebe, já que a seta termina normalmente
+          mesmo em cima dela. */}
+      {isHandoff && (
+        <circle
+          cx={0.25 * from.x + 0.5 * control.x + 0.25 * to.x}
+          cy={0.25 * from.y + 0.5 * control.y + 0.25 * to.y}
+          r="4"
+          fill="#EA5B13"
+          stroke={color}
+          strokeWidth="1"
+        />
       )}
     </g>
   );

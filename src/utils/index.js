@@ -53,6 +53,15 @@ function computeAnimatedPositions(diagram, t) {
       overrides[ball.id] = { ...ball, ...positionOnArrow(dribbleArrow, t) };
     }
   }
+  // Hand-off: a bola acompanha quem a entrega até ao fim da seta, onde fica
+  // com quem recebe — tal como o drible, mas a entregar em vez de guardar.
+  const handoffArrow = diagram.arrows.find((a) => a.type === "handoff" && a.tokenId);
+  if (handoffArrow) {
+    const ball = diagram.tokens.find((tk) => tk.type === "ball");
+    if (ball) {
+      overrides[ball.id] = { ...ball, ...positionOnArrow(handoffArrow, t) };
+    }
+  }
   return overrides;
 }
 function resolveFinalDiagram(diagram) {

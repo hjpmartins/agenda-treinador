@@ -214,6 +214,7 @@ const ARROW_TYPES = [
   { id: "corte", label: "Corte", desc: "linha contínua" },
   { id: "bloqueio", label: "Bloqueio", desc: "traço grosso, arrasta na direção do bloqueio" },
   { id: "lancamento", label: "Lançamento", desc: "arco pontilhado até ao alvo" },
+  { id: "handoff", label: "Hand-off", desc: "jogadora com bola aproxima-se e entrega à companheira — marcador de bola no fim" },
 ];
 const HALF_VB = { w: 300, h: 320 };
 const FULL_VB = { w: 300, h: 560 };

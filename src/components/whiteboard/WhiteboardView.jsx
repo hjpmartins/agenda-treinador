@@ -31,7 +31,7 @@ function StrokeShape({ points }) {
 // o movimento), mas em ecrã inteiro e dimensionado ao ecrã que estiver a
 // ser usado, em vez de preso ao tamanho de uma modal.
 
-const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible"]);
+const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible", "handoff"]);
 const ERASE_RADIUS = 7;
 
 // Distância de um ponto ao segmento [a,b] — usada para apagar um traço

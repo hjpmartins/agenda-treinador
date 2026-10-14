@@ -1,6 +1,6 @@
-import { Home, Users, Dumbbell, CheckCircle2, Swords, BookOpen, Globe, CalendarDays, PenTool } from "lucide-react";
+import { Home, Users, Dumbbell, CheckCircle2, Swords, BookOpen, Globe, CalendarDays, PenTool, FlaskConical } from "lucide-react";
 
-function Sidebar({ tab, setTab, playerCount, sessionCount, realizadosCount, jogosCount, libraryCount, publicLibraryCount, onOpenWhiteboard }) {
+function Sidebar({ tab, setTab, playerCount, sessionCount, realizadosCount, jogosCount, libraryCount, publicLibraryCount, onOpenWhiteboard, onOpenCourt3DTest }) {
   const items = [
     { id: "inicio", label: "Início", icon: Home, count: null },
     { id: "jogadores", label: "Plantel", icon: Users, count: playerCount },
@@ -14,6 +14,9 @@ function Sidebar({ tab, setTab, playerCount, sessionCount, realizadosCount, jogo
     // ecrã inteiro por cima de tudo, para poder usar-se a meio de qualquer
     // outro ecrã (ex: durante o registo de estatísticas ao vivo).
     { id: "quadro", label: "Quadro tático", icon: PenTool, count: null, action: onOpenWhiteboard },
+    // Temporário: só para experimentar o novo editor 3D antes de decidir
+    // substituir o editor de exercícios atual. Remover depois dos testes.
+    { id: "teste3d", label: "Teste 3D", icon: FlaskConical, count: null, action: onOpenCourt3DTest },
   ];
   return (
     <aside style={{ width: 208, flexShrink: 0 }} className="bg-[#1E242E] border-r border-[#2E3644]">

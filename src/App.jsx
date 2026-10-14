@@ -19,6 +19,7 @@ import { JogosView } from "./components/jogos/JogosViews";
 import { JogoModal } from "./components/jogos/JogoModal";
 import { LiveStatsView } from "./components/jogos/LiveStatsView";
 import { WhiteboardView } from "./components/whiteboard/WhiteboardView";
+import { Court3DTestView } from "./components/diagrams/Court3DTestView";
 import { LibraryView } from "./components/library/LibraryView";
 import { LibraryModal } from "./components/library/LibraryModal";
 import { LibraryImportModal } from "./components/library/LibraryImportModal";
@@ -57,6 +58,7 @@ export default function App() {
   const [jogoModal, setJogoModal] = useState(null); // null | jogo object
   const [liveStatsModal, setLiveStatsModal] = useState(null); // null | jogo object
   const [whiteboardOpen, setWhiteboardOpen] = useState(false);
+  const [court3dTestOpen, setCourt3dTestOpen] = useState(false); // temporário: ver Court3DTestView
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState(null); // {y, m, d} | null
   const [importPreview, setImportPreview] = useState(null); // {parsed, fileName}
@@ -583,6 +585,7 @@ export default function App() {
           libraryCount={library.length}
           publicLibraryCount={publicLibrary.length}
           onOpenWhiteboard={() => setWhiteboardOpen(true)}
+          onOpenCourt3DTest={() => setCourt3dTestOpen(true)}
         />
         <main className="flex-1 p-5 md:p-8 max-w-5xl">
           {!ready ? (
@@ -733,6 +736,7 @@ export default function App() {
         />
       )}
       {whiteboardOpen && <WhiteboardView onClose={() => setWhiteboardOpen(false)} />}
+      {court3dTestOpen && <Court3DTestView library={library} onClose={() => setCourt3dTestOpen(false)} />}
       {importModal && (
         <ImportModal onClose={() => setImportModal(false)} onImport={importPlayers} />
       )}

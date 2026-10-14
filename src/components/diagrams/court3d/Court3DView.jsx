@@ -15,6 +15,8 @@ import {
   Rewind,
 } from "lucide-react";
 import { Court3DScene } from "./Court3DScene";
+import { usePlayEditor } from "./usePlayEditor";
+import { EditToolbar } from "./EditToolbar";
 
 const SPEEDS = [0.5, 1, 1.5, 2];
 
@@ -37,7 +39,8 @@ function IconBtn({ onClick, title, active, children, className = "" }) {
 }
 
 /**
- * Vista 3D (só leitura) de uma jogada.
+ * Vista 3D de uma jogada. Com `editable`, a vista 2D (campo de madeira visto
+ * de cima) passa a ser também o editor: desenha-se lá e vê-se em 3D.
  *
  * Props:
  *  - diagramas: array de diagramas {court, tokens, arrows} (um por passo) ou um
@@ -46,20 +49,26 @@ function IconBtn({ onClick, title, active, children, className = "" }) {
  *  - autoPlay: começa a reproduzir assim que a cena estiver pronta.
  *  - bloom: liga/desliga o brilho pós-processado (desligar em aparelhos fracos).
  *  - onReady(scene): recebe a instância de Court3DScene (controlo externo / testes).
+ *  - editable: liga o editor na vista 2D. Nesse modo `diagramas` só é lido na
+ *    montagem (dá uma `key` diferente por jogada) e cada alteração chega por
+ *    onChange(diagramas).
+ *  - initialView: "3d" (por omissão) ou "2d".
  *  - className / style: dimensões do contentor (o canvas ocupa 100%).
  */
-function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady, className = "", style }) {
+function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady, editable = false, onChange, initialView = "3d", className = "", style }) {
   const rootRef = useRef(null);
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const [state, setState] = useState(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const initialViewRef = useRef(initialView);
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
 
   useEffect(() => {
     const scene = new Court3DScene(mountRef.current, { onStateChange: setState, bloom });
     sceneRef.current = scene;
+    if (initialViewRef.current === "2d") scene.setViewMode("2d");
     onReadyRef.current?.(scene);
     return () => {
       scene.dispose();
@@ -67,12 +76,23 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
     };
   }, [bloom]);
 
+  const editor = usePlayEditor({
+    initial: Array.isArray(diagramas) ? diagramas : diagramas ? [diagramas] : [],
+    onChange,
+    sceneRef,
+    stepIndex: state?.stepIndex ?? 0,
+    editable,
+    enabled: editable && (state?.viewMode ?? initialView) === "2d",
+  });
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+
   useEffect(() => {
     const scene = sceneRef.current;
-    if (!scene) return;
+    if (!scene || editable) return;
     scene.setSequence(diagramas);
     if (autoPlay) scene.ready.then(() => setTimeout(() => sceneRef.current === scene && scene.play(), 900));
-  }, [diagramas, autoPlay, bloom]);
+  }, [diagramas, autoPlay, bloom, editable]);
 
   useEffect(() => {
     const onFs = () => setFullscreen(document.fullscreenElement === rootRef.current);
@@ -85,8 +105,15 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
     const el = rootRef.current;
     const onKey = (e) => {
       const s = sceneRef.current;
-      if (!s || e.target.closest("button, input, textarea")) return;
-      if (e.key === " ") s.togglePlay();
+      if (!s || e.target.closest("button, input, textarea, select")) return;
+      const ed = editorRef.current;
+      if (editable && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        if (e.shiftKey) ed.redo();
+        else ed.undo();
+      } else if (editable && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") ed.redo();
+      else if (editable && (e.key === "Delete" || e.key === "Backspace")) ed.deleteSelected();
+      else if (editable && e.key === "Escape") ed.setMode(ed.mode);
+      else if (e.key === " ") s.togglePlay();
       else if (e.key === "ArrowRight") s.nextStep();
       else if (e.key === "ArrowLeft") s.prevStep();
       else if (e.key === "q") s.rotateBy(Math.PI / 4);
@@ -97,7 +124,7 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
     };
     el.addEventListener("keydown", onKey);
     return () => el.removeEventListener("keydown", onKey);
-  }, []);
+  }, [editable]);
 
   const s = sceneRef.current;
   const st = state || { stepIndex: 0, stepCount: 1, stepProgress: 0, playing: false, speed: 1, viewMode: "3d", autoRotate: false, tilt: 0.6 };
@@ -116,9 +143,11 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
     <div
       ref={rootRef}
       tabIndex={0}
-      className={`relative overflow-hidden rounded-lg bg-[#0B0E13] outline-none select-none ${className}`}
+      className={`flex flex-col overflow-hidden rounded-lg bg-[#0B0E13] outline-none select-none ${className}`}
       style={style}
     >
+      {editable && <EditToolbar editor={editor} viewMode={st.viewMode} stepIndex={st.stepIndex} onEditIn2D={() => s?.setViewMode("2d")} />}
+      <div className="relative flex-1 min-h-0">
       <div ref={mountRef} className="absolute inset-0" />
       {/* Vinheta: escurece os cantos e puxa o olhar para o campo. */}
       <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(5,7,10,0.65) 100%)" }} />
@@ -241,6 +270,7 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
             />
           </label>
         </div>
+      </div>
       </div>
     </div>
   );

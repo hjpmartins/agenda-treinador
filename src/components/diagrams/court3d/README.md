@@ -1,8 +1,9 @@
 # Vista 3D de jogadas (protótipo)
 
-Visualização **só de leitura** de uma jogada já desenhada no editor 2D: campo de
-madeira em perspetiva sobre uma mesa com grelha, câmara orbital e reprodução
-animada passo a passo. A edição continua a ser feita em 2D.
+Vista de uma jogada num campo de madeira, com dois modos: **2D** (vista de cima)
+e **3D** (perspetiva, câmara orbital, reprodução animada passo a passo). Com
+`editable`, a vista 2D é também o editor: as jogadas desenham-se diretamente no
+campo de madeira e veem-se logo em 3D, sem o editor de fundo preto.
 
 Protótipo isolado (sem login): `npm run dev` e abrir
 `http://localhost:5173/prototype-3d.html`. Também é incluído no build, por isso
@@ -16,6 +17,8 @@ fica disponível em `/prototype-3d.html` em qualquer deploy.
 | `Court3DView.jsx` | Invólucro React com os controlos (2D/3D, rodar, zoom, enquadrar, rotação automática, ecrã inteiro, reproduzir/passos, velocidade, inclinação). |
 | `textures.js` | Texturas procedimentais em canvas: madeira + marcações (mesma geometria de `CourtPrimitives.jsx`), tampos das fichas, bola. |
 | `arrows3d.js` | Setas como fitas no soalho, com shader próprio (tracejado, revelação progressiva, halo). |
+| `usePlayEditor.js` | Lógica de edição (mesmas regras do `DiagramEditor`: arrastar fichas, setas com `tokenId`, toque-toque, curvar pela pega, desfazer/refazer) aplicada à sequência inteira de passos. Os toques chegam da cena já em coordenadas do diagrama (raycast ao soalho). |
+| `EditToolbar.jsx` | Barra de edição (ação, adicionar fichas, passos, campo). |
 | `playAnimation.js` | Amostra um passo no instante t. As posições x/y vêm de `computeAnimatedPositions` (mesmas regras do leitor 2D); aqui só se acrescenta a altura da bola (passe em arco, drible a saltar, lançamento ao cesto). |
 
 Não há imagens nem modelos para carregar — tudo é gerado em código. A única
@@ -33,7 +36,10 @@ const Court3DView = lazy(() => import("../diagrams/court3d/Court3DView").then((m
 </Suspense>
 ```
 
-Props: `diagramas` (array de passos ou um diagrama), `title`, `autoPlay`,
+Para editar: `<Court3DView key={jogada.id} editable initialView="2d" diagramas={jogada.diagramas} onChange={(d) => guardar(d)} />`
+(com `editable`, `diagramas` só é lido na montagem — muda a `key` para trocar de jogada).
+
+Props: `diagramas` (array de passos ou um diagrama), `title`, `autoPlay`, `editable`, `onChange`, `initialView`,
 `bloom` (desligar em aparelhos fracos), `onReady(scene)` (acesso ao motor para
 controlo externo), `className`/`style` (tamanho do contentor).
 

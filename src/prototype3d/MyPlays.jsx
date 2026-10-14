@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { Plus, Copy, Trash2, Pencil, Check, ClipboardCopy } from "lucide-react";
-import { resolveFinalDiagram, emptyDiagram, uid } from "../utils";
-import { DiagramEditor } from "../components/diagrams/DiagramEditor";
-import { DiagramThumbnail } from "../components/diagrams/CourtPrimitives";
+import { Plus, Trash2, Check, ClipboardCopy } from "lucide-react";
+import { uid } from "../utils";
 
 // Jogadas criadas no protótipo ficam guardadas só neste navegador.
 const STORAGE_KEY = "prototipo3d.jogadas";
@@ -53,77 +51,8 @@ function ConfirmButton({ onConfirm, title, children, className = "" }) {
 }
 
 /**
- * Painel de passos de uma jogada: miniaturas, editor 2D (o mesmo da app) para
- * criar/editar cada passo, duplicar e apagar.
- */
-function StepsEditor({ play, onChange }) {
-  const [editing, setEditing] = useState(null); // {isNew, base} | {isNew:false, index}
-  const steps = play.diagramas;
-
-  const openNew = () => {
-    const base = steps.length > 0 ? resolveFinalDiagram(steps[steps.length - 1]) : emptyDiagram();
-    setEditing({ isNew: true, base });
-  };
-
-  const handleSave = (diagram) => {
-    if (editing.isNew) onChange([...steps, diagram]);
-    else onChange(steps.map((d, i) => (i === editing.index ? diagram : d)));
-    setEditing(null);
-  };
-
-  const duplicate = (i) => {
-    const copy = { court: steps[i].court, tokens: steps[i].tokens.map((t) => ({ ...t })), arrows: steps[i].arrows.map((a) => ({ ...a })) };
-    onChange([...steps.slice(0, i + 1), copy, ...steps.slice(i + 1)]);
-  };
-
-  const smallBtn = "w-6 h-6 rounded-md border border-[#2E3644] bg-[#14181F] text-[#8A93A3] hover:text-[#F2EDE3] hover:border-[#5A6272] flex items-center justify-center";
-
-  return (
-    <div className="flex items-start gap-3 overflow-x-auto pb-1">
-      {steps.map((d, i) => (
-        <div key={i} className="flex flex-col items-center gap-1.5 shrink-0">
-          <button type="button" onClick={() => setEditing({ isNew: false, index: i })} title={`Editar passo ${i + 1}`} className="relative rounded hover:ring-2 hover:ring-[#EA5B13]">
-            {d.tokens.length || d.arrows.length ? (
-              <DiagramThumbnail diagram={d} size={64} />
-            ) : (
-              <div className="w-16 h-16 rounded border border-[#2E3644] bg-[#0F1319]" />
-            )}
-            <span style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="absolute -top-2 -left-2 bg-[#14181F] border border-[#2E3644] text-[10px] rounded-full w-5 h-5 flex items-center justify-center text-[#F2EDE3]">
-              {i + 1}
-            </span>
-          </button>
-          <div className="flex gap-1">
-            <button type="button" onClick={() => setEditing({ isNew: false, index: i })} title="Editar" className={smallBtn}>
-              <Pencil size={11} />
-            </button>
-            <button type="button" onClick={() => duplicate(i)} title="Duplicar passo" className={smallBtn}>
-              <Copy size={11} />
-            </button>
-            <ConfirmButton onConfirm={() => onChange(steps.filter((_, idx) => idx !== i))} title="Apagar passo" className={smallBtn}>
-              <Trash2 size={11} />
-            </ConfirmButton>
-          </div>
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={openNew}
-        className="w-16 h-16 shrink-0 flex flex-col items-center justify-center gap-0.5 rounded border border-dashed border-[#5A6272] hover:border-[#EA5B13] text-[#8A93A3] hover:text-[#FF6B1A]"
-        title={steps.length ? "Novo passo a partir das posições finais do anterior" : "Desenhar o primeiro passo"}
-      >
-        <Plus size={18} />
-        <span className="text-[9px] uppercase tracking-wider" style={{ fontFamily: "'Oswald', sans-serif" }}>
-          Passo
-        </span>
-      </button>
-      {editing && <DiagramEditor initial={editing.isNew ? editing.base : steps[editing.index]} onClose={() => setEditing(null)} onSave={handleSave} />}
-    </div>
-  );
-}
-
-/**
- * "As minhas jogadas": lista de jogadas guardadas no navegador, com nome,
- * passos editáveis e cópia em JSON (para colar mais tarde noutro lado).
+ * "As minhas jogadas": escolher/criar/apagar jogadas, nome e cópia em JSON.
+ * Os passos editam-se diretamente na vista 2D do Court3DView.
  */
 function MyPlays({ plays, selectedId, onSelect, onPlaysChange }) {
   const [copied, setCopied] = useState(false);
@@ -203,11 +132,6 @@ function MyPlays({ plays, selectedId, onSelect, onPlaysChange }) {
               style={{ fontFamily: "'IBM Plex Mono', monospace" }}
             />
           )}
-          <StepsEditor play={selected} onChange={(diagramas) => update({ diagramas })} />
-          <p className="text-[11px] text-[#5A6272]">
-            Toca em <span className="text-[#8A93A3]">+ Passo</span> para desenhar no editor 2D. Cada passo novo começa nas posições finais do anterior. A vista 3D atualiza quando guardas.
-            As jogadas ficam guardadas só neste navegador.
-          </p>
         </>
       ) : (
         <p className="text-sm text-[#8A93A3]">Ainda não tens jogadas. Carrega em <span className="text-[#F2EDE3]">Nova jogada</span> para começar.</p>

@@ -182,12 +182,13 @@ function sampleCurve(from, control, to, segments, wavy) {
  * Cria um THREE.Group com todas as setas de um diagrama. `toWorld(p)` converte
  * {x, y} do diagrama para {x, z} do mundo. Devolve { group, setProgress, dispose }.
  */
-function buildArrows(diagram, toWorld) {
+function buildArrows(diagram, toWorld, { highlightId = null } = {}) {
   const group = new THREE.Group();
   const items = []; // { materials: [], length }
-  const color = "#F2EDE3";
 
   diagram.arrows.forEach((arrow) => {
+    // Seta selecionada no editor fica laranja.
+    const color = arrow.id === highlightId ? "#FF6B1A" : "#F2EDE3";
     const mats = [];
     const add = (geometry, mat) => {
       const m = new THREE.Mesh(geometry, mat);

@@ -264,15 +264,19 @@ class Court3DScene {
     this.goal = { ...this.cam };
     this.saved3d = { az: Math.PI, polar: THREE.MathUtils.degToRad(55) };
 
+    this.edit = { handler: null, hover: null, selectedId: null, pendingId: null, handle: null };
     this._initRenderer();
     this._initScene();
+    this._initEditOverlay();
     this._bindInput();
 
     this.clock = new THREE.Clock();
     this._loop = this._loop.bind(this);
     this.raf = requestAnimationFrame(this._loop);
 
-    this.ready = ensureFonts();
+    this.ready = ensureFonts().then(() => {
+      this.fontsReady = true;
+    });
   }
 
   /* -------------------------------- setup -------------------------------- */
@@ -424,15 +428,21 @@ class Court3DScene {
 
   /* ------------------------------- dados ---------------------------------- */
 
-  setSequence(diagramas) {
+  /**
+   * Troca a sequência de passos. Com { keep: true } (usado durante a edição)
+   * mantém o passo atual, as fichas já criadas e a câmara.
+   */
+  setSequence(diagramas, opts = {}) {
     const list = (Array.isArray(diagramas) ? diagramas : [diagramas]).filter(Boolean);
     // As texturas usam as fontes da app: só desenhar depois de carregadas.
-    this.ready.then(() => {
-      if (!this.disposed) this._applySequence(list);
-    });
+    if (this.fontsReady) this._applySequence(list, opts);
+    else
+      this.ready.then(() => {
+        if (!this.disposed) this._applySequence(list, opts);
+      });
   }
 
-  _applySequence(list) {
+  _applySequence(list, { keep = false, stepIndex } = {}) {
     this.steps = list.length ? list : [{ court: "meio", tokens: [], arrows: [] }];
     const court = this.steps[0].court === "campo" ? "campo" : "meio";
     if (court !== this.court) {
@@ -451,35 +461,52 @@ class Court3DScene {
       this._buildCourt(court);
       if (this.opts.intro && !this.introDone) this._intro();
     }
-    this._clearTokens();
-    this.stepIndex = 0;
-    this.t = 0;
-    this.playing = false;
-    this.pauseLeft = 0;
+    if (keep) {
+      const next = Math.max(0, Math.min(stepIndex ?? this.stepIndex, this.steps.length - 1));
+      if (next !== this.stepIndex) {
+        this.stepIndex = next;
+        this.t = 0;
+        this.playing = false;
+        this.pauseLeft = 0;
+      }
+    } else {
+      this._clearTokens();
+      this.stepIndex = 0;
+      this.t = 0;
+      this.playing = false;
+      this.pauseLeft = 0;
+    }
     this._rebuildArrows();
     this._emit(true);
   }
 
   _clearTokens() {
-    this.tokenMeshes.forEach(({ object, topMat }) => {
-      this.scene.remove(object);
-      object.traverse((o) => {
-        if (o.geometry) o.geometry.dispose();
-        if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
-      });
-      if (topMat && topMat.map) topMat.map.dispose();
-    });
+    this.tokenMeshes.forEach((entry) => this._disposeToken(entry));
     this.tokenMeshes.clear();
   }
 
   _tokenMesh(token) {
+    const sig = `${token.type}|${token.number ?? ""}`;
     let entry = this.tokenMeshes.get(token.id);
+    if (entry && entry.sig !== sig) {
+      this._disposeToken(entry);
+      entry = null;
+    }
     if (!entry) {
-      entry = createTokenMesh(token);
+      entry = { ...createTokenMesh(token), sig };
       this.scene.add(entry.object);
       this.tokenMeshes.set(token.id, entry);
     }
     return entry.object;
+  }
+
+  _disposeToken({ object, topMat }) {
+    this.scene.remove(object);
+    object.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
+    });
+    if (topMat && topMat.map) topMat.map.dispose();
   }
 
   _rebuildArrows() {
@@ -488,7 +515,7 @@ class Court3DScene {
       this.arrows.dispose();
     }
     const step = this.steps[this.stepIndex];
-    this.arrows = buildArrows(step, (p) => this.toWorld(p));
+    this.arrows = buildArrows(step, (p) => this.toWorld(p), { highlightId: this.edit.selectedId });
     this.scene.add(this.arrows.group);
     this.arrowsStep = this.stepIndex;
   }
@@ -643,6 +670,7 @@ class Court3DScene {
       this.goal.fov = FOV_3D;
     }
     this.viewMode = mode;
+    this.renderer.domElement.style.cursor = this.edit.handler && mode === "2d" ? "crosshair" : "grab";
     this.goal.tx = 0;
     this.goal.tz = 0;
     this.goal.zoom = 1;
@@ -730,9 +758,28 @@ class Court3DScene {
     let lastMid = null;
     let panMode = false;
 
+    // Edição (só na vista 2D): um dedo / botão esquerdo vai para o editor;
+    // dois dedos, botão direito e roda continuam a mexer na câmara.
+    let editPointer = null;
+    const editEvent = (phase, e) => {
+      const pt = this.screenToDiagram(e.clientX, e.clientY);
+      if (pt) this.edit.handler({ phase, ...pt, shiftKey: e.shiftKey });
+    };
+
     const onDown = (e) => {
       el.setPointerCapture(e.pointerId);
+      const canEdit = this.edit.handler && this.viewMode === "2d" && e.button === 0 && pointers.size === 0;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (canEdit) {
+        editPointer = e.pointerId;
+        editEvent("down", e);
+        return;
+      }
+      if (editPointer != null) {
+        // Segundo dedo durante uma edição: passa a ser gesto de câmara.
+        this.edit.handler({ phase: "cancel" });
+        editPointer = null;
+      }
       panMode = e.button === 2 || e.shiftKey;
       el.style.cursor = "grabbing";
       this.autoRotate = false;
@@ -741,6 +788,14 @@ class Court3DScene {
       this._emit(true);
     };
     const onMove = (e) => {
+      if (e.pointerId === editPointer) {
+        editEvent("move", e);
+        return;
+      }
+      if (this.edit.handler && this.viewMode === "2d" && pointers.size === 0) {
+        const pt = this.screenToDiagram(e.clientX, e.clientY);
+        el.style.cursor = pt && this.edit.hover ? this.edit.hover(pt) : "crosshair";
+      }
       if (!pointers.has(e.pointerId)) return;
       const prev = pointers.get(e.pointerId);
       const dx = e.clientX - prev.x;
@@ -767,6 +822,11 @@ class Court3DScene {
     };
     const onUp = (e) => {
       pointers.delete(e.pointerId);
+      if (e.pointerId === editPointer) {
+        editPointer = null;
+        editEvent("up", e);
+        return;
+      }
       lastPinch = null;
       lastMid = null;
       if (pointers.size === 0) el.style.cursor = "grab";
@@ -791,6 +851,74 @@ class Court3DScene {
       el.removeEventListener("wheel", onWheel);
       el.removeEventListener("contextmenu", onContext);
     };
+  }
+
+  /* -------------------------------- edição -------------------------------- */
+
+  // Ponto do ecrã -> coordenadas do diagrama (x, y do viewBox), por raycast
+  // ao plano do soalho. Fica limitado ao campo.
+  screenToDiagram(clientX, clientY) {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this._raycaster = this._raycaster || new THREE.Raycaster();
+    this._raycaster.setFromCamera(ndc, this.camera);
+    const hit = new THREE.Vector3();
+    if (!this._raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) return null;
+    const { w, h } = this.vb;
+    return { x: THREE.MathUtils.clamp(hit.x + w / 2, 4, w - 4), y: THREE.MathUtils.clamp(hit.z + h / 2, 4, h - 4) };
+  }
+
+  // handler({phase: 'down'|'move'|'up'|'cancel', x, y, shiftKey}); hover(pt) devolve o cursor.
+  setEditHandler(handler, hover) {
+    this.edit.handler = handler;
+    this.edit.hover = hover;
+    this.renderer.domElement.style.cursor = handler && this.viewMode === "2d" ? "crosshair" : "grab";
+  }
+
+  // Marcas visuais da edição: ficha/seta selecionada, jogadora de partida à
+  // espera do destino e pega para curvar a seta.
+  setEditOverlay({ selectedId = null, pendingId = null, handle = null } = {}) {
+    const changed = selectedId !== this.edit.selectedId;
+    Object.assign(this.edit, { selectedId, pendingId, handle });
+    if (changed && this.steps.length && this.court) this._rebuildArrows();
+  }
+
+  _initEditOverlay() {
+    const ringMat = (color) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false });
+    this.selRing = new THREE.Mesh(new THREE.RingGeometry(1, 1.22, 48), ringMat(COLORS.text));
+    this.pendRing = new THREE.Mesh(new THREE.RingGeometry(1, 1.22, 48), ringMat(COLORS.accent));
+    this.handle = new THREE.Group();
+    const hDisc = new THREE.Mesh(new THREE.CircleGeometry(5, 32), new THREE.MeshBasicMaterial({ color: COLORS.accent }));
+    const hRing = new THREE.Mesh(new THREE.RingGeometry(5, 6.5, 32), new THREE.MeshBasicMaterial({ color: COLORS.text }));
+    this.handle.add(hDisc, hRing);
+    [this.selRing, this.pendRing, this.handle].forEach((m) => {
+      m.rotation.x = -Math.PI / 2;
+      m.position.y = 0.7;
+      m.visible = false;
+      m.renderOrder = 5;
+      this.scene.add(m);
+    });
+  }
+
+  _updateEditOverlay(sample, time) {
+    const place = (mesh, id) => {
+      const tk = id && sample.positions[id];
+      mesh.visible = !!tk;
+      if (!tk) return;
+      const p = this.toWorld(tk);
+      const isBall = sample.ball && sample.ball.id === id;
+      mesh.position.set(p.x, isBall ? sample.ball.h - 5 : PUCK_H + 0.6, p.z);
+      mesh.scale.setScalar(isBall ? 8.5 : PUCK_R + 3);
+    };
+    place(this.selRing, this.edit.selectedId);
+    place(this.pendRing, this.edit.pendingId);
+    this.pendRing.material.opacity = 0.55 + 0.4 * Math.sin(time * 6);
+    const hd = this.edit.handle;
+    this.handle.visible = !!hd;
+    if (hd) {
+      const p = this.toWorld(hd);
+      this.handle.position.set(p.x, 0.9, p.z);
+    }
   }
 
   _pan(dx, dy) {
@@ -858,6 +986,7 @@ class Court3DScene {
     this.arrows.setProgress(idlePreview ? null : this.t, this.pauseLeft > 0 ? 0.35 + 0.65 * (this.pauseLeft / PAUSE_SECONDS) : 1);
 
     const sample = sampleStep(step, this.t, this.vb);
+    this._updateEditOverlay(sample, time);
     const seen = new Set();
     // Rodar as fichas com a câmara mantém os números sempre direitos.
     const yaw = this.cam.az;

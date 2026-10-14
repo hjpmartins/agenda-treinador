@@ -101,19 +101,15 @@ function Prototype3D() {
         <div>
           <div className="relative">
             <Court3DView
-              key={current.key}
+              key={`${source}-${current.key}`}
               diagramas={current.diagramas}
+              editable={source === "minhas" && !!myPlay}
+              initialView={source === "minhas" ? "2d" : "3d"}
+              onChange={(diagramas) => setPlays((ps) => ps.map((p) => (p.id === myId ? { ...p, diagramas } : p)))}
               onReady={(scene) => (window.__court3d = scene)}
               title={current.nome}
-              className="w-full h-[72vh] min-h-[420px] border border-[#2E3644]"
+              className="w-full h-[80vh] min-h-[520px] border border-[#2E3644]"
             />
-            {source === "minhas" && current.diagramas.length === 0 && (
-              <div className="pointer-events-none absolute inset-x-0 top-1/3 flex justify-center px-4">
-                <div className="bg-[#1E242E]/90 border border-[#2E3644] rounded-lg px-4 py-3 text-sm text-[#8A93A3] text-center max-w-sm">
-                  {myPlay ? "Esta jogada ainda não tem passos. Usa o botão + Passo acima para desenhar o primeiro." : "Cria uma jogada acima para a veres aqui em 3D."}
-                </div>
-              </div>
-            )}
           </div>
           <div className="mt-3 text-[11px] text-[#5A6272] leading-relaxed">
             Arrastar para rodar/inclinar · roda do rato ou pinça para zoom · botão direito (ou Shift) + arrastar para deslocar · teclas: espaço reproduz, ← → passos,

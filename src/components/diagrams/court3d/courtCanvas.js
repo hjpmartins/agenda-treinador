@@ -3,6 +3,8 @@
 // vista 3D (texturas.js) e a exportação de GIF (gifExport.js), e as duas
 // aparências ficarem sempre iguais.
 
+import { rimPositions } from "./playAnimation";
+
 const PX = 4; // pixéis de textura por unidade do viewBox do diagrama
 
 // Gerador pseudo-aleatório com semente fixa: a madeira sai sempre igual, em
@@ -110,6 +112,30 @@ function drawHalf(ctx, w, h, flipY, paint) {
   ctx.restore();
 }
 
+// Cesto visto de cima: tabela (linha reta na linha de fundo) + aro (círculo,
+// 22 unidades campo adentro, a mesma distância usada na vista 3D — ver
+// rimPositions em playAnimation.js) + um traço a ligar as duas.
+function drawHoop(ctx, rim, h) {
+  const intoCourt = rim.y > h / 2 ? -1 : 1; // sentido da tabela para o aro, para dentro do campo
+  const backboardY = rim.y - intoCourt * 22;
+  ctx.save();
+  ctx.strokeStyle = "rgba(242,237,227,0.94)";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(rim.x - 12, backboardY);
+  ctx.lineTo(rim.x + 12, backboardY);
+  ctx.moveTo(rim.x, backboardY);
+  ctx.lineTo(rim.x, rim.y);
+  ctx.stroke();
+  ctx.strokeStyle = "#EA5B13";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(rim.x, rim.y, 7, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 // Desenha o campo (madeira + marcações) num canvas novo de w*px × h*px.
 function drawCourtCanvas(court, vb, px = PX) {
   const { w, h } = vb;
@@ -163,6 +189,8 @@ function drawCourtCanvas(court, vb, px = PX) {
     ctx.arc(w / 2, 10, 30, 0, Math.PI);
     ctx.stroke();
   }
+
+  rimPositions(court, { w, h }).forEach((rim) => drawHoop(ctx, rim, h));
 
   return canvas;
 }

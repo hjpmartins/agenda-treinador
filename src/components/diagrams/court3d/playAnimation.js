@@ -11,7 +11,7 @@ import { computeAnimatedPositions, positionOnArrow, arrowPathPoints, assignCarri
 
 const BALL_R = 5.5;
 const PUCK_H = 4.5;
-const PUCK_R = 12;
+const PUCK_R = 9; // raio das fichas das jogadoras (o 2D usa 12; aqui um pouco menores)
 const RIM_H = 61; // 3,05 m com o campo de 15 m = 300 unidades.
 
 // Cestos em coordenadas do diagrama (mesma posição do ponto em HalfMarkings).

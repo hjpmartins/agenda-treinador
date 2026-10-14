@@ -186,11 +186,11 @@ function createTokenMesh(token) {
   if (type === "treinador") {
     const topTex = createTokenTopTexture("treinador");
     const side = new THREE.MeshStandardMaterial({ color: "#D8D2C6", roughness: 0.5 });
-    const box = new THREE.Mesh(new RoundedBoxGeometry(20, PUCK_H + 1, 20, 3, 2), side);
+    const box = new THREE.Mesh(new RoundedBoxGeometry(15, PUCK_H + 1, 15, 3, 2), side);
     box.position.y = (PUCK_H + 1) / 2;
     box.castShadow = true;
     const topMat = new THREE.MeshStandardMaterial({ map: topTex, roughness: 0.5 });
-    const top = new THREE.Mesh(new THREE.PlaneGeometry(17, 17), topMat);
+    const top = new THREE.Mesh(new THREE.PlaneGeometry(12.5, 12.5), topMat);
     top.rotation.x = -Math.PI / 2;
     top.position.y = PUCK_H + 1.02;
     const g = new THREE.Group();

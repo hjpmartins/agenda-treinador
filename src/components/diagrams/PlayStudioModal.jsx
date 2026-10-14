@@ -1,7 +1,15 @@
 import { lazy, Suspense, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Download, Loader2 } from "lucide-react";
+import { X, Download, Share2, Loader2 } from "lucide-react";
 import { generateSequenceGif } from "../../lib/gifExport";
+
+// No telemóvel, partilha o ficheiro diretamente (a app de destino recebe-o
+// logo com o tipo e o nome certos) em vez de descarregar para a pasta de
+// transferências e depois ser preciso voltar a escolhê-lo na Galeria — esse
+// passo intermédio é onde o WhatsApp às vezes deixa de reconhecer a GIF como
+// animada e manda só a primeira imagem. Em computador não há partilha nativa,
+// mantém-se o descarregar de sempre.
+const canShareFiles = typeof navigator !== "undefined" && !!navigator.share && !!navigator.canShare;
 
 // O three.js (~140 kB gzip) só é descarregado quando se abre o estúdio.
 const Court3DView = lazy(() => import("./court3d/Court3DView").then((m) => ({ default: m.Court3DView })));
@@ -32,16 +40,26 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
     setGifState({ progress: 0 });
     try {
       const blob = await generateSequenceGif(steps, { onProgress: (progress) => setGifState({ progress }) });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `jogada-${steps.length}-passos.gif`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const filename = `jogada-${steps.length}-passos.gif`;
+      const file = canShareFiles ? new File([blob], filename, { type: "image/gif" }) : null;
+      if (file && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: title || "Jogada" });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
       setGifState(null);
     } catch (e) {
+      if (e?.name === "AbortError") {
+        setGifState(null); // o utilizador fechou a folha de partilha sem escolher nada
+        return;
+      }
       setGifState({ error: e.message || "Não foi possível gerar o ficheiro." });
     }
   };
@@ -62,12 +80,16 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
           type="button"
           onClick={downloadGif}
           disabled={(gifState && "progress" in gifState) || !cleaned().length}
-          title="Descarregar a sequência como GIF, para enviar às jogadoras"
+          title={canShareFiles ? "Partilhar a sequência como GIF, para enviar às jogadoras" : "Descarregar a sequência como GIF, para enviar às jogadoras"}
           className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-[#2E3644] text-[#C7CDD8] hover:border-[#5A6272] hover:text-[#F2EDE3] disabled:opacity-40"
         >
           {gifState && "progress" in gifState ? (
             <>
               <Loader2 size={13} className="animate-spin" /> {Math.round(gifState.progress * 100)}%
+            </>
+          ) : canShareFiles ? (
+            <>
+              <Share2 size={13} /> Partilhar GIF
             </>
           ) : (
             <>

@@ -39,8 +39,8 @@ function IconBtn({ onClick, title, active, children, className = "" }) {
 }
 
 /**
- * Vista 3D de uma jogada. Com `editable`, a vista 2D (campo de madeira visto
- * de cima) passa a ser também o editor: desenha-se lá e vê-se em 3D.
+ * Vista 3D de uma jogada. Com `editable`, a própria vista é o editor, tanto em
+ * 2D (campo visto de cima) como em 3D (perspetiva).
  *
  * Props:
  *  - diagramas: array de diagramas {court, tokens, arrows} (um por passo) ou um
@@ -49,7 +49,7 @@ function IconBtn({ onClick, title, active, children, className = "" }) {
  *  - autoPlay: começa a reproduzir assim que a cena estiver pronta.
  *  - bloom: liga/desliga o brilho pós-processado (desligar em aparelhos fracos).
  *  - onReady(scene): recebe a instância de Court3DScene (controlo externo / testes).
- *  - editable: liga o editor na vista 2D. Nesse modo `diagramas` só é lido na
+ *  - editable: liga o editor (na vista 2D e na 3D). Nesse modo `diagramas` só é lido na
  *    montagem (dá uma `key` diferente por jogada) e cada alteração chega por
  *    onChange(diagramas).
  *  - initialView: "3d" (por omissão) ou "2d".
@@ -82,7 +82,7 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
     sceneRef,
     stepIndex: state?.stepIndex ?? 0,
     editable,
-    enabled: editable && (state?.viewMode ?? initialView) === "2d",
+    enabled: editable,
   });
   const editorRef = useRef(editor);
   editorRef.current = editor;
@@ -146,7 +146,7 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
       className={`flex flex-col overflow-hidden rounded-lg bg-[#0B0E13] outline-none select-none ${className}`}
       style={style}
     >
-      {editable && <EditToolbar editor={editor} viewMode={st.viewMode} stepIndex={st.stepIndex} onEditIn2D={() => s?.setViewMode("2d")} />}
+      {editable && <EditToolbar editor={editor} viewMode={st.viewMode} stepIndex={st.stepIndex} />}
       <div className="relative flex-1 min-h-0">
       <div ref={mountRef} className="absolute inset-0" />
       {/* Vinheta: escurece os cantos e puxa o olhar para o campo. */}

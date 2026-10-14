@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MousePointer2, Undo2, Redo2, Trash2, Plus, Copy, Pencil, Check } from "lucide-react";
+import { MousePointer2, Undo2, Redo2, Trash2, Plus, Copy, Check } from "lucide-react";
 import { ARROW_TYPES } from "../../../data";
 
 const TOKENS = [
@@ -12,6 +12,7 @@ const TOKENS = [
 
 const HINTS = {
   mover: "Arrasta as fichas para as posicionar. Toca numa seta para a selecionar e arrasta a pega laranja para a curvar.",
+  mover3d: "Arrasta as fichas para as mover; arrastar no chão vazio roda a câmara. Toca numa seta para a selecionar e arrasta a pega laranja para a curvar.",
   passe: "Arrasta da jogadora com bola até quem recebe (ou toca numa e depois na outra). O passe só desloca a bola.",
   drible: "Arrasta da jogadora com bola até onde termina o drible. A bola vai com ela.",
   corte: "Arrasta da jogadora até ao destino do corte.",
@@ -36,19 +37,8 @@ function Group({ label, children }) {
 }
 
 /** Barra de edição por cima da vista (aparece com `editable`). */
-function EditToolbar({ editor, viewMode, stepIndex, onEditIn2D }) {
+function EditToolbar({ editor, viewMode, stepIndex }) {
   const [confirmStep, setConfirmStep] = useState(false);
-
-  if (viewMode !== "2d") {
-    return (
-      <div className="flex items-center justify-between gap-3 flex-wrap px-3 py-2.5 bg-[#1E242E] border-b border-[#2E3644]">
-        <span className="text-xs text-[#8A93A3]">A ver em 3D. Para desenhar ou mudar a jogada, passa para a vista 2D.</span>
-        <button type="button" onClick={onEditIn2D} className={`${btn} ${active}`}>
-          <Pencil size={13} /> Editar em 2D
-        </button>
-      </div>
-    );
-  }
 
   const e = editor;
   return (
@@ -121,7 +111,8 @@ function EditToolbar({ editor, viewMode, stepIndex, onEditIn2D }) {
       </div>
 
       <div className="text-[11px] text-[#8A93A3]">
-        {e.pendingFrom ? "Agora toca na jogadora (ou no ponto) de destino · toca outra vez na mesma para cancelar." : HINTS[e.mode]}
+        {e.pendingFrom ? "Agora toca na jogadora (ou no ponto) de destino · toca outra vez na mesma para cancelar." : HINTS[e.mode === "mover" && viewMode === "3d" ? "mover3d" : e.mode]}
+        {e.mode !== "mover" && viewMode === "3d" && !e.pendingFrom && <span className="text-[#5A6272]"> · Para rodar a câmara enquanto desenhas: botão direito, dois dedos ou as setas à direita.</span>}
         {e.mode !== "mover" && !e.pendingFrom && <span className="text-[#5A6272]"> · Shift ao arrastar para linha reta.</span>}
       </div>
     </div>

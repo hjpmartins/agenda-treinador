@@ -2,8 +2,10 @@
 
 Vista de uma jogada num campo de madeira, com dois modos: **2D** (vista de cima)
 e **3D** (perspetiva, câmara orbital, reprodução animada passo a passo). Com
-`editable`, a vista 2D é também o editor: as jogadas desenham-se diretamente no
-campo de madeira e veem-se logo em 3D, sem o editor de fundo preto.
+`editable`, a própria vista é o editor, tanto em 2D como em 3D: as jogadas
+desenham-se diretamente no campo de madeira, sem o editor de fundo preto.
+Em 3D, arrastar uma ficha (ou desenhar uma seta) edita; arrastar o chão vazio
+em "Mover" roda a câmara; botão direito / dois dedos rodam e deslocam sempre.
 
 Protótipo isolado (sem login): `npm run dev` e abrir
 `http://localhost:5173/prototype-3d.html`. Também é incluído no build, por isso

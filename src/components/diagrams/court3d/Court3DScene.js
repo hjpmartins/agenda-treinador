@@ -670,7 +670,7 @@ class Court3DScene {
       this.goal.fov = FOV_3D;
     }
     this.viewMode = mode;
-    this.renderer.domElement.style.cursor = this.edit.handler && mode === "2d" ? "crosshair" : "grab";
+    this.renderer.domElement.style.cursor = "grab";
     this.goal.tx = 0;
     this.goal.tz = 0;
     this.goal.zoom = 1;
@@ -758,22 +758,29 @@ class Court3DScene {
     let lastMid = null;
     let panMode = false;
 
-    // Edição (só na vista 2D): um dedo / botão esquerdo vai para o editor;
-    // dois dedos, botão direito e roda continuam a mexer na câmara.
+    // Edição (2D e 3D): um dedo / botão esquerdo vai primeiro ao editor. Em
+    // 2D o editor fica sempre com o gesto; em 3D só quando começa numa ficha,
+    // na pega de uma curva, ou numa ação de desenhar seta — arrastar no chão
+    // vazio continua a rodar a câmara (e um toque simples seleciona/limpa).
+    // Dois dedos, botão direito e roda continuam a mexer na câmara.
     let editPointer = null;
+    let tapStart = null;
     const editEvent = (phase, e) => {
       const pt = this.screenToDiagram(e.clientX, e.clientY);
-      if (pt) this.edit.handler({ phase, ...pt, shiftKey: e.shiftKey });
+      return pt ? this.edit.handler({ phase, ...pt, shiftKey: e.shiftKey, view: this.viewMode }) : false;
     };
 
     const onDown = (e) => {
       el.setPointerCapture(e.pointerId);
-      const canEdit = this.edit.handler && this.viewMode === "2d" && e.button === 0 && pointers.size === 0;
+      const canEdit = this.edit.handler && e.button === 0 && !(e.shiftKey && this.viewMode === "3d") && pointers.size === 0;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      tapStart = null;
       if (canEdit) {
-        editPointer = e.pointerId;
-        editEvent("down", e);
-        return;
+        if (editEvent("down", e) !== false) {
+          editPointer = e.pointerId;
+          return;
+        }
+        tapStart = { id: e.pointerId, x: e.clientX, y: e.clientY };
       }
       if (editPointer != null) {
         // Segundo dedo durante uma edição: passa a ser gesto de câmara.
@@ -792,9 +799,9 @@ class Court3DScene {
         editEvent("move", e);
         return;
       }
-      if (this.edit.handler && this.viewMode === "2d" && pointers.size === 0) {
+      if (this.edit.handler && pointers.size === 0) {
         const pt = this.screenToDiagram(e.clientX, e.clientY);
-        el.style.cursor = pt && this.edit.hover ? this.edit.hover(pt) : "crosshair";
+        el.style.cursor = pt && this.edit.hover ? this.edit.hover(pt, this.viewMode) : "grab";
       }
       if (!pointers.has(e.pointerId)) return;
       const prev = pointers.get(e.pointerId);
@@ -827,6 +834,9 @@ class Court3DScene {
         editEvent("up", e);
         return;
       }
+      // Toque curto no chão (sem arrastar) em 3D: conta como clique do editor.
+      if (tapStart && tapStart.id === e.pointerId && Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) < 5) editEvent("tap", e);
+      tapStart = null;
       lastPinch = null;
       lastMid = null;
       if (pointers.size === 0) el.style.cursor = "grab";
@@ -863,7 +873,9 @@ class Court3DScene {
     this._raycaster = this._raycaster || new THREE.Raycaster();
     this._raycaster.setFromCamera(ndc, this.camera);
     const hit = new THREE.Vector3();
-    if (!this._raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) return null;
+    // Em perspetiva aponta-se ao topo das fichas, não ao soalho por baixo delas.
+    const planeY = this.viewMode === "3d" ? PUCK_H : 0;
+    if (!this._raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY), hit)) return null;
     const { w, h } = this.vb;
     return { x: THREE.MathUtils.clamp(hit.x + w / 2, 4, w - 4), y: THREE.MathUtils.clamp(hit.z + h / 2, 4, h - 4) };
   }
@@ -872,7 +884,7 @@ class Court3DScene {
   setEditHandler(handler, hover) {
     this.edit.handler = handler;
     this.edit.hover = hover;
-    this.renderer.domElement.style.cursor = handler && this.viewMode === "2d" ? "crosshair" : "grab";
+    this.renderer.domElement.style.cursor = "grab";
   }
 
   // Marcas visuais da edição: ficha/seta selecionada, jogadora de partida à

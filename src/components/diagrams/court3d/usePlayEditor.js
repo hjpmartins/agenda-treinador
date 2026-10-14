@@ -153,6 +153,17 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     if (ev.phase === "down" && scene && (scene.playing || scene.t > 0)) scene.goToStep(idx);
     const pt = { x: ev.x, y: ev.y };
 
+    // Em 3D, arrastar no chão vazio em "Mover" fica para a câmara (devolve
+    // false); o clique simples chega depois como "tap".
+    if (ev.phase === "tap") {
+      const arrow = step.arrows.reduce((best, a) => {
+        const d = distToArrow(a, pt);
+        return d < 9 && (!best || d < best.d) ? { a, d } : best;
+      }, null);
+      setSelectedId(arrow ? arrow.a.id : null);
+      return;
+    }
+
     if (ev.phase === "cancel") {
       dragRef.current = null;
       setDrawing(null);
@@ -173,6 +184,7 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
           setSelectedId(tk.id);
           return;
         }
+        if (ev.view === "3d") return false;
         const arrow = step.arrows.reduce((best, a) => {
           const d = distToArrow(a, pt);
           return d < 9 && (!best || d < best.d) ? { a, d } : best;
@@ -229,10 +241,10 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     }
   };
 
-  const hover = (pt) => {
+  const hover = (pt, view) => {
     if (mode !== "mover") return "crosshair";
-    if (handle && distPt(handle, pt) < 10) return "grab";
-    return nearestToken(pt) ? "grab" : "default";
+    if ((handle && distPt(handle, pt) < 10) || nearestToken(pt)) return "move";
+    return view === "3d" ? "grab" : "default";
   };
 
   // Liga o editor à cena só quando a edição está ativa.

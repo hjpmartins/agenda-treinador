@@ -41,10 +41,16 @@ function computeAnimatedPositions(diagram, t) {
   diagram.arrows.forEach((a) => {
     // Bloqueios antigos (ponto único, sem tokenId) ficam de fora — não há para onde mover.
     if (!a.tokenId || !a.to) return;
-    const token = diagram.tokens.find((tk) => tk.id === a.tokenId);
+    let token = diagram.tokens.find((tk) => tk.id === a.tokenId);
+    if ((a.type === "passe" || a.type === "lancamento") && (!token || token.type !== "ball")) {
+      // A bola pode ter sido arrastada para junto do jogador depois de a seta
+      // já estar desenhada — nesse caso o tokenId guardado é do jogador, não
+      // da bola. Procura-se a bola perto do início da seta, para o passe
+      // funcionar sempre, independentemente da ordem em que foi feito.
+      token = diagram.tokens.find((tk) => tk.type === "ball" && Math.hypot(tk.x - a.from.x, tk.y - a.from.y) < 14);
+    }
     if (!token) return;
-    if ((a.type === "passe" || a.type === "lancamento") && token.type !== "ball") return;
-    overrides[a.tokenId] = { ...token, ...positionOnArrow(a, t) };
+    overrides[token.id] = { ...token, ...positionOnArrow(a, t) };
   });
   const dribbleArrow = diagram.arrows.find((a) => a.type === "drible" && a.tokenId);
   if (dribbleArrow) {

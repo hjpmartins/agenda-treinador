@@ -1,7 +1,8 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Download, Share2, Loader2 } from "lucide-react";
 import { generateSequenceVideo } from "../../lib/videoExport";
+import { recordScene3D } from "../../lib/video3DExport";
 
 // No telemóvel, partilha o ficheiro diretamente (a app de destino recebe-o
 // logo com o tipo e o nome certos) em vez de descarregar para a pasta de
@@ -24,6 +25,7 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
   const [draft, setDraft] = useState(diagramas || []);
   const [dirty, setDirty] = useState(false);
   const [exportState, setExportState] = useState(null); // null | {progress} | {error} | {ready: {blob, filename}}
+  const sceneRef = useRef(null);
 
   const cleaned = () => draft.filter((d, i) => !(isEmptyStep(d) && draft.length === 1 && i === 0));
 
@@ -42,13 +44,20 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
   // vídeo, e só o toque seguinte ("Partilhar agora") é que ainda conta como
   // reação ao utilizador. Em computador não há essa restrição, descarrega-se
   // logo a seguir a gerar, sem precisar de um segundo toque.
+  //
+  // Grava a partir da vista onde o treinador estiver no momento do toque: em
+  // 3D, grava a própria cena 3D (recordScene3D); em 2D, o campo achatado
+  // (generateSequenceVideo) — o que se vê é o que fica no vídeo.
   const prepareVideo = async () => {
     const steps = cleaned();
     if (!steps.length) return;
+    const is3D = sceneRef.current?.viewMode === "3d";
     setExportState({ progress: 0 });
     try {
-      const { blob, extension, mimeType } = await generateSequenceVideo(steps, { onProgress: (progress) => setExportState({ progress }) });
-      const filename = `jogada-${steps.length}-passos.${extension}`;
+      const { blob, extension, mimeType } = is3D
+        ? await recordScene3D(sceneRef.current, { onProgress: (progress) => setExportState({ progress }) })
+        : await generateSequenceVideo(steps, { onProgress: (progress) => setExportState({ progress }) });
+      const filename = `jogada-${steps.length}-passos${is3D ? "-3d" : ""}.${extension}`;
       if (canShareFiles) {
         setExportState({ ready: { blob, filename, mimeType } });
       } else {
@@ -113,8 +122,8 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
             exportState?.ready
               ? "Partilhar o vídeo já gerado"
               : canShareFiles
-                ? "Gerar a sequência em vídeo, para partilhar"
-                : "Descarregar a sequência como vídeo, para enviar às jogadoras"
+                ? "Gerar a sequência em vídeo (na vista 2D ou 3D em que estiveres), para partilhar"
+                : "Descarregar a sequência como vídeo (na vista 2D ou 3D em que estiveres), para enviar às jogadoras"
           }
           className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-[#2E3644] text-[#C7CDD8] hover:border-[#5A6272] hover:text-[#F2EDE3] disabled:opacity-40"
         >
@@ -167,6 +176,9 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
             onChange={(d) => {
               setDraft(d);
               setDirty(true);
+            }}
+            onReady={(scene) => {
+              sceneRef.current = scene;
             }}
             className="w-full h-full border border-[#2E3644]"
           />

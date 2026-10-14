@@ -240,6 +240,10 @@ class Court3DScene {
     this.container = container;
     this.opts = { bloom: true, intro: true, ...opts };
     this.onStateChange = opts.onStateChange || (() => {});
+    // Gancho opcional, atribuível de fora (ex: gravação de vídeo): chamado a
+    // seguir a cada frame renderizado, para quem estiver a gravar o <canvas>
+    // pedir exatamente esse frame (captureStream em modo manual).
+    this.onFrame = null;
     this.disposed = false;
 
     this.steps = [];
@@ -1024,6 +1028,7 @@ class Court3DScene {
 
     if (this.composer) this.composer.render(dt);
     else this.renderer.render(this.scene, this.camera);
+    if (this.onFrame) this.onFrame();
   }
 
   _updatePieces(time, dt) {

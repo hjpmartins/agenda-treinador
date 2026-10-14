@@ -1,5 +1,5 @@
 import { FULL_VB, HALF_VB, ESTATISTICAS_CAMPOS, estatisticaNumero, somaEstatistica, getTipoTeste, habilidadeGroups } from "../data";
-import { escapeHtml, formatDateFull, formatDateShortYear, wavyCurvedPathD, defaultControlPoint, arrowHead, calcPresenca, playerChartData } from "../utils";
+import { escapeHtml, formatDateFull, formatDateShortYear, wavyCurvedPathD, defaultControlPoint, arrowHead, calcPresenca, playerChartData, hasWaypoints, arrowPathPoints, polylinePathD } from "../utils";
 
 function svgHalfMarkingsStr(flipY, w, h) {
   const cx = w / 2;
@@ -55,15 +55,21 @@ function svgArrowStr(arrow) {
       return `<g transform="translate(${x} ${y})"><line x1="-9" y1="0" x2="9" y2="0" stroke="${color}" stroke-width="4"/></g>`;
     }
     const { from, to } = arrow;
+    if (hasWaypoints(arrow)) return `<path d="${polylinePathD(arrowPathPoints(arrow))}" stroke="${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
     return `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke="${color}" stroke-width="4" stroke-linecap="round"/>`;
   }
   const { from, to } = arrow;
   const isShot = arrow.type === "lancamento";
   const isDrible = arrow.type === "drible";
   const control = arrow.control || defaultControlPoint(arrow.type, from, to);
-  const d = isDrible ? wavyCurvedPathD(from, control, to) : `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`;
+  const multi = hasWaypoints(arrow);
+  const d = multi
+    ? polylinePathD(arrowPathPoints(arrow), isDrible)
+    : isDrible
+      ? wavyCurvedPathD(from, control, to)
+      : `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`;
   const dash = arrow.type === "passe" || isShot ? 'stroke-dasharray="6 4"' : "";
-  const tipFrom = control;
+  const tipFrom = multi ? arrowPathPoints(arrow).slice(-2)[0] : control;
   const tip = isShot
     ? `<circle cx="${to.x}" cy="${to.y}" r="6" fill="none" stroke="${color}" stroke-width="2"/><circle cx="${to.x}" cy="${to.y}" r="2" fill="${color}"/>`
     : `<path d="${arrowHead(tipFrom.x, tipFrom.y, to.x, to.y)}" stroke="${color}" stroke-width="2" fill="none"/>`;

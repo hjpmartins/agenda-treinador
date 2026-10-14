@@ -1,5 +1,5 @@
 import { HALF_VB, FULL_VB } from "../../data";
-import { wavyCurvedPathD, defaultControlPoint, arrowHead, hasWaypoints, arrowPolyline, polylinePathD } from "../../utils";
+import { wavyCurvedPathD, defaultControlPoint, arrowHead, hasWaypoints, arrowPathPoints, polylinePathD } from "../../utils";
 
 function HalfMarkings({ flipY = false, w = HALF_VB.w, h = HALF_VB.h }) {
   // Drawn for a court with baseline at bottom (y = h-10), hoop area near baseline, centered on w/2.
@@ -110,7 +110,7 @@ function ArrowShape({ arrow, onMouseDown, selected }) {
     if (hasWaypoints(arrow)) {
       return (
         <g onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "pointer" }}>
-          <path d={polylinePathD(arrowPolyline(arrow))} stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <path d={polylinePathD(arrowPathPoints(arrow))} stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
         </g>
       );
     }
@@ -127,13 +127,13 @@ function ArrowShape({ arrow, onMouseDown, selected }) {
   const control = arrow.control || defaultControlPoint(arrow.type, from, to);
   const multi = hasWaypoints(arrow);
   const d = multi
-    ? polylinePathD(arrowPolyline(arrow), isDrible)
+    ? polylinePathD(arrowPathPoints(arrow), isDrible)
     : isDrible
       ? wavyCurvedPathD(from, control, to)
       : `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`;
   // A ponta da seta aponta na direção da tangente da curva (do ponto de controlo
   // ou do último ponto de mudança até ao fim), não da reta from→to.
-  const tipFrom = multi ? arrow.waypoints[arrow.waypoints.length - 1] : control;
+  const tipFrom = multi ? arrowPathPoints(arrow).slice(-2)[0] : control;
   return (
     <g onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "pointer" }}>
       <path d={d} stroke={color} strokeWidth="2" fill="none" strokeDasharray={arrow.type === "passe" || isShot ? "6 4" : "none"} />

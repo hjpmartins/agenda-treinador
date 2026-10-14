@@ -4,7 +4,7 @@
 // suave por baixo para dar o ar de néon sobre a madeira.
 
 import * as THREE from "three";
-import { defaultControlPoint, hasWaypoints, arrowPolyline, positionOnArrow } from "../../../utils";
+import { defaultControlPoint, hasWaypoints, arrowPathPoints, positionOnArrow } from "../../../utils";
 
 const LIFT = 0.35; // acima do soalho, para não haver z-fighting.
 
@@ -145,18 +145,18 @@ function discGeometry(center, r, dist) {
   return g;
 }
 
-// Pontos ao longo do caminho da seta: retas entre os pontos de mudança de
-// direção (subdivididas, para a ondulação do drible), ou a curva quadrática.
+// Pontos ao longo do caminho da seta: a curva suave pelos pontos de mudança
+// de direção (subdividida, para a ondulação do drible), ou a quadrática.
 function sampleCurve(arrow, control, segments, wavy) {
   const { from, to } = arrow;
   const raw = [];
   if (hasWaypoints(arrow)) {
-    const poly = arrowPolyline(arrow);
+    const poly = arrowPathPoints(arrow);
     raw.push({ x: poly[0].x, y: poly[0].y });
     for (let i = 1; i < poly.length; i++) {
       const a = poly[i - 1];
       const b = poly[i];
-      const n = wavy ? Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 3)) : 1;
+      const n = wavy ? Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 3)) : 1;
       for (let k = 1; k <= n; k++) raw.push({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
     }
   } else {
@@ -214,7 +214,7 @@ function buildArrows(diagram, toWorld, { highlightId = null } = {}) {
     if (arrow.type === "bloqueio") {
       const from = arrow.at ? { x: arrow.at.x - 9, y: arrow.at.y } : arrow.from;
       const to = arrow.at ? { x: arrow.at.x + 9, y: arrow.at.y } : arrow.to;
-      const pts = (!arrow.at && hasWaypoints(arrow) ? arrowPolyline(arrow) : [from, to]).map(toWorld);
+      const pts = (!arrow.at && hasWaypoints(arrow) ? arrowPathPoints(arrow) : [from, to]).map(toWorld);
       const core = makeMaterial({ color });
       const glow = makeMaterial({ color, glow: true });
       const r = ribbonGeometry(pts, 4.5);
@@ -256,7 +256,7 @@ function buildArrows(diagram, toWorld, { highlightId = null } = {}) {
       add(ringGeometry(tipW, 6, 2, r.length), headMat);
       add(discGeometry(tipW, 2.2, r.length), headMat);
     } else {
-      const c = toWorld(hasWaypoints(arrow) ? arrow.waypoints[arrow.waypoints.length - 1] : control);
+      const c = toWorld(hasWaypoints(arrow) ? arrowPathPoints(arrow).slice(-3)[0] : control);
       const dx = tipW.x - c.x;
       const dz = tipW.z - c.z;
       const l = Math.hypot(dx, dz) || 1;

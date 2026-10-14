@@ -22,14 +22,36 @@ function normalizeJogo(s) {
 function emptyDiagram(court = "meio") {
   return { court, tokens: [], arrows: [] };
 }
-// Pontos de mudança de direção (opcional): uma seta com `waypoints` segue em
-// linha reta de from -> waypoints[0] -> ... -> to. Sem waypoints, mantém-se a
-// curva Bezier quadrática (from, control, to) de sempre.
+// Pontos de mudança de direção (opcional): uma seta com `waypoints` passa
+// por eles numa curva suave (from -> waypoints -> to). Sem waypoints,
+// mantém-se a curva Bezier quadrática (from, control, to) de sempre.
 function arrowPolyline(a) {
   return [a.from, ...(a.waypoints || []), a.to];
 }
 function hasWaypoints(a) {
   return !!(a.waypoints && a.waypoints.length);
+}
+const PATH_SAMPLES_PER_SEG = 16;
+// Curva Catmull-Rom que passa por todos os pontos, amostrada: o ponto de
+// mudança i fica exatamente no índice (i + 1) * PATH_SAMPLES_PER_SEG.
+function arrowPathPoints(a) {
+  const pts = arrowPolyline(a);
+  if (pts.length < 3) return pts.map((p) => ({ x: p.x, y: p.y }));
+  const out = [{ x: pts[0].x, y: pts[0].y }];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    for (let k = 1; k <= PATH_SAMPLES_PER_SEG; k++) {
+      const t = k / PATH_SAMPLES_PER_SEG;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      const f = (a0, a1, a2, a3) => 0.5 * (2 * a1 + (-a0 + a2) * t + (2 * a0 - 5 * a1 + 4 * a2 - a3) * t2 + (-a0 + 3 * a1 - 3 * a2 + a3) * t3);
+      out.push({ x: f(p0.x, p1.x, p2.x, p3.x), y: f(p0.y, p1.y, p2.y, p3.y) });
+    }
+  }
+  return out;
 }
 // Ponto a uma fração t (0..1) do comprimento total de uma polilinha.
 function pointAlongPolyline(pts, t) {
@@ -56,7 +78,7 @@ function pointAlongPolyline(pts, t) {
 // mudança de direção, se houver; senão a curva Bezier quadrática (from,
 // control, to) quando há um ponto de controlo definido, ou uma linha reta.
 function positionOnArrow(a, t) {
-  if (hasWaypoints(a)) return pointAlongPolyline(arrowPolyline(a), t);
+  if (hasWaypoints(a)) return pointAlongPolyline(arrowPathPoints(a), t);
   if (a.control) {
     const mt = 1 - t;
     return {
@@ -200,23 +222,26 @@ function wavyCurvedPathD(from, control, to, amplitude = 5, segments = 8) {
 // "lancamento" já começa com uma leve curva (como um arco de lançamento);
 // os outros tipos curáveis (passe, corte, drible) começam retos — o
 // treinador pode depois arrastar o ponto de controlo para curvar a linha.
-// Caminho SVG de uma seta com pontos de mudança de direção (retas), ondulado
-// no caso do drible.
+// Caminho SVG por uma lista de pontos (já amostrada), ondulado no drible.
 function polylinePathD(pts, wavy = false, amplitude = 5) {
   if (!wavy) return pts.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
+  const total = pts.reduce((acc, p, i) => (i ? acc + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0), 0);
   let d = `M ${pts[0].x} ${pts[0].y}`;
+  let acc = 0;
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1];
     const b = pts[i];
     const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
     const nx = -(b.y - a.y) / len;
     const ny = (b.x - a.x) / len;
-    const segs = Math.max(2, Math.round(len / 12));
-    for (let k = 1; k <= segs; k++) {
-      const t = k / segs;
-      const off = k === segs ? 0 : (k % 2 === 0 ? 1 : -1) * amplitude;
-      d += ` L ${a.x + (b.x - a.x) * t + nx * off} ${a.y + (b.y - a.y) * t + ny * off}`;
+    const steps = Math.max(1, Math.ceil(len / 3));
+    for (let k = 1; k <= steps; k++) {
+      const dist = acc + (len * k) / steps;
+      const fade = Math.min(1, (total - dist) / 10);
+      const off = Math.sin((dist / 16) * Math.PI * 2) * amplitude * fade;
+      d += ` L ${a.x + ((b.x - a.x) * k) / steps + nx * off} ${a.y + ((b.y - a.y) * k) / steps + ny * off}`;
     }
+    acc += len;
   }
   return d;
 }
@@ -415,6 +440,8 @@ export {
   computeAnimatedPositions,
   positionOnArrow,
   arrowPolyline,
+  arrowPathPoints,
+  PATH_SAMPLES_PER_SEG,
   hasWaypoints,
   pointAlongPolyline,
   assignCarriedBalls,

@@ -7,7 +7,7 @@
 // saltar, lançamento ao cesto) e um ligeiro desvio lateral no drible para a
 // bola não ficar enterrada dentro da ficha.
 
-import { computeAnimatedPositions, positionOnArrow, arrowPolyline, pointAlongPolyline, assignCarriedBalls } from "../../../utils";
+import { computeAnimatedPositions, positionOnArrow, arrowPathPoints, assignCarriedBalls } from "../../../utils";
 
 const BALL_R = 5.5;
 const PUCK_H = 4.5;
@@ -32,7 +32,7 @@ function arrowTangent(a, t) {
 }
 
 function pathLength(a) {
-  const pts = arrowPolyline(a);
+  const pts = arrowPathPoints(a);
   let l = 0;
   for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
   return l;
@@ -89,26 +89,17 @@ function sampleBall(diagram, ballTk, driver, positions, t, te, vb) {
       }
     } else if (driver.type === "lancamento") {
       const rim = nearestRim(diagram, vb, driver.to);
-      const wps = driver.waypoints || [];
-      // Com pontos de mudança, a bola primeiro percorre o caminho até ao
-      // último ponto (rente ao chão) e só lá é lançada.
-      const pre = wps.length ? 0.4 : 0;
-      const start = wps.length ? wps[wps.length - 1] : driver.from;
-      if (t < pre) {
-        const u = t / pre;
-        const p = pointAlongPolyline([driver.from, ...wps], u);
-        x = p.x;
-        y = p.y;
-        motionH = BALL_R + 8 * Math.sin(Math.PI * u);
-      } else if (rim.r && rim.d < 40) {
+      // A bola voa pelo caminho desenhado (no chão), com o arco em altura.
+      if (rim.r && rim.d < 40) {
         // Arco até ao aro e queda pela rede.
-        const k = pre + (1 - pre) * 0.82;
+        const k = 0.82;
         if (t < k) {
-          const u = (t - pre) / (k - pre);
-          const dist = Math.hypot(rim.r.x - start.x, rim.r.y - start.y);
+          const u = t / k;
+          const p = positionOnArrow(driver, u);
+          const dist = Math.hypot(rim.r.x - driver.from.x, rim.r.y - driver.from.y);
           const apex = 48 + dist * 0.25;
-          x = start.x + (rim.r.x - start.x) * u;
-          y = start.y + (rim.r.y - start.y) * u;
+          x = p.x + (rim.r.x - driver.to.x) * u;
+          y = p.y + (rim.r.y - driver.to.y) * u;
           motionH = BALL_R + 14 + (RIM_H + 4 - BALL_R - 14) * u + apex * 4 * u * (1 - u) * 0.6;
         } else {
           const u = (t - k) / (1 - k);
@@ -118,11 +109,7 @@ function sampleBall(diagram, ballTk, driver, positions, t, te, vb) {
           shotPhase = 1 - u;
         }
       } else {
-        const u = (t - pre) / (1 - pre);
-        const p = pointAlongPolyline([start, driver.to], u);
-        x = p.x;
-        y = p.y;
-        motionH = BALL_R + (30 + len * 0.2) * Math.sin(Math.PI * u);
+        motionH = BALL_R + (30 + len * 0.2) * Math.sin(Math.PI * t);
       }
     } else if (driver.type === "passe") {
       motionH = BALL_R + 10 * env + Math.min(26, len * 0.1) * env;

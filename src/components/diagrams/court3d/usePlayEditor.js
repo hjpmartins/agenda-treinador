@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { HALF_VB, FULL_VB } from "../../../data";
-import { uid, distPt, emptyDiagram, defaultControlPoint, resolveFinalDiagram, positionOnArrow, hasWaypoints, arrowPolyline } from "../../../utils";
+import { uid, distPt, emptyDiagram, defaultControlPoint, resolveFinalDiagram, positionOnArrow, hasWaypoints} from "../../../utils";
 
 const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible", "handoff"]);
 const SNAP_DIST = 14;
@@ -53,23 +53,26 @@ function distToArrow(a, pt) {
   return best;
 }
 
-// Pegas da seta selecionada: curva (sem pontos), pontos de mudança, e "+"
-// a meio de cada troço para acrescentar um ponto novo arrastando.
+// Bloqueio, corte, drible e lançamento têm sempre 2 pegas por onde a linha
+// passa (curva em S). Setas antigas sem pontos mostram-nas a 1/3 e 2/3 do
+// caminho atual; ao arrastar uma, os dois pontos ficam gravados.
+function defaultWaypoints(a) {
+  const full = withControl(a);
+  return [positionOnArrow(full, 1 / 3), positionOnArrow(full, 2 / 3)];
+}
+
+// Pegas da seta selecionada: 2 pontos da curva em S, ou a pega única de
+// curva do passe / hand-off.
 function arrowHandles(a) {
-  if (!a || a.at) return [];
-  if (hasWaypoints(a)) {
-    const poly = arrowPolyline(a);
-    const hs = a.waypoints.map((w, i) => ({ kind: "wp", index: i, x: w.x, y: w.y }));
-    for (let i = 1; i < poly.length; i++) {
-      if (distPt(poly[i - 1], poly[i]) > 34) hs.push({ kind: "add", index: i - 1, x: (poly[i - 1].x + poly[i].x) / 2, y: (poly[i - 1].y + poly[i].y) / 2 });
-    }
-    return hs;
+  if (!a || a.at || !a.from || !a.to) return [];
+  if (WAYPOINT_TYPES.has(a.type)) {
+    const wps = hasWaypoints(a) ? a.waypoints : defaultWaypoints(a);
+    return wps.map((w, i) => ({ kind: "wp", index: i, x: w.x, y: w.y }));
   }
   if (CURVABLE_TYPES.has(a.type)) {
     const c = a.control || defaultControlPoint(a.type, a.from, a.to);
     return [{ kind: "control", x: c.x, y: c.y }];
   }
-  if (WAYPOINT_TYPES.has(a.type)) return [{ kind: "add", index: 0, x: (a.from.x + a.to.x) / 2, y: (a.from.y + a.to.y) / 2 }];
   return [];
 }
 
@@ -210,20 +213,15 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         ...d,
         arrows: [
           ...d.arrows,
-          { id: uid(), type, from, to, control: CURVABLE_TYPES.has(type) ? defaultControlPoint(type, from, to) : undefined, tokenId: tokenId || null },
+          WAYPOINT_TYPES.has(type)
+            ? { id: uid(), type, from, to, waypoints: defaultWaypoints({ type, from, to }), tokenId: tokenId || null }
+            : { id: uid(), type, from, to, control: CURVABLE_TYPES.has(type) ? defaultControlPoint(type, from, to) : undefined, tokenId: tokenId || null },
         ],
       }))
     );
   };
 
   const updateArrow = (id, fn, replace = false) => (replace ? replaceCurrent : commit)(updateStep((d) => ({ ...d, arrows: d.arrows.map((a) => (a.id === id ? fn(a) : a)) })));
-
-  // Insere um ponto de mudança no troço `index` (0 = entre o início e o 1.º ponto).
-  const insertWaypoint = (a, index, p) => {
-    const wps = hasWaypoints(a) ? a.waypoints.slice() : [];
-    wps.splice(index, 0, { x: p.x, y: p.y });
-    return { ...a, waypoints: wps, control: undefined };
-  };
 
   const handler = (ev) => {
     const scene = sceneRef.current;
@@ -253,11 +251,10 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         if (h) {
           commit((l) => l);
           if (h.kind === "control") dragRef.current = { kind: "control", id: selectedId };
-          else if (h.kind === "wp") dragRef.current = { kind: "wp", id: selectedId, index: h.index, start: pt, moved: false };
           else {
-            // "+" a meio de um troço: cria o ponto e começa logo a arrastá-lo.
-            updateArrow(selectedId, (a) => insertWaypoint(a, h.index, pt), true);
-            dragRef.current = { kind: "wp", id: selectedId, index: h.index, start: pt, moved: true };
+            // Seta sem pontos gravados: grava os dois de omissão antes de arrastar.
+            updateArrow(selectedId, (a) => (hasWaypoints(a) ? a : { ...a, waypoints: defaultWaypoints(a), control: undefined }), true);
+            dragRef.current = { kind: "wp", id: selectedId, index: h.index };
           }
           return;
         }
@@ -292,8 +289,7 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
       } else if (drag?.kind === "control") {
         updateArrow(drag.id, (a) => ({ ...a, control: pt }), true);
       } else if (drag?.kind === "wp") {
-        if (distPt(pt, drag.start) > 3) drag.moved = true;
-        if (drag.moved) updateArrow(drag.id, (a) => ({ ...a, waypoints: a.waypoints.map((w, i) => (i === drag.index ? { x: pt.x, y: pt.y } : w)) }), true);
+        updateArrow(drag.id, (a) => ({ ...a, waypoints: a.waypoints.map((w, i) => (i === drag.index ? { x: pt.x, y: pt.y } : w)) }), true);
       } else if (drawing) {
         const hoopPt = drawing.type === "lancamento" ? snapToHoop(ev, pt) : null;
         const near = hoopPt ? null : nearestToken(pt);
@@ -305,16 +301,8 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     }
 
     if (ev.phase === "up") {
-      const drag = dragRef.current;
-      if (drag) {
+      if (dragRef.current) {
         dragRef.current = null;
-        // Toque num ponto de mudança sem o arrastar: remove-o.
-        if (drag.kind === "wp" && !drag.moved) {
-          updateArrow(drag.id, (a) => {
-            const wps = a.waypoints.filter((_, i) => i !== drag.index);
-            return { ...a, waypoints: wps.length ? wps : undefined };
-          }, true);
-        }
         return;
       }
       if (!drawing) return;
@@ -408,36 +396,6 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     setSelectedId(null);
   };
 
-  // Botões da barra: acrescentar / tirar ponto de mudança na seta selecionada.
-  const canWaypoint = !!selectedArrow && !selectedArrow.at && WAYPOINT_TYPES.has(selectedArrow.type);
-  const addWaypoint = () => {
-    if (!canWaypoint) return;
-    const a = withControl(selectedArrow);
-    if (hasWaypoints(a)) {
-      // No troço mais comprido.
-      const poly = arrowPolyline(a);
-      let bi = 0;
-      let bl = -1;
-      for (let i = 1; i < poly.length; i++) {
-        const l = distPt(poly[i - 1], poly[i]);
-        if (l > bl) {
-          bl = l;
-          bi = i - 1;
-        }
-      }
-      updateArrow(a.id, (x) => insertWaypoint(x, bi, { x: (poly[bi].x + poly[bi + 1].x) / 2, y: (poly[bi].y + poly[bi + 1].y) / 2 }));
-    } else {
-      updateArrow(a.id, (x) => insertWaypoint(x, 0, positionOnArrow(a, 0.5)));
-    }
-  };
-  const removeWaypoint = () => {
-    if (!canWaypoint || !hasWaypoints(selectedArrow)) return;
-    updateArrow(selectedArrow.id, (a) => {
-      const wps = a.waypoints.slice(0, -1);
-      return { ...a, waypoints: wps.length ? wps : undefined };
-    });
-  };
-
   const setCourt = (c) => commit((list) => list.map((d) => ({ ...d, court: c })));
 
   // Passo novo a seguir ao atual, com as fichas nas posições finais dele.
@@ -475,10 +433,7 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     redo,
     canUndo: hist.index > 0,
     canRedo: hist.index < hist.history.length - 1,
-    canWaypoint,
-    waypointCount: selectedArrow?.waypoints?.length || 0,
-    addWaypoint,
-    removeWaypoint,
+    selectedCurve: selectedArrow && !selectedArrow.at ? (WAYPOINT_TYPES.has(selectedArrow.type) ? "s" : CURVABLE_TYPES.has(selectedArrow.type) ? "c" : null) : null,
   };
 }
 

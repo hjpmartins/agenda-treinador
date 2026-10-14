@@ -166,6 +166,27 @@ function WhiteboardView({ onClose }) {
 
   const nearestToken = (pt) => diagram.tokens.find((t) => distPt(t, pt) < SNAP_DIST);
 
+  // "Quem tem bola": a jogadora mais próxima da bola, dentro de uma distância
+  // curta — usado para que um Passe ou Lançamento iniciado a partir dela saia
+  // sempre da bola (e não da jogadora), para a animação funcionar e a seta
+  // começar no sítio certo, sem o treinador ter de acertar exatamente no
+  // ícone pequeno da bola.
+  const findBallHolder = () => {
+    const ball = diagram.tokens.find((t) => t.type === "ball");
+    if (!ball) return null;
+    const holder = diagram.tokens.find((t) => t.type !== "ball" && t.type !== "cone" && t.type !== "treinador" && distPt(t, ball) < SNAP_DIST);
+    return holder ? { ball, holder } : null;
+  };
+
+  // Para Passe/Lançamento: se o toque/arrasto começar na jogadora que tem a
+  // bola, a seta começa mesmo na bola (não na jogadora) — ver findBallHolder.
+  const resolveArrowOrigin = (type, token) => {
+    if (type !== "passe" && type !== "lancamento") return token;
+    const possession = findBallHolder();
+    if (possession && possession.holder.id === token.id) return possession.ball;
+    return token;
+  };
+
   const snapAngle = (from, raw) => {
     const dx = raw.x - from.x;
     const dy = raw.y - from.y;
@@ -271,7 +292,8 @@ function WhiteboardView({ onClose }) {
       setDragId(tokenId);
       setSelectedId(tokenId);
     } else {
-      setDrawing({ type: mode, from: { x: token.x, y: token.y, tokenId: token.id }, to: { x: token.x, y: token.y, tokenId: null } });
+      const origin = resolveArrowOrigin(mode, token);
+      setDrawing({ type: mode, from: { x: origin.x, y: origin.y, tokenId: origin.id }, to: { x: origin.x, y: origin.y, tokenId: null } });
     }
   };
 
@@ -472,9 +494,14 @@ function WhiteboardView({ onClose }) {
         )}
         {mode !== "mover" && mode !== "caneta" && mode !== "borracha" && (
           <span className="text-[11px] text-[#8A93A3] ml-1 hidden sm:inline">
-            {pendingFrom
-              ? <>Agora toca na jogadora (ou ponto) de destino · ou toca outra vez na mesma para cancelar</>
-              : <>Arrasta para desenhar, ou toca na jogadora de partida e depois na de destino · segura <b className="text-[#F2EDE3]">Shift</b> ao arrastar para linha reta</>}
+            {pendingFrom ? (
+              <>Agora toca na jogadora (ou ponto) de destino · ou toca outra vez na mesma para cancelar</>
+            ) : (
+              <>
+                Arrasta para desenhar, ou toca na jogadora de partida e depois na de destino · segura <b className="text-[#F2EDE3]">Shift</b> ao arrastar para linha reta
+                {(mode === "passe" || mode === "lancamento") && <> · sai sempre da bola, mesmo tocando na jogadora que a tem</>}
+              </>
+            )}
           </span>
         )}
         <div className="ml-auto flex gap-2">

@@ -141,7 +141,9 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
   }, [steps, drawing, idx, sceneRef, editable]);
 
   const selectedArrow = step.arrows.find((a) => a.id === selectedId);
-  const handles = enabled && mode === "mover" && !drawing ? arrowHandles(selectedArrow) : [];
+  // As pegas da seta selecionada aparecem em qualquer ação (logo depois de
+  // desenhar a seta, por exemplo), não só em "Mover".
+  const handles = enabled && !drawing ? arrowHandles(selectedArrow) : [];
   const handlesKey = JSON.stringify(handles);
 
   useEffect(() => {
@@ -208,14 +210,17 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         tokenId = ball.id;
       }
     }
+    const id = uid();
+    // A seta nova fica selecionada, para as pegas aparecerem logo.
+    setSelectedId(id);
     commit(
       updateStep((d) => ({
         ...d,
         arrows: [
           ...d.arrows,
           WAYPOINT_TYPES.has(type)
-            ? { id: uid(), type, from, to, waypoints: defaultWaypoints({ type, from, to }), tokenId: tokenId || null }
-            : { id: uid(), type, from, to, control: CURVABLE_TYPES.has(type) ? defaultControlPoint(type, from, to) : undefined, tokenId: tokenId || null },
+            ? { id, type, from, to, waypoints: defaultWaypoints({ type, from, to }), tokenId: tokenId || null }
+            : { id, type, from, to, control: CURVABLE_TYPES.has(type) ? defaultControlPoint(type, from, to) : undefined, tokenId: tokenId || null },
         ],
       }))
     );
@@ -246,8 +251,15 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     }
 
     if (ev.phase === "down") {
-      if (mode === "mover") {
-        const h = handleAt(pt);
+      // Tocar numa pega (em qualquer ação) passa logo para "Mover" e arrasta-a.
+      const h = handleAt(pt);
+      if (h) {
+        if (mode !== "mover") {
+          setModeState("mover");
+          setPendingFrom(null);
+        }
+      }
+      if (h || mode === "mover") {
         if (h) {
           commit((l) => l);
           if (h.kind === "control") dragRef.current = { kind: "control", id: selectedId };
@@ -327,8 +339,9 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
   };
 
   const hover = (pt, view) => {
+    if (handleAt(pt)) return "move";
     if (mode !== "mover") return "crosshair";
-    if (handleAt(pt) || nearestToken(pt)) return "move";
+    if (nearestToken(pt)) return "move";
     return view === "3d" ? "grab" : "default";
   };
 

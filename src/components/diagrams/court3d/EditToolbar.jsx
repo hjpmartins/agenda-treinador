@@ -115,6 +115,7 @@ function EditToolbar({ editor, viewMode, stepIndex }) {
       <div className="text-[11px] text-[#8A93A3]">
         {e.pendingFrom ? "Agora toca na jogadora (ou no ponto) de destino · toca outra vez na mesma para cancelar." : HINTS[e.mode === "mover" && e.selectedCurve === "s" ? "pontos" : e.mode === "mover" && e.selectedCurve === "c" ? "curva" : e.mode === "mover" && viewMode === "3d" ? "mover3d" : e.mode]}
         {e.mode !== "mover" && viewMode === "3d" && !e.pendingFrom && <span className="text-[#5A6272]"> · Para rodar a câmara enquanto desenhas: botão direito, dois dedos ou as setas à direita.</span>}
+        {e.mode !== "mover" && !e.pendingFrom && e.selectedCurve && <span className="text-[#F2EDE3]"> · Arrasta as pegas laranja da seta para lhe dar a forma.</span>}
         {e.mode !== "mover" && !e.pendingFrom && <span className="text-[#5A6272]"> · Shift ao arrastar para linha reta.</span>}
       </div>
     </div>

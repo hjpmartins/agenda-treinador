@@ -1,78 +1,95 @@
 import { pickMimeType } from "./mediaRecorderUtil";
 
-// Grava a cena 3D tal como está a ser vista (o próprio <canvas> do three.js)
-// a reproduzir a sequência completa uma vez, do início ao fim — para um
-// vídeo "a sério" em 3D, em vez do campo achatado em 2D (ver
-// src/lib/videoExport.js). Usa a cena já montada e visível (`scene`, uma
-// instância de Court3DScene — ver Court3DView.jsx/onReady), por isso mostra
-// exatamente o que o treinador está a ver, incluindo os passos já editados.
-//
-// A captura é manual (captureStream(0) + requestFrame a cada frame
-// renderizado, via scene.onFrame — ver Court3DScene.js) em vez de pedir um
-// fps fixo ao navegador, para não perder frames da animação em aparelhos
-// mais lentos.
-async function recordScene3D(scene, { onProgress } = {}) {
-  if (!scene || !scene.renderer) {
-    throw new Error("A vista 3D ainda não está pronta.");
-  }
-  if (!scene.steps || !scene.steps.length) {
+// Tamanho fixo do vídeo 3D, independente do que estiver visível no ecrã no
+// momento — gravar diretamente do <canvas> ao vivo dava vídeos com má
+// qualidade (canvas pequeno num telemóvel em pé) e proporções estranhas
+// (bandas pretas), consoante o tamanho que o estúdio calhasse ter aberto.
+// 16:9 é a proporção que as apps (incluindo o WhatsApp) tratam melhor.
+const EXPORT_WIDTH = 960;
+const EXPORT_HEIGHT = 540;
+
+// Grava a sequência de diagramas numa cena 3D própria, criada só para isto —
+// escondida fora do ecrã, com tamanho fixo — em vez da cena ao vivo que o
+// treinador está a ver (essa fica livre para continuar a ser usada/editada,
+// e o vídeo sai sempre com a mesma qualidade e proporção, seja qual for o
+// aparelho ou o tamanho da janela).
+async function recordDiagramasVideo3D(diagramas, { onProgress } = {}) {
+  if (!diagramas || !diagramas.length) {
     throw new Error("Não há diagramas nesta sequência.");
   }
-  const canvas = scene.renderer.domElement;
-  if (!canvas.captureStream) {
+  if (typeof MediaRecorder === "undefined") {
     throw new Error("Este navegador não permite gravar vídeo.");
   }
   const mimeType = pickMimeType();
   if (!mimeType) {
     throw new Error("Este navegador não sabe gravar vídeo em nenhum formato conhecido.");
   }
+  // Importado aqui dentro (não no topo do ficheiro): o three.js (~140 kB
+  // gzip) só pode entrar no bundle principal da app se for importado de
+  // forma estática nalgum sítio — com import() aqui dentro, só é pedido
+  // quando esta função é mesmo chamada, e partilha o mesmo pedaço (chunk)
+  // já carregado pela vista 3D do editor (ver Court3DView.jsx).
+  const { Court3DScene } = await import("../components/diagrams/court3d/Court3DScene");
 
-  // Põe a câmara em 3D e no início da jogada antes de começar — se já lá
-  // estava, isto não faz nada (setViewMode/goToStep ignoram-no sem alterar
-  // o enquadramento atual).
-  scene.setViewMode("3d");
-  scene.goToStep(0);
-  // Dá tempo à câmara para assentar na posição 3D (transição suave, não
-  // instantânea) antes de a gravação começar.
-  await new Promise((resolve) => setTimeout(resolve, 650));
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-99999px";
+  container.style.top = "0";
+  container.style.width = `${EXPORT_WIDTH}px`;
+  container.style.height = `${EXPORT_HEIGHT}px`;
+  document.body.appendChild(container);
 
-  const stream = canvas.captureStream(0);
-  const track = stream.getVideoTracks()[0];
-  const chunks = [];
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
-  recorder.ondataavailable = (e) => {
-    if (e.data && e.data.size) chunks.push(e.data);
-  };
-  const stopped = new Promise((resolve) => {
-    recorder.onstop = resolve;
-  });
+  const scene = new Court3DScene(container, { bloom: true, intro: false });
+  try {
+    await scene.ready;
+    scene.setSequence(diagramas);
+    // Dá tempo à câmara para assentar no enquadramento inicial antes de
+    // começar a gravar (a transição é suave, não instantânea).
+    await new Promise((resolve) => setTimeout(resolve, 700));
 
-  const totalSteps = scene.steps.length;
-  const prevOnStateChange = scene.onStateChange;
-  let started = false;
+    const canvas = scene.renderer.domElement;
+    if (!canvas.captureStream) {
+      throw new Error("Este navegador não permite gravar vídeo.");
+    }
 
-  recorder.start();
-  scene.onFrame = () => track.requestFrame();
-  track.requestFrame();
-
-  await new Promise((resolve) => {
-    scene.onStateChange = (state) => {
-      prevOnStateChange(state);
-      if (state.playing) started = true;
-      if (onProgress) onProgress(Math.min(1, (state.stepIndex + state.stepProgress) / totalSteps));
-      if (started && !state.playing) resolve();
+    const stream = canvas.captureStream(0);
+    const track = stream.getVideoTracks()[0];
+    const chunks = [];
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size) chunks.push(e.data);
     };
-    scene.play();
-  });
+    const stopped = new Promise((resolve) => {
+      recorder.onstop = resolve;
+    });
 
-  scene.onFrame = null;
-  scene.onStateChange = prevOnStateChange;
-  recorder.stop();
-  await stopped;
+    const totalSteps = scene.steps.length;
+    let started = false;
 
-  const isMp4 = mimeType.startsWith("video/mp4");
-  const baseType = isMp4 ? "video/mp4" : "video/webm";
-  return { blob: new Blob(chunks, { type: baseType }), mimeType: baseType, extension: isMp4 ? "mp4" : "webm" };
+    recorder.start();
+    scene.onFrame = () => track.requestFrame();
+    track.requestFrame();
+
+    await new Promise((resolve) => {
+      scene.onStateChange = (state) => {
+        if (state.playing) started = true;
+        if (onProgress) onProgress(Math.min(1, (state.stepIndex + state.stepProgress) / totalSteps));
+        if (started && !state.playing) resolve();
+      };
+      scene.play();
+    });
+
+    scene.onFrame = null;
+    recorder.stop();
+    await stopped;
+
+    const isMp4 = mimeType.startsWith("video/mp4");
+    const baseType = isMp4 ? "video/mp4" : "video/webm";
+    return { blob: new Blob(chunks, { type: baseType }), mimeType: baseType, extension: isMp4 ? "mp4" : "webm" };
+  } finally {
+    scene.dispose();
+    container.remove();
+  }
 }
 
-export { recordScene3D };
+export { recordDiagramasVideo3D };

@@ -2,7 +2,7 @@ import { lazy, Suspense, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Download, Share2, Loader2 } from "lucide-react";
 import { generateSequenceVideo } from "../../lib/videoExport";
-import { recordScene3D } from "../../lib/video3DExport";
+import { recordDiagramasVideo3D } from "../../lib/video3DExport";
 
 // No telemóvel, partilha o ficheiro diretamente (a app de destino recebe-o
 // logo com o tipo e o nome certos) em vez de descarregar para a pasta de
@@ -45,9 +45,12 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
   // reação ao utilizador. Em computador não há essa restrição, descarrega-se
   // logo a seguir a gerar, sem precisar de um segundo toque.
   //
-  // Grava a partir da vista onde o treinador estiver no momento do toque: em
-  // 3D, grava a própria cena 3D (recordScene3D); em 2D, o campo achatado
-  // (generateSequenceVideo) — o que se vê é o que fica no vídeo.
+  // Grava consoante a vista onde o treinador estiver no momento do toque: em
+  // 3D, grava numa cena 3D própria e escondida, criada só para isto, com
+  // tamanho fixo (recordDiagramasVideo3D) — gravar diretamente o ecrã ao
+  // vivo dava vídeos com má qualidade e proporções estranhas, consoante o
+  // tamanho do ecrã do aparelho. Em 2D, continua a ser o campo achatado
+  // (generateSequenceVideo), que já tem tamanho fixo desde sempre.
   const prepareVideo = async () => {
     const steps = cleaned();
     if (!steps.length) return;
@@ -55,7 +58,7 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
     setExportState({ progress: 0 });
     try {
       const { blob, extension, mimeType } = is3D
-        ? await recordScene3D(sceneRef.current, { onProgress: (progress) => setExportState({ progress }) })
+        ? await recordDiagramasVideo3D(steps, { onProgress: (progress) => setExportState({ progress }) })
         : await generateSequenceVideo(steps, { onProgress: (progress) => setExportState({ progress }) });
       const filename = `jogada-${steps.length}-passos${is3D ? "-3d" : ""}.${extension}`;
       if (canShareFiles) {

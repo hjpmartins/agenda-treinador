@@ -73,4 +73,27 @@ class CutPlannerTest {
     clock.start(1_000_000)
     assertEquals(2_500_000L, clock.toRecUs(3_500_000))
   }
+
+  @Test
+  fun timebase_framesInMonotonicClock_areShiftedToBoottime() {
+    // Telemóvel ligado há 5 dias, 112 h a dormir: MONOTONIC está 112 h atrás de BOOTTIME.
+    val mono = 8 * 3600 * s
+    val boot = mono + 112 * 3600 * s
+    val frame = mono - 80_000 // frame captado há 80 ms, em MONOTONIC
+    assertEquals(boot - mono, Timebase.offsetToBootUs(frame, boot, mono))
+  }
+
+  @Test
+  fun timebase_framesAlreadyInBoottime_needNoShift() {
+    val mono = 8 * 3600 * s
+    val boot = mono + 112 * 3600 * s
+    assertEquals(0L, Timebase.offsetToBootUs(boot - 80_000, boot, mono))
+  }
+
+  @Test
+  fun timebase_unknownClock_isAnchoredToNow() {
+    val mono = 8 * 3600 * s
+    val boot = mono + 112 * 3600 * s
+    assertEquals(boot - 1_000, Timebase.offsetToBootUs(1_000, boot, mono))
+  }
 }

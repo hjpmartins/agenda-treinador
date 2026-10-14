@@ -161,44 +161,49 @@ export function ClipsScreen({ onBack }: Props) {
               {s.fullVideoUris.map((uri, i) => {
                 const title = s.fullVideoUris.length > 1 ? `Jogo completo — parte ${i + 1}` : 'Jogo completo';
                 return (
-                  <View key={uri} style={styles.row}>
-                    <Text style={[styles.rowTitle, { flex: 1 }]}>{title}</Text>
-                    <Button label="▶ Ver" onPress={() => setPlaying({ uri, title })} />
-                    <Button label="Galeria" onPress={() => run(() => saveToGallery(uri))} />
-                    <Button label="Partilhar" onPress={() => run(() => share(uri))} />
+                  <View key={uri} style={styles.item}>
+                    <Text style={styles.rowTitle}>{title}</Text>
+                    <View style={styles.actions}>
+                      <Button label="▶ Ver" onPress={() => setPlaying({ uri, title })} style={styles.action} />
+                      <Button label="Galeria" onPress={() => run(() => saveToGallery(uri))} style={styles.action} />
+                      <Button label="Partilhar" onPress={() => run(() => share(uri))} style={styles.action} />
+                    </View>
                   </View>
                 );
               })}
 
               {s.clips.length === 0 ? <Text style={styles.muted}>Sem clips.</Text> : null}
               {s.clips.map((c) => (
-                <View key={c.id} style={styles.row}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle}>{c.name}</Text>
+                <View key={c.id} style={styles.item}>
+                  <View style={styles.itemHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rowTitle}>{c.name}</Text>
                     <Text style={styles.muted}>
                       {formatClock(c.startMs)} – {formatClock(c.endMs)} ({formatDuration(c.endMs - c.startMs)})
                       {c.status === 'ready' ? ` · ${formatBytes(c.sizeBytes)}` : ''}
                     </Text>
-                    {c.error ? <Text style={styles.errorText}>{c.error}</Text> : null}
+                      {c.error ? <Text style={styles.errorText}>{c.error}</Text> : null}
+                    </View>
+                    {c.status !== 'ready' ? (
+                      <View style={[styles.badge, c.status === 'failed' && { borderColor: colors.danger }]}>
+                        {c.status !== 'failed' ? <ActivityIndicator size="small" color={colors.accent} /> : null}
+                        <Text style={[styles.badgeText, c.status === 'failed' && { color: colors.danger }]}>
+                          {STATUS_LABEL[c.status]}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {c.status === 'ready' || c.status === 'failed' ? (
+                      <Pressable onPress={() => deleteClip(c)} hitSlop={12} style={styles.trash}>
+                        <Text style={styles.trashText}>✕</Text>
+                      </Pressable>
+                    ) : null}
                   </View>
                   {c.status === 'ready' && c.uri ? (
-                    <>
-                      <Button label="▶" onPress={() => setPlaying({ uri: c.uri!, title: c.name })} />
-                      <Button label="Galeria" onPress={() => run(() => saveToGallery(c.uri!))} />
-                      <Button label="Partilhar" onPress={() => run(() => share(c.uri!))} />
-                    </>
-                  ) : (
-                    <View style={[styles.badge, c.status === 'failed' && { borderColor: colors.danger }]}>
-                      {c.status !== 'failed' ? <ActivityIndicator size="small" color={colors.accent} /> : null}
-                      <Text style={[styles.badgeText, c.status === 'failed' && { color: colors.danger }]}>
-                        {STATUS_LABEL[c.status]}
-                      </Text>
+                    <View style={styles.actions}>
+                      <Button label="▶ Ver" onPress={() => setPlaying({ uri: c.uri!, title: c.name })} style={styles.action} />
+                      <Button label="Galeria" onPress={() => run(() => saveToGallery(c.uri!))} style={styles.action} />
+                      <Button label="Partilhar" onPress={() => run(() => share(c.uri!))} style={styles.action} />
                     </View>
-                  )}
-                  {c.status === 'ready' || c.status === 'failed' ? (
-                    <Pressable onPress={() => deleteClip(c)} hitSlop={12} style={styles.trash}>
-                      <Text style={styles.trashText}>✕</Text>
-                    </Pressable>
                   ) : null}
                 </View>
               ))}
@@ -237,14 +242,15 @@ const styles = StyleSheet.create({
   sessionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: space(1) },
   sessionTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
   muted: { color: colors.muted, fontSize: 14 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  item: {
     gap: space(1),
-    paddingVertical: space(1),
+    paddingVertical: space(1.5),
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
+  itemHeader: { flexDirection: 'row', alignItems: 'center', gap: space(1) },
+  actions: { flexDirection: 'row', gap: space(1) },
+  action: { flex: 1, paddingHorizontal: space(1) },
   rowTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
   errorText: { color: colors.danger, fontSize: 13 },
   badge: {

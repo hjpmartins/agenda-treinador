@@ -8,7 +8,6 @@ import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
 import android.os.Handler
-import android.os.SystemClock
 import android.util.Log
 import android.util.Range
 import android.view.Surface
@@ -30,13 +29,6 @@ class CameraController(
   val cameraId: String
   val sensorOrientation: Int
 
-  /**
-   * Diferença (µs) a somar aos timestamps da câmara para ficarem no relógio
-   * BOOTTIME (SystemClock.elapsedRealtimeNanos). Em câmaras com timestamps
-   * "REALTIME" é zero; nas outras os timestamps estão em CLOCK_MONOTONIC.
-   */
-  val timestampOffsetUs: Long
-
   private val fpsRange: Range<Int>?
 
   private var device: CameraDevice? = null
@@ -51,12 +43,6 @@ class CameraController(
     cameraId = id
     val chars = manager.getCameraCharacteristics(id)
     sensorOrientation = chars.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
-    val source = chars.get(CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE)
-    timestampOffsetUs = if (source == CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME) {
-      0L
-    } else {
-      (SystemClock.elapsedRealtimeNanos() - System.nanoTime()) / 1000
-    }
     val ranges = chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES) ?: emptyArray()
     fpsRange = ranges.firstOrNull { it.lower == 30 && it.upper == 30 }
       ?: ranges.filter { it.upper == 30 }.maxByOrNull { it.lower }

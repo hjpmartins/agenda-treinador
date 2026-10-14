@@ -15,6 +15,7 @@ import android.view.Surface
 import pt.clipsjogo.engine.core.CutPlan
 import pt.clipsjogo.engine.core.CutPlanner
 import pt.clipsjogo.engine.core.RecordingClock
+import pt.clipsjogo.engine.core.Timebase
 import pt.clipsjogo.engine.media.AudioEncoder
 import pt.clipsjogo.engine.media.CameraController
 import pt.clipsjogo.engine.media.ClipCutter
@@ -71,6 +72,8 @@ object ClipEngine {
   private var previewSurface: Surface? = null
 
   private val clock = RecordingClock()
+  /** Detetado no primeiro frame de cada gravação (só usado na thread do encoder). */
+  private var timebaseOffsetUs: Long? = null
   @Volatile private var session: SessionInfo? = null
   private var muxer: SegmentMuxer? = null
   private var videoEncoder: VideoEncoder? = null
@@ -135,6 +138,7 @@ object ClipEngine {
     val s = storage.newSession(if (config.height >= 1080) "1080p" else "720p", config.width, config.height, rotation)
 
     clock.reset()
+    timebaseOffsetUs = null
     recordingDone = false
     val withAudio = hasPermission(Manifest.permission.RECORD_AUDIO)
     val m = SegmentMuxer(s.segmentsDir, SEGMENT_US, rotation, withAudio, clock) { seg -> onSegmentClosed(s, seg) }
@@ -150,7 +154,15 @@ object ClipEngine {
     val video = try {
       VideoEncoder(
         config, encoderHandler,
-        ptsToBootUs = { it + cam.timestampOffsetUs },
+        ptsToBootUs = { pts ->
+          if (timebaseOffsetUs == null) {
+            timebaseOffsetUs = Timebase.offsetToBootUs(
+              pts, SystemClock.elapsedRealtimeNanos() / 1000, System.nanoTime() / 1000
+            )
+            Log.i(TAG, "Relógio da câmara: desvio para BOOTTIME = ${timebaseOffsetUs} µs")
+          }
+          pts + timebaseOffsetUs!!
+        },
         muxer = m,
         onError = { msg -> emitError(msg) },
         onEndOfStream = { finishWriting(s) }

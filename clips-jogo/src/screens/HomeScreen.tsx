@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { isEngineAvailable } from '../../modules/clip-engine';
 import { Button } from '../components/ui';
 import { colors, space } from '../theme';
+import appConfig from '../../app.json';
 
 type Props = {
   onRecord: () => void;
@@ -43,7 +44,10 @@ export function HomeScreen({ onRecord, onRemote, onClips }: Props) {
         </Text>
       ) : null}
 
-      <Button label="Ver gravações e clips" variant="ghost" onPress={onClips} />
+      <View>
+        <Button label="Ver gravações e clips" variant="ghost" onPress={onClips} />
+        <Text style={styles.version}>Versão {appConfig.expo.version}</Text>
+      </View>
     </SafeAreaView>
   );
 }
@@ -55,5 +59,6 @@ const styles = StyleSheet.create({
   subtitle: { color: colors.muted, fontSize: 16, marginTop: space(1), lineHeight: 22 },
   choices: { gap: space(2) },
   choice: { minHeight: 140 },
+  version: { color: colors.muted, textAlign: 'center', fontSize: 12, marginTop: space(1) },
   notice: { color: colors.warn, textAlign: 'center', marginBottom: space(1) },
 });

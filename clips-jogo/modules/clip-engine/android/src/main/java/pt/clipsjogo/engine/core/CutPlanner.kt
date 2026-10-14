@@ -104,3 +104,27 @@ class RecordingClock {
 
   fun toRecUs(bootUs: Long): Long = if (started) bootUs - t0BootUs else 0L
 }
+
+/**
+ * Descobre em que relógio vêm os timestamps dos frames da câmara.
+ *
+ * Alguns telemóveis dizem que usam BOOTTIME (conta o tempo a dormir) mas entregam
+ * CLOCK_MONOTONIC (não conta). Num telemóvel ligado há dias, a diferença chega a
+ * horas. Em vez de confiar no que a câmara declara, comparamos o primeiro frame
+ * com os dois relógios e escolhemos o mais próximo.
+ */
+object Timebase {
+  private const val MAX_FRAME_AGE_US = 5_000_000L
+
+  /** Valor a somar aos timestamps da câmara para ficarem em BOOTTIME (µs). */
+  fun offsetToBootUs(framePtsUs: Long, bootNowUs: Long, monotonicNowUs: Long): Long {
+    val distBoot = kotlin.math.abs(bootNowUs - framePtsUs)
+    val distMono = kotlin.math.abs(monotonicNowUs - framePtsUs)
+    return when {
+      // Nenhum dos dois relógios bate (ex.: encoder que começa do zero): ancora no "agora".
+      minOf(distBoot, distMono) > MAX_FRAME_AGE_US -> bootNowUs - framePtsUs
+      distMono < distBoot -> bootNowUs - monotonicNowUs
+      else -> 0L
+    }
+  }
+}

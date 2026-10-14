@@ -1,14 +1,12 @@
 import { lazy, Suspense, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Download, Share2, Loader2 } from "lucide-react";
-import { generateSequenceGif } from "../../lib/gifExport";
+import { generateSequenceVideo } from "../../lib/videoExport";
 
 // No telemóvel, partilha o ficheiro diretamente (a app de destino recebe-o
 // logo com o tipo e o nome certos) em vez de descarregar para a pasta de
-// transferências e depois ser preciso voltar a escolhê-lo na Galeria — esse
-// passo intermédio é onde o WhatsApp às vezes deixa de reconhecer a GIF como
-// animada e manda só a primeira imagem. Em computador não há partilha nativa,
-// mantém-se o descarregar de sempre.
+// transferências e depois ser preciso voltar a escolhê-lo na Galeria. Em
+// computador não há partilha nativa, mantém-se o descarregar de sempre.
 const canShareFiles = typeof navigator !== "undefined" && !!navigator.share && !!navigator.canShare;
 
 // O three.js (~140 kB gzip) só é descarregado quando se abre o estúdio.
@@ -25,7 +23,7 @@ const isEmptyStep = (d) => !d || (d.tokens.length === 0 && d.arrows.length === 0
 function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = false, onSave, onClose }) {
   const [draft, setDraft] = useState(diagramas || []);
   const [dirty, setDirty] = useState(false);
-  const [gifState, setGifState] = useState(null); // null | {progress} | {error}
+  const [exportState, setExportState] = useState(null); // null | {progress} | {error}
 
   const cleaned = () => draft.filter((d, i) => !(isEmptyStep(d) && draft.length === 1 && i === 0));
 
@@ -34,14 +32,18 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
     onClose();
   };
 
-  const downloadGif = async () => {
+  // Vídeo em vez de GIF: ao contrário de uma GIF partilhada de fora da caixa
+  // de GIFs do WhatsApp (que muitas vezes chega só como uma imagem parada,
+  // limitação do próprio WhatsApp), um vídeo mostra sempre pré-visualização
+  // e repete em loop. Demora o tempo real da jogada a gravar.
+  const shareVideo = async () => {
     const steps = cleaned();
     if (!steps.length) return;
-    setGifState({ progress: 0 });
+    setExportState({ progress: 0 });
     try {
-      const blob = await generateSequenceGif(steps, { onProgress: (progress) => setGifState({ progress }) });
-      const filename = `jogada-${steps.length}-passos.gif`;
-      const file = canShareFiles ? new File([blob], filename, { type: "image/gif" }) : null;
+      const { blob, extension } = await generateSequenceVideo(steps, { onProgress: (progress) => setExportState({ progress }) });
+      const filename = `jogada-${steps.length}-passos.${extension}`;
+      const file = canShareFiles ? new File([blob], filename, { type: blob.type }) : null;
       if (file && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: title || "Jogada" });
       } else {
@@ -54,13 +56,13 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }
-      setGifState(null);
+      setExportState(null);
     } catch (e) {
       if (e?.name === "AbortError") {
-        setGifState(null); // o utilizador fechou a folha de partilha sem escolher nada
+        setExportState(null); // o utilizador fechou a folha de partilha sem escolher nada
         return;
       }
-      setGifState({ error: e.message || "Não foi possível gerar o ficheiro." });
+      setExportState({ error: e.message || "Não foi possível gerar o vídeo." });
     }
   };
 
@@ -75,25 +77,25 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
             {title || "Diagrama do exercício"}
           </h2>
         </div>
-        {gifState?.error && <span className="text-xs text-[#D64545]">{gifState.error}</span>}
+        {exportState?.error && <span className="text-xs text-[#D64545]">{exportState.error}</span>}
         <button
           type="button"
-          onClick={downloadGif}
-          disabled={(gifState && "progress" in gifState) || !cleaned().length}
-          title={canShareFiles ? "Partilhar a sequência como GIF, para enviar às jogadoras" : "Descarregar a sequência como GIF, para enviar às jogadoras"}
+          onClick={shareVideo}
+          disabled={(exportState && "progress" in exportState) || !cleaned().length}
+          title={canShareFiles ? "Partilhar a sequência como vídeo, para enviar às jogadoras" : "Descarregar a sequência como vídeo, para enviar às jogadoras"}
           className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-[#2E3644] text-[#C7CDD8] hover:border-[#5A6272] hover:text-[#F2EDE3] disabled:opacity-40"
         >
-          {gifState && "progress" in gifState ? (
+          {exportState && "progress" in exportState ? (
             <>
-              <Loader2 size={13} className="animate-spin" /> {Math.round(gifState.progress * 100)}%
+              <Loader2 size={13} className="animate-spin" /> {Math.round(exportState.progress * 100)}%
             </>
           ) : canShareFiles ? (
             <>
-              <Share2 size={13} /> Partilhar GIF
+              <Share2 size={13} /> Partilhar vídeo
             </>
           ) : (
             <>
-              <Download size={13} /> GIF
+              <Download size={13} /> Vídeo
             </>
           )}
         </button>

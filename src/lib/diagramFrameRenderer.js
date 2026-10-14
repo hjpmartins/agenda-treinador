@@ -1,10 +1,12 @@
-import { GIFEncoder, quantize, applyPalette } from "gifenc";
+// Desenho de um frame de uma jogada (campo de madeira + setas + fichas) num
+// <canvas> 2D normal — partilhado entre a exportação em GIF e em vídeo, para
+// as duas corresponderem sempre ao que se vê no estúdio de jogadas.
+
 import { HALF_VB, FULL_VB } from "../data";
-import { computeAnimatedPositions, hasWaypoints, arrowPathPoints, defaultControlPoint } from "../utils";
+import { hasWaypoints, arrowPathPoints, defaultControlPoint } from "../utils";
 import { drawCourtCanvas, drawTokenTopCanvas } from "../components/diagrams/court3d/courtCanvas";
 
-const STEP_FRAMES = 16; // frames por transição de movimento dentro de um passo
-const STEP_MS = 1400; // duração da transição, igual à animação do editor
+const STEP_MS = 1400; // duração da transição de um passo, igual à animação do editor
 const PAUSE_MS = 550; // pausa no fim de cada passo, antes de avançar para o seguinte
 const ARROW_COLOR = "#C7CDD8";
 
@@ -64,7 +66,7 @@ function drawToken(ctx, cache, token) {
 }
 
 // Réplica, em canvas, do ArrowShape de CourtPrimitives.jsx — mesma paleta e
-// geometria (incluindo waypoints/hand-off), para a GIF corresponder ao editor.
+// geometria (incluindo waypoints/hand-off).
 function drawArrow(ctx, a) {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
@@ -141,32 +143,9 @@ function drawArrow(ctx, a) {
   }
 }
 
-// Gera um GIF animado com a sequência completa de diagramas (do início ao fim),
-// reproduzindo o movimento de cada passo tal como o estúdio de jogadas já faz —
-// mesmo campo de madeira e as mesmas fichas, para corresponder ao que se vê lá.
-// Devolve uma Promise que resolve com o Blob do ficheiro .gif.
-async function generateSequenceGif(diagramas, { width: rawWidth = 320, onProgress } = {}) {
-  if (!diagramas || diagramas.length === 0) {
-    throw new Error("Não há diagramas nesta sequência.");
-  }
-
-  // O WhatsApp converte GIFs para vídeo (H.264) antes de os reproduzir inline —
-  // esse codec exige dimensões pares; uma dimensão ímpar faz essa conversão
-  // falhar silenciosamente (o ficheiro chega bem, mas só abre "por fora").
-  const width = rawWidth % 2 === 0 ? rawWidth : rawWidth + 1;
-  const vb0 = diagramas[0].court === "campo" ? FULL_VB : HALF_VB;
-  const rawHeight = Math.round(width * (vb0.h / vb0.w));
-  const height = rawHeight % 2 === 0 ? rawHeight : rawHeight + 1;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-  const gif = GIFEncoder();
-
-  // A madeira é cara de gerar (ruído pixel a pixel) — gera-se uma vez por tipo
-  // de campo encontrado na sequência, não a cada frame.
+// Cria as caches reutilizáveis entre frames (a madeira é cara de gerar —
+// ruído pixel a pixel — por isso só se gera uma vez por tipo de campo).
+function createFrameCaches() {
   const courtCache = new Map();
   const tokenCache = new Map();
   const getCourtCanvas = (court, vb) => {
@@ -178,42 +157,21 @@ async function generateSequenceGif(diagramas, { width: rawWidth = 320, onProgres
     }
     return c;
   };
-
-  const addFrame = (diagram, overrides, delay) => {
-    const vb = diagram.court === "campo" ? FULL_VB : HALF_VB;
-    const wood = getCourtCanvas(diagram.court, vb);
-    ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(wood, 0, 0, wood.width, wood.height, 0, 0, width, height);
-    ctx.save();
-    ctx.scale(width / vb.w, height / vb.h);
-    diagram.arrows.forEach((a) => drawArrow(ctx, a));
-    diagram.tokens.forEach((t) => drawToken(ctx, tokenCache, overrides && overrides[t.id] ? { ...t, ...overrides[t.id] } : t));
-    ctx.restore();
-    const { data } = ctx.getImageData(0, 0, width, height);
-    const palette = quantize(data, 256);
-    const index = applyPalette(data, palette);
-    gif.writeFrame(index, width, height, { palette, delay });
-  };
-
-  const total = diagramas.length;
-  for (let i = 0; i < total; i++) {
-    const diagram = diagramas[i];
-    const hasMovement = (diagram.arrows || []).some((a) => a.tokenId && a.to);
-    if (hasMovement) {
-      for (let f = 0; f <= STEP_FRAMES; f++) {
-        const t = f / STEP_FRAMES;
-        const overrides = computeAnimatedPositions(diagram, t);
-        const isLastFrame = f === STEP_FRAMES;
-        addFrame(diagram, overrides, isLastFrame ? PAUSE_MS : Math.round(STEP_MS / STEP_FRAMES));
-      }
-    } else {
-      addFrame(diagram, null, PAUSE_MS);
-    }
-    if (onProgress) onProgress((i + 1) / total);
-  }
-
-  gif.finish();
-  return new Blob([gif.bytes()], { type: "image/gif" });
+  return { getCourtCanvas, tokenCache };
 }
 
-export { generateSequenceGif };
+// Desenha um diagrama (campo + setas + fichas, com posições já animadas em
+// `overrides`) num canvas de width×height.
+function drawDiagramFrame(ctx, diagram, overrides, width, height, caches) {
+  const vb = diagram.court === "campo" ? FULL_VB : HALF_VB;
+  const wood = caches.getCourtCanvas(diagram.court, vb);
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(wood, 0, 0, wood.width, wood.height, 0, 0, width, height);
+  ctx.save();
+  ctx.scale(width / vb.w, height / vb.h);
+  diagram.arrows.forEach((a) => drawArrow(ctx, a));
+  diagram.tokens.forEach((t) => drawToken(ctx, caches.tokenCache, overrides && overrides[t.id] ? { ...t, ...overrides[t.id] } : t));
+  ctx.restore();
+}
+
+export { STEP_MS, PAUSE_MS, createFrameCaches, drawDiagramFrame };

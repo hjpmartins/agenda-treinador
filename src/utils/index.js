@@ -22,10 +22,63 @@ function normalizeJogo(s) {
 function emptyDiagram(court = "meio") {
   return { court, tokens: [], arrows: [] };
 }
-// Posição ao longo de uma seta num instante t (0..1): segue a curva Bezier
-// quadrática (from, control, to) quando há um ponto de controlo definido,
-// ou uma linha reta caso contrário.
+// Pontos de mudança de direção (opcional): uma seta com `waypoints` passa
+// por eles numa curva suave (from -> waypoints -> to). Sem waypoints,
+// mantém-se a curva Bezier quadrática (from, control, to) de sempre.
+function arrowPolyline(a) {
+  return [a.from, ...(a.waypoints || []), a.to];
+}
+function hasWaypoints(a) {
+  return !!(a.waypoints && a.waypoints.length);
+}
+const PATH_SAMPLES_PER_SEG = 16;
+// Curva Catmull-Rom que passa por todos os pontos, amostrada: o ponto de
+// mudança i fica exatamente no índice (i + 1) * PATH_SAMPLES_PER_SEG.
+function arrowPathPoints(a) {
+  const pts = arrowPolyline(a);
+  if (pts.length < 3) return pts.map((p) => ({ x: p.x, y: p.y }));
+  const out = [{ x: pts[0].x, y: pts[0].y }];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    for (let k = 1; k <= PATH_SAMPLES_PER_SEG; k++) {
+      const t = k / PATH_SAMPLES_PER_SEG;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      const f = (a0, a1, a2, a3) => 0.5 * (2 * a1 + (-a0 + a2) * t + (2 * a0 - 5 * a1 + 4 * a2 - a3) * t2 + (-a0 + 3 * a1 - 3 * a2 + a3) * t3);
+      out.push({ x: f(p0.x, p1.x, p2.x, p3.x), y: f(p0.y, p1.y, p2.y, p3.y) });
+    }
+  }
+  return out;
+}
+// Ponto a uma fração t (0..1) do comprimento total de uma polilinha.
+function pointAlongPolyline(pts, t) {
+  const lens = [];
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const l = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    lens.push(l);
+    total += l;
+  }
+  if (total === 0) return { x: pts[0].x, y: pts[0].y };
+  let target = Math.max(0, Math.min(1, t)) * total;
+  for (let i = 0; i < lens.length; i++) {
+    if (target <= lens[i] || i === lens.length - 1) {
+      const k = lens[i] ? Math.min(1, target / lens[i]) : 0;
+      return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * k, y: pts[i].y + (pts[i + 1].y - pts[i].y) * k };
+    }
+    target -= lens[i];
+  }
+  return { x: pts[pts.length - 1].x, y: pts[pts.length - 1].y };
+}
+
+// Posição ao longo de uma seta num instante t (0..1): segue os pontos de
+// mudança de direção, se houver; senão a curva Bezier quadrática (from,
+// control, to) quando há um ponto de controlo definido, ou uma linha reta.
 function positionOnArrow(a, t) {
+  if (hasWaypoints(a)) return pointAlongPolyline(arrowPathPoints(a), t);
   if (a.control) {
     const mt = 1 - t;
     return {
@@ -34,6 +87,38 @@ function positionOnArrow(a, t) {
     };
   }
   return { x: a.from.x + (a.to.x - a.from.x) * t, y: a.from.y + (a.to.y - a.from.y) * t };
+}
+
+// Que bola leva cada seta de drible / hand-off. Com várias bolas, cada seta
+// fica com a bola livre mais próxima do seu início (até 30 unidades). Com uma
+// só bola mantém-se o comportamento antigo: o hand-off tem prioridade e
+// depois o drible, sem limite de distância.
+function assignCarriedBalls(diagram) {
+  const balls = diagram.tokens.filter((tk) => tk.type === "ball");
+  const result = {}; // arrowId -> ballId
+  if (!balls.length) return result;
+  const taken = new Set();
+  const carriers = [
+    ...diagram.arrows.filter((a) => a.type === "handoff" && a.tokenId && a.from),
+    ...diagram.arrows.filter((a) => a.type === "drible" && a.tokenId && a.from),
+  ];
+  carriers.forEach((a) => {
+    let best = null;
+    let bestD = balls.length === 1 ? Infinity : 30;
+    balls.forEach((b) => {
+      if (taken.has(b.id)) return;
+      const d = Math.hypot(b.x - a.from.x, b.y - a.from.y);
+      if (d < bestD) {
+        best = b;
+        bestD = d;
+      }
+    });
+    if (best) {
+      taken.add(best.id);
+      result[a.id] = best.id;
+    }
+  });
+  return result;
 }
 
 function computeAnimatedPositions(diagram, t) {
@@ -54,22 +139,15 @@ function computeAnimatedPositions(diagram, t) {
     if (!token) return;
     overrides[token.id] = { ...token, ...positionOnArrow(a, t) };
   });
-  const dribbleArrow = diagram.arrows.find((a) => a.type === "drible" && a.tokenId);
-  if (dribbleArrow) {
-    const ball = diagram.tokens.find((tk) => tk.type === "ball");
-    if (ball) {
-      overrides[ball.id] = { ...ball, ...positionOnArrow(dribbleArrow, t) };
-    }
-  }
-  // Hand-off: a bola acompanha quem a entrega até ao fim da seta, onde fica
-  // com quem recebe — tal como o drible, mas a entregar em vez de guardar.
-  const handoffArrow = diagram.arrows.find((a) => a.type === "handoff" && a.tokenId);
-  if (handoffArrow) {
-    const ball = diagram.tokens.find((tk) => tk.type === "ball");
-    if (ball) {
-      overrides[ball.id] = { ...ball, ...positionOnArrow(handoffArrow, t) };
-    }
-  }
+  // Drible e hand-off: a bola acompanha quem a leva (no hand-off fica com
+  // quem recebe, no fim da seta).
+  const carried = assignCarriedBalls(diagram);
+  diagram.arrows.forEach((a) => {
+    const ballId = carried[a.id];
+    if (!ballId) return;
+    const ball = diagram.tokens.find((tk) => tk.id === ballId);
+    overrides[ball.id] = { ...ball, ...positionOnArrow(a, t) };
+  });
   return overrides;
 }
 function resolveFinalDiagram(diagram) {
@@ -152,6 +230,29 @@ function wavyCurvedPathD(from, control, to, amplitude = 5, segments = 8) {
 // "lancamento" já começa com uma leve curva (como um arco de lançamento);
 // os outros tipos curáveis (passe, corte, drible) começam retos — o
 // treinador pode depois arrastar o ponto de controlo para curvar a linha.
+// Caminho SVG por uma lista de pontos (já amostrada), ondulado no drible.
+function polylinePathD(pts, wavy = false, amplitude = 5) {
+  if (!wavy) return pts.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
+  const total = pts.reduce((acc, p, i) => (i ? acc + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0), 0);
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  let acc = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const nx = -(b.y - a.y) / len;
+    const ny = (b.x - a.x) / len;
+    const steps = Math.max(1, Math.ceil(len / 3));
+    for (let k = 1; k <= steps; k++) {
+      const dist = acc + (len * k) / steps;
+      const fade = Math.min(1, (total - dist) / 10);
+      const off = Math.sin((dist / 16) * Math.PI * 2) * amplitude * fade;
+      d += ` L ${a.x + ((b.x - a.x) * k) / steps + nx * off} ${a.y + ((b.y - a.y) * k) / steps + ny * off}`;
+    }
+    acc += len;
+  }
+  return d;
+}
 function defaultControlPoint(type, from, to) {
   const mx = (from.x + to.x) / 2;
   const my = (from.y + to.y) / 2;
@@ -345,6 +446,14 @@ export {
   normalizeJogo,
   emptyDiagram,
   computeAnimatedPositions,
+  positionOnArrow,
+  arrowPolyline,
+  arrowPathPoints,
+  PATH_SAMPLES_PER_SEG,
+  hasWaypoints,
+  pointAlongPolyline,
+  assignCarriedBalls,
+  polylinePathD,
   resolveFinalDiagram,
   normalizeDiagramas,
   resizeImageFile,

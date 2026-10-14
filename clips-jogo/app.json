@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "Clips de Jogo",
+    "slug": "clips-jogo",
+    "version": "0.1.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0D10",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0D10"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "pt.clipsjogo.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "A câmara é usada para gravar o jogo.",
+        "NSMicrophoneUsageDescription": "O microfone é usado para gravar o som do jogo.",
+        "NSLocalNetworkUsageDescription": "A rede local é usada para ligar o telemóvel que grava ao tablet que pede os clips, sem internet."
+      }
+    },
+    "android": {
+      "package": "pt.clipsjogo.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0D10",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-video",
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": false,
+          "savePhotosPermission": "Guardar os clips e o jogo completo na galeria.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": [
+            "video"
+          ]
+        }
+      ]
+    ]
+  }
+}

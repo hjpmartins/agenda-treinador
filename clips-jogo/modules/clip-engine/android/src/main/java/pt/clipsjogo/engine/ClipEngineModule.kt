@@ -1,0 +1,126 @@
+package pt.clipsjogo.engine
+
+import android.Manifest
+import android.net.Uri
+import android.view.Surface
+import expo.modules.interfaces.permissions.Permissions
+import expo.modules.kotlin.Promise
+import expo.modules.kotlin.modules.Module
+import expo.modules.kotlin.modules.ModuleDefinition
+import java.io.File
+
+class ClipEngineModule : Module() {
+  private fun clipToMap(sessionId: String, clip: ClipInfo): Map<String, Any?> {
+    val dir = ClipEngine.findSession(sessionId)?.clipsDir
+    return mapOf(
+      "id" to clip.id,
+      "sessionId" to sessionId,
+      "name" to clip.name,
+      "status" to clip.status,
+      "requestedStartMs" to clip.requestedStartUs / 1000.0,
+      "requestedEndMs" to clip.requestedEndUs / 1000.0,
+      "startMs" to clip.startUs / 1000.0,
+      "endMs" to clip.endUs / 1000.0,
+      "createdAtMs" to clip.createdAtMs,
+      "uri" to clip.fileName?.let { f -> dir?.let { Uri.fromFile(File(it, f)).toString() } },
+      "sizeBytes" to clip.sizeBytes,
+      "error" to clip.error
+    )
+  }
+
+  private fun sessionToMap(s: SessionInfo): Map<String, Any?> = mapOf(
+    "id" to s.id,
+    "startedAtMs" to s.startedAtMs,
+    "status" to s.status,
+    "quality" to s.quality,
+    "durationMs" to s.durationUs / 1000.0,
+    "fullVideoUris" to s.fullVideoParts.map { Uri.fromFile(File(s.dir, it)).toString() },
+    "clips" to s.clips.map { clipToMap(s.id, it) }
+  )
+
+  private fun displayRotationDegrees(): Int {
+    @Suppress("DEPRECATION")
+    val rotation = appContext.currentActivity?.windowManager?.defaultDisplay?.rotation ?: Surface.ROTATION_90
+    return when (rotation) {
+      Surface.ROTATION_0 -> 0
+      Surface.ROTATION_90 -> 90
+      Surface.ROTATION_180 -> 180
+      else -> 270
+    }
+  }
+
+  override fun definition() = ModuleDefinition {
+    Name("ClipEngine")
+
+    Events("onStateChange", "onClipUpdate", "onFinalizeProgress", "onError")
+
+    OnCreate {
+      ClipEngine.init(appContext.reactContext!!)
+      ClipEngine.listener = object : ClipEngine.Listener {
+        override fun onStateChanged(state: String) = sendEvent("onStateChange", mapOf("state" to state))
+        override fun onClipUpdated(sessionId: String, clip: ClipInfo) =
+          sendEvent("onClipUpdate", clipToMap(sessionId, clip))
+        override fun onFinalizeProgress(sessionId: String, progress: Float) =
+          sendEvent("onFinalizeProgress", mapOf("sessionId" to sessionId, "progress" to progress.toDouble()))
+        override fun onError(message: String) = sendEvent("onError", mapOf("message" to message))
+      }
+    }
+
+    OnDestroy {
+      ClipEngine.listener = null
+    }
+
+    AsyncFunction("requestPermissionsAsync") { promise: Promise ->
+      Permissions.askForPermissionsWithPermissionsManager(
+        appContext.permissions, promise,
+        Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO
+      )
+    }
+
+    AsyncFunction("getPermissionsAsync") { promise: Promise ->
+      Permissions.getPermissionsWithPermissionsManager(
+        appContext.permissions, promise,
+        Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO
+      )
+    }
+
+    Function("getStatus") { ClipEngine.status() }
+
+    Function("getRecordingTimeMs") { ClipEngine.nowRecUs() / 1000.0 }
+
+    AsyncFunction("startRecording") { quality: String ->
+      ClipEngine.startRecording(quality, displayRotationDegrees())
+    }
+
+    AsyncFunction("stopRecording") {
+      ClipEngine.stopRecording()
+    }
+
+    AsyncFunction("requestClip") { id: String?, startMs: Double, endMs: Double, name: String? ->
+      val clip = ClipEngine.requestClip(id, (startMs * 1000).toLong(), (endMs * 1000).toLong(), name)
+      clipToMap(ClipEngine.currentSession()!!.id, clip)
+    }
+
+    AsyncFunction("renameClip") { sessionId: String, clipId: String, name: String ->
+      ClipEngine.renameClip(sessionId, clipId, name)
+    }
+
+    AsyncFunction("deleteClip") { sessionId: String, clipId: String ->
+      ClipEngine.deleteClip(sessionId, clipId)
+    }
+
+    AsyncFunction("listSessions") {
+      ClipEngine.listSessions().map { sessionToMap(it) }
+    }
+
+    AsyncFunction("deleteSession") { sessionId: String ->
+      ClipEngine.deleteSession(sessionId)
+    }
+
+    AsyncFunction("recoverSession") { sessionId: String ->
+      ClipEngine.recoverSession(sessionId)
+    }
+
+    View(CameraPreviewView::class) {}
+  }
+}

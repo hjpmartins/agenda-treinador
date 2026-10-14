@@ -103,6 +103,15 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
   const [selectedId, setSelectedId] = useState(null);
   const [pendingFrom, setPendingFrom] = useState(null);
   const [drawing, setDrawing] = useState(null);
+  // Aviso curto quando uma ação é recusada (ex: passe sem bola).
+  const [notice, setNotice] = useState(null);
+  const noticeTimer = useRef(null);
+  const notify = (msg) => {
+    setNotice(msg);
+    clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 3500);
+  };
+
   const dragRef = useRef(null); // {kind: 'token'|'control', id}
 
   const commit = useCallback((u) => dispatch({ type: "commit", updater: u }), []);
@@ -171,6 +180,8 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     const rim = (ev.rims || []).find((r) => distPt(r, pt) < 30);
     return rim ? { x: rim.x, y: rim.y, hoop: true } : null;
   };
+
+  const ballBusy = (ballId) => step.arrows.some((a) => (a.type === "passe" || a.type === "lancamento") && a.tokenId === ballId);
 
   // Passe e lançamento movem a bola: se se começa na jogadora, usa a bola dela.
   const ballOf = (tokenId) => {
@@ -286,6 +297,22 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         return;
       }
       const near = nearestToken(pt);
+      const isBallAction = mode === "passe" || mode === "lancamento";
+      // Passe e lançamento só começam em quem tem bola (ou na própria bola),
+      // e cada bola só pode ter um passe/lançamento por passo.
+      if (isBallAction && !pendingFrom) {
+        const ball = near ? ballOf(near.id) : null;
+        if (!ball) {
+          notify(mode === "passe" ? "Só quem tem bola pode passar." : "Só quem tem bola pode lançar.");
+          return;
+        }
+        if (ballBusy(ball.id)) {
+          notify("Esta bola já tem um passe ou lançamento neste passo. Cria um passo novo (ou apaga a seta) para outro.");
+          return;
+        }
+        setDrawing({ type: mode, from: { x: ball.x, y: ball.y, tokenId: ball.id }, to: { x: ball.x, y: ball.y, tokenId: null } });
+        return;
+      }
       const hoopPt = mode === "lancamento" && pendingFrom && !near ? snapToHoop(ev, pt) : null;
       const from = near ? { x: near.x, y: near.y, tokenId: near.id } : { ...(hoopPt || pt), tokenId: null };
       setDrawing({ type: mode, from, to: { x: from.x, y: from.y, tokenId: null } });
@@ -325,7 +352,7 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
       } else if (drawing.from.tokenId) {
         // Toque sem arrastar: escolhe a jogadora de partida; o toque seguinte completa a seta.
         if (!pendingFrom) setPendingFrom(drawing.from);
-        else if (pendingFrom.tokenId === drawing.from.tokenId) setPendingFrom(null);
+        else if (pendingFrom.tokenId === drawing.from.tokenId || ballOf(drawing.from.tokenId)?.id === pendingFrom.tokenId) setPendingFrom(null);
         else {
           addArrow(mode, { x: pendingFrom.x, y: pendingFrom.y }, { x: drawing.from.x, y: drawing.from.y }, pendingFrom.tokenId);
           setPendingFrom(null);
@@ -446,6 +473,7 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     redo,
     canUndo: hist.index > 0,
     canRedo: hist.index < hist.history.length - 1,
+    notice,
     selectedCurve: selectedArrow && !selectedArrow.at ? (WAYPOINT_TYPES.has(selectedArrow.type) ? "s" : CURVABLE_TYPES.has(selectedArrow.type) ? "c" : null) : null,
   };
 }

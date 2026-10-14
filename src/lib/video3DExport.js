@@ -63,10 +63,17 @@ async function recordDiagramasVideo3D(diagramas, { onProgress, camera } = {}) {
       throw new Error("Este navegador não permite gravar vídeo.");
     }
 
-    const stream = canvas.captureStream(0);
-    const track = stream.getVideoTracks()[0];
+    // Captura automática a fps fixo (igual ao que já se usa para o vídeo 2D,
+    // que sempre funcionou) — não a captura manual (fps=0 + requestFrame a
+    // cada desenho) que esta função usava antes: funcionava bem a testar
+    // aqui, mas continuou a dar ficheiros que o WhatsApp recusava em
+    // telemóvel e tablet reais, mesmo depois de corrigido o
+    // preserveDrawingBuffer. A captura automática é o caminho muito mais
+    // testado/comum para gravar um <canvas>, mais garantias de compatibilidade.
+    const FPS = 24;
+    const stream = canvas.captureStream(FPS);
     const chunks = [];
-    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
     recorder.ondataavailable = (e) => {
       if (e.data && e.data.size) chunks.push(e.data);
     };
@@ -78,8 +85,6 @@ async function recordDiagramasVideo3D(diagramas, { onProgress, camera } = {}) {
     let started = false;
 
     recorder.start();
-    scene.onFrame = () => track.requestFrame();
-    track.requestFrame();
 
     await new Promise((resolve) => {
       scene.onStateChange = (state) => {
@@ -90,7 +95,6 @@ async function recordDiagramasVideo3D(diagramas, { onProgress, camera } = {}) {
       scene.play();
     });
 
-    scene.onFrame = null;
     recorder.stop();
     await stopped;
 

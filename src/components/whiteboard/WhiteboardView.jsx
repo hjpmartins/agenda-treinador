@@ -90,6 +90,7 @@ function WhiteboardView({ onClose }) {
   const [dragId, setDragId] = useState(null);
   const [dragControlId, setDragControlId] = useState(null);
   const [drawing, setDrawing] = useState(null);
+  const [pendingFrom, setPendingFrom] = useState(null); // { x, y, tokenId } — jogadora de partida já escolhida por toque, à espera do destino
   const [drawingStroke, setDrawingStroke] = useState(null); // pontos do traço de caneta a ser desenhado agora
   const [erasing, setErasing] = useState(false);
   const [eraserPos, setEraserPos] = useState(null); // posição atual da borracha, só para mostrar o círculo
@@ -210,8 +211,32 @@ function WhiteboardView({ onClose }) {
     setSelectedId(null);
   };
 
+  // Troca de modo cancela sempre uma jogadora de partida que estivesse à
+  // espera de um destino (tocar em "Mover" ou noutra ação a meio do gesto).
+  const changeMode = (next) => {
+    setMode(next);
+    setPendingFrom(null);
+  };
+
   const beginStroke = (e) => {
     setDrawingStroke([getPoint(e)]);
+  };
+
+  const addArrow = (type, from, to, tokenId) => {
+    commit((d) => ({
+      ...d,
+      arrows: [
+        ...d.arrows,
+        {
+          id: uid(),
+          type,
+          from,
+          to,
+          control: CURVABLE_TYPES.has(type) ? defaultControlPoint(type, from, to) : undefined,
+          tokenId: tokenId || null,
+        },
+      ],
+    }));
   };
 
   // Apaga qualquer traço de caneta que passe perto do ponto dado.
@@ -331,22 +356,26 @@ function WhiteboardView({ onClose }) {
     if (drawing) {
       const isTiny = distPt(drawing.from, drawing.to) < 6;
       if (!isTiny) {
-        const from = { x: drawing.from.x, y: drawing.from.y };
-        const to = { x: drawing.to.x, y: drawing.to.y };
-        commit((d) => ({
-          ...d,
-          arrows: [
-            ...d.arrows,
-            {
-              id: uid(),
-              type: drawing.type,
-              from,
-              to,
-              control: CURVABLE_TYPES.has(drawing.type) ? defaultControlPoint(drawing.type, from, to) : undefined,
-              tokenId: drawing.from.tokenId || drawing.to.tokenId || null,
-            },
-          ],
-        }));
+        // Arrastou mesmo — desenha a seta diretamente, como já acontecia.
+        addArrow(drawing.type, { x: drawing.from.x, y: drawing.from.y }, { x: drawing.to.x, y: drawing.to.y }, drawing.from.tokenId || drawing.to.tokenId || null);
+        setPendingFrom(null);
+      } else if (drawing.from.tokenId) {
+        // Toque rápido (sem arrastar) numa jogadora: em vez de descartar,
+        // guarda-a como ponto de partida — o próximo toque (noutra jogadora
+        // ou no campo) completa a seta sozinho, sem ser preciso arrastar.
+        if (!pendingFrom) {
+          setPendingFrom({ x: drawing.from.x, y: drawing.from.y, tokenId: drawing.from.tokenId });
+        } else if (drawing.from.tokenId === pendingFrom.tokenId) {
+          setPendingFrom(null); // tocou na mesma outra vez — cancela a escolha
+        } else {
+          addArrow(mode, { x: pendingFrom.x, y: pendingFrom.y }, { x: drawing.from.x, y: drawing.from.y }, pendingFrom.tokenId);
+          setPendingFrom(null);
+        }
+      } else if (pendingFrom) {
+        // Segundo toque em campo vazio (ex: lançamento para o cesto, corte
+        // para espaço livre) — completa a seta na mesma, sem precisar de jogadora de destino.
+        addArrow(mode, { x: pendingFrom.x, y: pendingFrom.y }, { x: drawing.from.x, y: drawing.from.y }, pendingFrom.tokenId);
+        setPendingFrom(null);
       }
       setDrawing(null);
     }
@@ -421,17 +450,17 @@ function WhiteboardView({ onClose }) {
 
       <div className="shrink-0 px-4 sm:px-6 pt-2 flex flex-wrap items-center gap-1.5">
         <span className="text-xs text-[#8A93A3] mr-1">Modo:</span>
-        <button onClick={() => setMode("mover")} className={`text-xs px-2.5 py-1 rounded ${mode === "mover" ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
+        <button onClick={() => changeMode("mover")} className={`text-xs px-2.5 py-1 rounded ${mode === "mover" ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
           Mover
         </button>
-        <button onClick={() => setMode("caneta")} title="Escrever ou desenhar livremente com a caneta ou o dedo" className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded ${mode === "caneta" ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
+        <button onClick={() => changeMode("caneta")} title="Escrever ou desenhar livremente com a caneta ou o dedo" className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded ${mode === "caneta" ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
           <Pencil size={12} /> Caneta
         </button>
-        <button onClick={() => setMode("borracha")} title="Apagar o que foi desenhado à mão — arrasta por cima para apagar" className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded ${mode === "borracha" ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
+        <button onClick={() => changeMode("borracha")} title="Apagar o que foi desenhado à mão — arrasta por cima para apagar" className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded ${mode === "borracha" ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
           <Eraser size={12} /> Borracha
         </button>
         {ARROW_TYPES.map((a) => (
-          <button key={a.id} onClick={() => setMode(a.id)} title={a.desc} className={`text-xs px-2.5 py-1 rounded ${mode === a.id ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
+          <button key={a.id} onClick={() => changeMode(a.id)} title={a.desc} className={`text-xs px-2.5 py-1 rounded ${mode === a.id ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
             {a.label}
           </button>
         ))}
@@ -443,7 +472,9 @@ function WhiteboardView({ onClose }) {
         )}
         {mode !== "mover" && mode !== "caneta" && mode !== "borracha" && (
           <span className="text-[11px] text-[#8A93A3] ml-1 hidden sm:inline">
-            Arrasta para desenhar · segura <b className="text-[#F2EDE3]">Shift</b> para linha reta
+            {pendingFrom
+              ? <>Agora toca na jogadora (ou ponto) de destino · ou toca outra vez na mesma para cancelar</>
+              : <>Arrasta para desenhar, ou toca na jogadora de partida e depois na de destino · segura <b className="text-[#F2EDE3]">Shift</b> ao arrastar para linha reta</>}
           </span>
         )}
         <div className="ml-auto flex gap-2">
@@ -503,7 +534,8 @@ function WhiteboardView({ onClose }) {
             )}
             {diagram.tokens.map((t) => {
               const pos = (animPositions && animPositions[t.id]) || t;
-              return <TokenShape key={t.id} token={pos} selected={selectedId === t.id} onMouseDown={(e) => startFromToken(e, t.id)} />;
+              const isPendingOrigin = pendingFrom && pendingFrom.tokenId === t.id;
+              return <TokenShape key={t.id} token={pos} selected={selectedId === t.id || isPendingOrigin} onMouseDown={(e) => startFromToken(e, t.id)} />;
             })}
             {(diagram.strokes || []).map((s) => (
               <StrokeShape key={s.id} points={s.points} />

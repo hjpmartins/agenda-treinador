@@ -47,6 +47,7 @@ function DiagramEditor({ initial, onClose, onSave }) {
   const [dragId, setDragId] = useState(null);
   const [dragControlId, setDragControlId] = useState(null); // id da seta cujo ponto de curva está a ser arrastado
   const [drawing, setDrawing] = useState(null); // {type, from:{x,y,tokenId}, to:{x,y,tokenId}}
+  const [pendingFrom, setPendingFrom] = useState(null); // { x, y, tokenId } — jogador de partida já escolhido por toque, à espera do destino
   const [selectedId, setSelectedId] = useState(null);
   const [animPositions, setAnimPositions] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -122,6 +123,30 @@ function DiagramEditor({ initial, onClose, onSave }) {
     setSelectedId(null);
   };
 
+  // Troca de modo cancela sempre um jogador de partida que estivesse à
+  // espera de um destino (tocar em "Mover" ou noutra ação a meio do gesto).
+  const changeMode = (next) => {
+    setMode(next);
+    setPendingFrom(null);
+  };
+
+  const addArrow = (type, from, to, tokenId) => {
+    commit((d) => ({
+      ...d,
+      arrows: [
+        ...d.arrows,
+        {
+          id: uid(),
+          type,
+          from,
+          to,
+          control: CURVABLE_TYPES.has(type) ? defaultControlPoint(type, from, to) : undefined,
+          tokenId: tokenId || null,
+        },
+      ],
+    }));
+  };
+
   // ---- Pointer down: start dragging a token, or start drawing an arrow (bloqueio incluído) ----
   const startFromToken = (e, tokenId) => {
     e.stopPropagation();
@@ -191,22 +216,26 @@ function DiagramEditor({ initial, onClose, onSave }) {
     if (drawing) {
       const isTiny = distPt(drawing.from, drawing.to) < 6;
       if (!isTiny) {
-        const from = { x: drawing.from.x, y: drawing.from.y };
-        const to = { x: drawing.to.x, y: drawing.to.y };
-        commit((d) => ({
-          ...d,
-          arrows: [
-            ...d.arrows,
-            {
-              id: uid(),
-              type: drawing.type,
-              from,
-              to,
-              control: CURVABLE_TYPES.has(drawing.type) ? defaultControlPoint(drawing.type, from, to) : undefined,
-              tokenId: drawing.from.tokenId || drawing.to.tokenId || null,
-            },
-          ],
-        }));
+        // Arrastou mesmo — desenha a seta diretamente, como já acontecia.
+        addArrow(drawing.type, { x: drawing.from.x, y: drawing.from.y }, { x: drawing.to.x, y: drawing.to.y }, drawing.from.tokenId || drawing.to.tokenId || null);
+        setPendingFrom(null);
+      } else if (drawing.from.tokenId) {
+        // Toque rápido (sem arrastar) num jogador: em vez de descartar,
+        // guarda-o como ponto de partida — o próximo toque (noutro jogador
+        // ou no campo) completa a seta sozinho, sem ser preciso arrastar.
+        if (!pendingFrom) {
+          setPendingFrom({ x: drawing.from.x, y: drawing.from.y, tokenId: drawing.from.tokenId });
+        } else if (drawing.from.tokenId === pendingFrom.tokenId) {
+          setPendingFrom(null); // tocou no mesmo outra vez — cancela a escolha
+        } else {
+          addArrow(mode, { x: pendingFrom.x, y: pendingFrom.y }, { x: drawing.from.x, y: drawing.from.y }, pendingFrom.tokenId);
+          setPendingFrom(null);
+        }
+      } else if (pendingFrom) {
+        // Segundo toque em campo vazio (ex: lançamento para o cesto, corte
+        // para espaço livre) — completa a seta na mesma, sem precisar de jogador de destino.
+        addArrow(mode, { x: pendingFrom.x, y: pendingFrom.y }, { x: drawing.from.x, y: drawing.from.y }, pendingFrom.tokenId);
+        setPendingFrom(null);
       }
       setDrawing(null);
     }
@@ -262,22 +291,28 @@ function DiagramEditor({ initial, onClose, onSave }) {
 
       <div className="flex flex-wrap items-center gap-1.5 mb-3">
         <span className="text-xs text-[#8A93A3] mr-1">Modo:</span>
-        <button onClick={() => setMode("mover")} className={`text-xs px-2.5 py-1 rounded ${mode === "mover" ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
+        <button onClick={() => changeMode("mover")} className={`text-xs px-2.5 py-1 rounded ${mode === "mover" ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
           Mover
         </button>
         {ARROW_TYPES.map((a) => (
-          <button key={a.id} onClick={() => setMode(a.id)} title={a.desc} className={`text-xs px-2.5 py-1 rounded ${mode === a.id ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
+          <button key={a.id} onClick={() => changeMode(a.id)} title={a.desc} className={`text-xs px-2.5 py-1 rounded ${mode === a.id ? "bg-[#EA5B13] text-[#14181F]" : "border border-[#2E3644] text-[#8A93A3]"}`}>
             {a.label}
           </button>
         ))}
         {mode !== "mover" && (
           <span className="text-[11px] text-[#8A93A3] ml-1">
-            Arrasta para desenhar · segura <b className="text-[#F2EDE3]">Shift</b> para linha reta
-            {mode === "passe" && <> · <b className="text-[#F2EDE3]">Passe</b> não desloca o jogador, só a bola — usa Corte para o movimento do passador</>}
-            {mode === "lancamento" && <> · <b className="text-[#F2EDE3]">Lançamento</b> desloca só a bola, terminando no alvo (ex: o cesto)</>}
-            {mode === "bloqueio" && <> · o traço fica orientado na direção que arrastares, e ao reproduzir o jogador desloca-se até ao fim da linha e para lá</>}
-            {mode === "handoff" && <> · <b className="text-[#F2EDE3]">Hand-off</b> desloca a jogadora com bola até à companheira — a bola fica com quem recebe</>}
-            {CURVABLE_TYPES.has(mode) && <> · depois de desenhada, seleciona-a em <b className="text-[#F2EDE3]">Mover</b> e arrasta o ponto do meio para curvar</>}
+            {pendingFrom ? (
+              <>Agora toca no jogador (ou ponto) de destino · ou toca outra vez no mesmo para cancelar</>
+            ) : (
+              <>
+                Arrasta para desenhar, ou toca no jogador de partida e depois no de destino · segura <b className="text-[#F2EDE3]">Shift</b> ao arrastar para linha reta
+                {mode === "passe" && <> · <b className="text-[#F2EDE3]">Passe</b> não desloca o jogador, só a bola — usa Corte para o movimento do passador</>}
+                {mode === "lancamento" && <> · <b className="text-[#F2EDE3]">Lançamento</b> desloca só a bola, terminando no alvo (ex: o cesto)</>}
+                {mode === "bloqueio" && <> · o traço fica orientado na direção que arrastares, e ao reproduzir o jogador desloca-se até ao fim da linha e para lá</>}
+                {mode === "handoff" && <> · <b className="text-[#F2EDE3]">Hand-off</b> desloca a jogadora com bola até à companheira — a bola fica com quem recebe</>}
+                {CURVABLE_TYPES.has(mode) && <> · depois de desenhada, seleciona-a em <b className="text-[#F2EDE3]">Mover</b> e arrasta o ponto do meio para curvar</>}
+              </>
+            )}
           </span>
         )}
       </div>
@@ -324,7 +359,8 @@ function DiagramEditor({ initial, onClose, onSave }) {
             )}
             {diagram.tokens.map((t) => {
               const pos = (animPositions && animPositions[t.id]) || t;
-              return <TokenShape key={t.id} token={pos} selected={selectedId === t.id} onMouseDown={(e) => startFromToken(e, t.id)} />;
+              const isPendingOrigin = pendingFrom && pendingFrom.tokenId === t.id;
+              return <TokenShape key={t.id} token={pos} selected={selectedId === t.id || isPendingOrigin} onMouseDown={(e) => startFromToken(e, t.id)} />;
             })}
           </svg>
         </div>

@@ -22,10 +22,41 @@ function normalizeJogo(s) {
 function emptyDiagram(court = "meio") {
   return { court, tokens: [], arrows: [] };
 }
-// Posição ao longo de uma seta num instante t (0..1): segue a curva Bezier
-// quadrática (from, control, to) quando há um ponto de controlo definido,
-// ou uma linha reta caso contrário.
+// Pontos de mudança de direção (opcional): uma seta com `waypoints` segue em
+// linha reta de from -> waypoints[0] -> ... -> to. Sem waypoints, mantém-se a
+// curva Bezier quadrática (from, control, to) de sempre.
+function arrowPolyline(a) {
+  return [a.from, ...(a.waypoints || []), a.to];
+}
+function hasWaypoints(a) {
+  return !!(a.waypoints && a.waypoints.length);
+}
+// Ponto a uma fração t (0..1) do comprimento total de uma polilinha.
+function pointAlongPolyline(pts, t) {
+  const lens = [];
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const l = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    lens.push(l);
+    total += l;
+  }
+  if (total === 0) return { x: pts[0].x, y: pts[0].y };
+  let target = Math.max(0, Math.min(1, t)) * total;
+  for (let i = 0; i < lens.length; i++) {
+    if (target <= lens[i] || i === lens.length - 1) {
+      const k = lens[i] ? Math.min(1, target / lens[i]) : 0;
+      return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * k, y: pts[i].y + (pts[i + 1].y - pts[i].y) * k };
+    }
+    target -= lens[i];
+  }
+  return { x: pts[pts.length - 1].x, y: pts[pts.length - 1].y };
+}
+
+// Posição ao longo de uma seta num instante t (0..1): segue os pontos de
+// mudança de direção, se houver; senão a curva Bezier quadrática (from,
+// control, to) quando há um ponto de controlo definido, ou uma linha reta.
 function positionOnArrow(a, t) {
+  if (hasWaypoints(a)) return pointAlongPolyline(arrowPolyline(a), t);
   if (a.control) {
     const mt = 1 - t;
     return {
@@ -34,6 +65,38 @@ function positionOnArrow(a, t) {
     };
   }
   return { x: a.from.x + (a.to.x - a.from.x) * t, y: a.from.y + (a.to.y - a.from.y) * t };
+}
+
+// Que bola leva cada seta de drible / hand-off. Com várias bolas, cada seta
+// fica com a bola livre mais próxima do seu início (até 30 unidades). Com uma
+// só bola mantém-se o comportamento antigo: o hand-off tem prioridade e
+// depois o drible, sem limite de distância.
+function assignCarriedBalls(diagram) {
+  const balls = diagram.tokens.filter((tk) => tk.type === "ball");
+  const result = {}; // arrowId -> ballId
+  if (!balls.length) return result;
+  const taken = new Set();
+  const carriers = [
+    ...diagram.arrows.filter((a) => a.type === "handoff" && a.tokenId && a.from),
+    ...diagram.arrows.filter((a) => a.type === "drible" && a.tokenId && a.from),
+  ];
+  carriers.forEach((a) => {
+    let best = null;
+    let bestD = balls.length === 1 ? Infinity : 30;
+    balls.forEach((b) => {
+      if (taken.has(b.id)) return;
+      const d = Math.hypot(b.x - a.from.x, b.y - a.from.y);
+      if (d < bestD) {
+        best = b;
+        bestD = d;
+      }
+    });
+    if (best) {
+      taken.add(best.id);
+      result[a.id] = best.id;
+    }
+  });
+  return result;
 }
 
 function computeAnimatedPositions(diagram, t) {
@@ -46,22 +109,15 @@ function computeAnimatedPositions(diagram, t) {
     if ((a.type === "passe" || a.type === "lancamento") && token.type !== "ball") return;
     overrides[a.tokenId] = { ...token, ...positionOnArrow(a, t) };
   });
-  const dribbleArrow = diagram.arrows.find((a) => a.type === "drible" && a.tokenId);
-  if (dribbleArrow) {
-    const ball = diagram.tokens.find((tk) => tk.type === "ball");
-    if (ball) {
-      overrides[ball.id] = { ...ball, ...positionOnArrow(dribbleArrow, t) };
-    }
-  }
-  // Hand-off: a bola acompanha quem a entrega até ao fim da seta, onde fica
-  // com quem recebe — tal como o drible, mas a entregar em vez de guardar.
-  const handoffArrow = diagram.arrows.find((a) => a.type === "handoff" && a.tokenId);
-  if (handoffArrow) {
-    const ball = diagram.tokens.find((tk) => tk.type === "ball");
-    if (ball) {
-      overrides[ball.id] = { ...ball, ...positionOnArrow(handoffArrow, t) };
-    }
-  }
+  // Drible e hand-off: a bola acompanha quem a leva (no hand-off fica com
+  // quem recebe, no fim da seta).
+  const carried = assignCarriedBalls(diagram);
+  diagram.arrows.forEach((a) => {
+    const ballId = carried[a.id];
+    if (!ballId) return;
+    const ball = diagram.tokens.find((tk) => tk.id === ballId);
+    overrides[ball.id] = { ...ball, ...positionOnArrow(a, t) };
+  });
   return overrides;
 }
 function resolveFinalDiagram(diagram) {
@@ -144,6 +200,26 @@ function wavyCurvedPathD(from, control, to, amplitude = 5, segments = 8) {
 // "lancamento" já começa com uma leve curva (como um arco de lançamento);
 // os outros tipos curáveis (passe, corte, drible) começam retos — o
 // treinador pode depois arrastar o ponto de controlo para curvar a linha.
+// Caminho SVG de uma seta com pontos de mudança de direção (retas), ondulado
+// no caso do drible.
+function polylinePathD(pts, wavy = false, amplitude = 5) {
+  if (!wavy) return pts.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const nx = -(b.y - a.y) / len;
+    const ny = (b.x - a.x) / len;
+    const segs = Math.max(2, Math.round(len / 12));
+    for (let k = 1; k <= segs; k++) {
+      const t = k / segs;
+      const off = k === segs ? 0 : (k % 2 === 0 ? 1 : -1) * amplitude;
+      d += ` L ${a.x + (b.x - a.x) * t + nx * off} ${a.y + (b.y - a.y) * t + ny * off}`;
+    }
+  }
+  return d;
+}
 function defaultControlPoint(type, from, to) {
   const mx = (from.x + to.x) / 2;
   const my = (from.y + to.y) / 2;
@@ -337,6 +413,12 @@ export {
   normalizeJogo,
   emptyDiagram,
   computeAnimatedPositions,
+  positionOnArrow,
+  arrowPolyline,
+  hasWaypoints,
+  pointAlongPolyline,
+  assignCarriedBalls,
+  polylinePathD,
   resolveFinalDiagram,
   normalizeDiagramas,
   resizeImageFile,

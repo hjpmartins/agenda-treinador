@@ -349,26 +349,39 @@ class Court3DScene {
     this.courtGroup = new THREE.Group();
     this.scene.add(this.courtGroup);
 
-    // Bola.
+    // Bolas (pode haver várias): geometria e material partilhados.
     this.ballTex = createBallTexture();
-    this.ball = new THREE.Mesh(
-      new THREE.SphereGeometry(BALL_R, 40, 24),
-      new THREE.MeshStandardMaterial({ map: this.ballTex, roughness: 0.75, emissive: "#3A1505", emissiveIntensity: 0.4 })
-    );
-    this.ball.castShadow = true;
-    this.ball.visible = false;
-    this.scene.add(this.ball);
-    this.ballPrev = null;
+    this.ballGeo = new THREE.SphereGeometry(BALL_R, 40, 24);
+    this.ballMat = new THREE.MeshStandardMaterial({ map: this.ballTex, roughness: 0.75, emissive: "#3A1505", emissiveIntensity: 0.4 });
+    this.balls = new Map(); // id -> { mesh, prev }
 
-    // Halo pulsante por baixo de quem tem a bola.
-    this.halo = new THREE.Mesh(
-      new THREE.RingGeometry(PUCK_R + 3, PUCK_R + 6.5, 64),
-      new THREE.MeshBasicMaterial({ color: COLORS.accent, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false })
-    );
-    this.halo.rotation.x = -Math.PI / 2;
-    this.halo.position.y = 0.3;
-    this.halo.visible = false;
-    this.scene.add(this.halo);
+    // Halos pulsantes por baixo de quem tem bola (um por bola).
+    this.haloGeo = new THREE.RingGeometry(PUCK_R + 3, PUCK_R + 6.5, 64);
+    this.haloMat = new THREE.MeshBasicMaterial({ color: COLORS.accent, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false });
+    this.halos = [];
+  }
+
+  _ballMesh(id) {
+    let entry = this.balls.get(id);
+    if (!entry) {
+      const mesh = new THREE.Mesh(this.ballGeo, this.ballMat);
+      mesh.castShadow = true;
+      this.scene.add(mesh);
+      entry = { mesh, prev: null };
+      this.balls.set(id, entry);
+    }
+    return entry;
+  }
+
+  _halo(i) {
+    while (this.halos.length <= i) {
+      const h = new THREE.Mesh(this.haloGeo, this.haloMat);
+      h.rotation.x = -Math.PI / 2;
+      h.position.y = 0.3;
+      this.scene.add(h);
+      this.halos.push(h);
+    }
+    return this.halos[i];
   }
 
   _buildCourt(court) {
@@ -767,7 +780,7 @@ class Court3DScene {
     let tapStart = null;
     const editEvent = (phase, e) => {
       const pt = this.screenToDiagram(e.clientX, e.clientY);
-      return pt ? this.edit.handler({ phase, ...pt, shiftKey: e.shiftKey, view: this.viewMode }) : false;
+      return pt ? this.edit.handler({ phase, ...pt, shiftKey: e.shiftKey, view: this.viewMode, rims: rimPositions(this.court, this.vb) }) : false;
     };
 
     const onDown = (e) => {
@@ -877,6 +890,14 @@ class Court3DScene {
     const planeY = this.viewMode === "3d" ? PUCK_H : 0;
     if (!this._raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY), hit)) return null;
     const { w, h } = this.vb;
+    // Apontar para o aro (no ar, em 3D) conta como apontar para o cesto.
+    const ray = this._raycaster.ray;
+    let hoop = null;
+    rimPositions(this.court, this.vb).forEach((r) => {
+      const wp = this.toWorld(r);
+      if (ray.distanceToPoint(new THREE.Vector3(wp.x, RIM_H, wp.z)) < 16) hoop = r;
+    });
+    if (hoop) return { x: hoop.x, y: hoop.y, hoop: true };
     return { x: THREE.MathUtils.clamp(hit.x + w / 2, 4, w - 4), y: THREE.MathUtils.clamp(hit.z + h / 2, 4, h - 4) };
   }
 
@@ -889,9 +910,10 @@ class Court3DScene {
 
   // Marcas visuais da edição: ficha/seta selecionada, jogadora de partida à
   // espera do destino e pega para curvar a seta.
-  setEditOverlay({ selectedId = null, pendingId = null, handle = null } = {}) {
+  // handles: [{x, y, kind: 'control' | 'wp' | 'add'}].
+  setEditOverlay({ selectedId = null, pendingId = null, handles = [] } = {}) {
     const changed = selectedId !== this.edit.selectedId;
-    Object.assign(this.edit, { selectedId, pendingId, handle });
+    Object.assign(this.edit, { selectedId, pendingId, handles });
     if (changed && this.steps.length && this.court) this._rebuildArrows();
   }
 
@@ -899,11 +921,14 @@ class Court3DScene {
     const ringMat = (color) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false });
     this.selRing = new THREE.Mesh(new THREE.RingGeometry(1, 1.22, 48), ringMat(COLORS.text));
     this.pendRing = new THREE.Mesh(new THREE.RingGeometry(1, 1.22, 48), ringMat(COLORS.accent));
-    this.handle = new THREE.Group();
-    const hDisc = new THREE.Mesh(new THREE.CircleGeometry(5, 32), new THREE.MeshBasicMaterial({ color: COLORS.accent }));
-    const hRing = new THREE.Mesh(new THREE.RingGeometry(5, 6.5, 32), new THREE.MeshBasicMaterial({ color: COLORS.text }));
-    this.handle.add(hDisc, hRing);
-    [this.selRing, this.pendRing, this.handle].forEach((m) => {
+    this.handleGeo = { disc: new THREE.CircleGeometry(5, 32), ring: new THREE.RingGeometry(5, 6.5, 32) };
+    this.handleMat = {
+      accent: new THREE.MeshBasicMaterial({ color: COLORS.accent }),
+      text: new THREE.MeshBasicMaterial({ color: COLORS.text }),
+      dark: new THREE.MeshBasicMaterial({ color: "#14181F", transparent: true, opacity: 0.85 }),
+    };
+    this.handlePool = [];
+    [this.selRing, this.pendRing].forEach((m) => {
       m.rotation.x = -Math.PI / 2;
       m.position.y = 0.7;
       m.visible = false;
@@ -918,19 +943,36 @@ class Court3DScene {
       mesh.visible = !!tk;
       if (!tk) return;
       const p = this.toWorld(tk);
-      const isBall = sample.ball && sample.ball.id === id;
-      mesh.position.set(p.x, isBall ? sample.ball.h - 5 : PUCK_H + 0.6, p.z);
+      const ball = sample.balls.find((b) => b.id === id);
+      mesh.position.set(p.x, ball ? ball.h - 5 : PUCK_H + 0.6, p.z);
+      const isBall = !!ball;
       mesh.scale.setScalar(isBall ? 8.5 : PUCK_R + 3);
     };
     place(this.selRing, this.edit.selectedId);
     place(this.pendRing, this.edit.pendingId);
     this.pendRing.material.opacity = 0.55 + 0.4 * Math.sin(time * 6);
-    const hd = this.edit.handle;
-    this.handle.visible = !!hd;
-    if (hd) {
-      const p = this.toWorld(hd);
-      this.handle.position.set(p.x, 0.9, p.z);
+    // Pegas: laranja = curva / ponto de mudança; pequena "+" = novo ponto.
+    const hs = this.edit.handles || [];
+    while (this.handlePool.length < hs.length) {
+      const g = new THREE.Group();
+      const disc = new THREE.Mesh(this.handleGeo.disc, this.handleMat.accent);
+      const ring = new THREE.Mesh(this.handleGeo.ring, this.handleMat.text);
+      g.add(disc, ring);
+      g.rotation.x = -Math.PI / 2;
+      g.renderOrder = 6;
+      g.userData = { disc };
+      this.scene.add(g);
+      this.handlePool.push(g);
     }
+    this.handlePool.forEach((g, i) => {
+      const hd = hs[i];
+      g.visible = !!hd;
+      if (!hd) return;
+      const p = this.toWorld(hd);
+      g.position.set(p.x, 0.9, p.z);
+      g.userData.disc.material = hd.kind === "add" ? this.handleMat.dark : this.handleMat.accent;
+      g.scale.setScalar(hd.kind === "add" ? 0.7 : 1);
+    });
   }
 
   _pan(dx, dy) {
@@ -980,13 +1022,6 @@ class Court3DScene {
       if (this.playing) this._emit();
     }
 
-    // Cestos discretos na vista de cima (não tapam a área restritiva).
-    const hoopAlpha = THREE.MathUtils.smoothstep(c.polar, 0.08, 0.35);
-    (this.hoops || []).forEach((hp) => {
-      hp.group.visible = hoopAlpha > 0.01;
-      hp.group.scale.setScalar(0.001 + hoopAlpha * 0.999);
-    });
-
     if (this.composer) this.composer.render(dt);
     else this.renderer.render(this.scene, this.camera);
   }
@@ -1017,48 +1052,53 @@ class Court3DScene {
       if (!seen.has(id)) entry.object.visible = false;
     });
 
-    if (sample.ball) {
-      const p = this.toWorld(sample.ball);
-      this.ball.visible = true;
+    const seenBalls = new Set();
+    let haloCount = 0;
+    const pulse = 0.5 + 0.5 * Math.sin(time * 4);
+    sample.balls.forEach((b) => {
+      seenBalls.add(b.id);
+      const entry = this._ballMesh(b.id);
+      const p = this.toWorld(b);
+      entry.mesh.visible = true;
       // Rolamento: roda em torno do eixo perpendicular ao deslocamento.
-      if (this.ballPrev) {
-        const dx = p.x - this.ballPrev.x;
-        const dz = p.z - this.ballPrev.z;
+      if (entry.prev) {
+        const dx = p.x - entry.prev.x;
+        const dz = p.z - entry.prev.z;
         const d = Math.hypot(dx, dz);
-        if (d > 0.001 && d < 40) {
-          const axis = new THREE.Vector3(dz / d, 0, -dx / d);
-          this.ball.rotateOnWorldAxis(axis, d / BALL_R);
-        }
+        if (d > 0.001 && d < 40) entry.mesh.rotateOnWorldAxis(new THREE.Vector3(dz / d, 0, -dx / d), d / BALL_R);
       }
-      this.ballPrev = p;
-      this.ball.position.set(p.x, sample.ball.h, p.z);
+      entry.prev = p;
+      entry.mesh.position.set(p.x, b.h, p.z);
+      if (b.shotPhase > 0) this.shotFlash = 1;
 
-      if (sample.ball.shotPhase > 0) this.shotFlash = 1;
       // Halo em quem tem a bola (a ficha de ataque mais próxima, se estiver perto).
       let holder = null;
       let best = PUCK_R + 14;
       step.tokens.forEach((tk) => {
         if (tk.type !== "offense") return;
         const q = sample.positions[tk.id];
-        const d = Math.hypot(q.x - sample.ball.x, q.y - sample.ball.y);
-        if (d < best && sample.ball.h < 28) {
+        const d = Math.hypot(q.x - b.x, q.y - b.y);
+        if (d < best && b.h < 28) {
           best = d;
           holder = q;
         }
       });
-      this.halo.visible = !!holder;
       if (holder) {
+        const halo = this._halo(haloCount++);
         const hp = this.toWorld(holder);
-        this.halo.position.x = hp.x;
-        this.halo.position.z = hp.z;
-        const pulse = 0.5 + 0.5 * Math.sin(time * 4);
-        this.halo.material.opacity = 0.35 + 0.35 * pulse;
-        this.halo.scale.setScalar(1 + 0.06 * pulse);
+        halo.visible = true;
+        halo.position.x = hp.x;
+        halo.position.z = hp.z;
+        halo.scale.setScalar(1 + 0.06 * pulse);
       }
-    } else {
-      this.ball.visible = false;
-      this.halo.visible = false;
-    }
+    });
+    this.haloMat.opacity = 0.35 + 0.35 * pulse;
+    this.halos.forEach((h, i) => {
+      if (i >= haloCount) h.visible = false;
+    });
+    this.balls.forEach((entry, id) => {
+      if (!seenBalls.has(id)) entry.mesh.visible = false;
+    });
 
     // Aro a acender quando a bola entra.
     this.shotFlash = Math.max(0, this.shotFlash - dt * 1.5);
@@ -1076,11 +1116,11 @@ class Court3DScene {
     this._clearTokens();
     this._disposeCourt();
     if (this.arrows) this.arrows.dispose();
-    this.ball.geometry.dispose();
-    this.ball.material.dispose();
+    this.ballGeo.dispose();
+    this.ballMat.dispose();
     this.ballTex.dispose();
-    this.halo.geometry.dispose();
-    this.halo.material.dispose();
+    this.haloGeo.dispose();
+    this.haloMat.dispose();
     this.table.geometry.dispose();
     this.table.material.dispose();
     this.envTex.dispose();

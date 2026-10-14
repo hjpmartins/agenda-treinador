@@ -4,7 +4,7 @@
 // suave por baixo para dar o ar de néon sobre a madeira.
 
 import * as THREE from "three";
-import { defaultControlPoint } from "../../../utils";
+import { defaultControlPoint, hasWaypoints, arrowPolyline, positionOnArrow } from "../../../utils";
 
 const LIFT = 0.35; // acima do soalho, para não haver z-fighting.
 
@@ -145,15 +145,29 @@ function discGeometry(center, r, dist) {
   return g;
 }
 
-function sampleCurve(from, control, to, segments, wavy) {
+// Pontos ao longo do caminho da seta: retas entre os pontos de mudança de
+// direção (subdivididas, para a ondulação do drible), ou a curva quadrática.
+function sampleCurve(arrow, control, segments, wavy) {
+  const { from, to } = arrow;
   const raw = [];
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments;
-    const mt = 1 - t;
-    raw.push({
-      x: mt * mt * from.x + 2 * mt * t * control.x + t * t * to.x,
-      y: mt * mt * from.y + 2 * mt * t * control.y + t * t * to.y,
-    });
+  if (hasWaypoints(arrow)) {
+    const poly = arrowPolyline(arrow);
+    raw.push({ x: poly[0].x, y: poly[0].y });
+    for (let i = 1; i < poly.length; i++) {
+      const a = poly[i - 1];
+      const b = poly[i];
+      const n = wavy ? Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 3)) : 1;
+      for (let k = 1; k <= n; k++) raw.push({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
+    }
+  } else {
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const mt = 1 - t;
+      raw.push({
+        x: mt * mt * from.x + 2 * mt * t * control.x + t * t * to.x,
+        y: mt * mt * from.y + 2 * mt * t * control.y + t * t * to.y,
+      });
+    }
   }
   if (!wavy) return raw;
   // Ondulação do drible: sinusoide perpendicular à curva, a apagar-se no fim
@@ -200,15 +214,15 @@ function buildArrows(diagram, toWorld, { highlightId = null } = {}) {
     if (arrow.type === "bloqueio") {
       const from = arrow.at ? { x: arrow.at.x - 9, y: arrow.at.y } : arrow.from;
       const to = arrow.at ? { x: arrow.at.x + 9, y: arrow.at.y } : arrow.to;
-      const pts = [toWorld(from), toWorld(to)];
+      const pts = (!arrow.at && hasWaypoints(arrow) ? arrowPolyline(arrow) : [from, to]).map(toWorld);
       const core = makeMaterial({ color });
       const glow = makeMaterial({ color, glow: true });
       const r = ribbonGeometry(pts, 4.5);
       add(ribbonGeometry(pts, 16).geometry, glow);
       add(r.geometry, core);
       // Barra do bloqueio (T) na extremidade.
-      const a = pts[0];
-      const b = pts[1];
+      const a = pts[pts.length - 2];
+      const b = pts[pts.length - 1];
       const dx = b.x - a.x;
       const dz = b.z - a.z;
       const l = Math.hypot(dx, dz) || 1;
@@ -224,7 +238,7 @@ function buildArrows(diagram, toWorld, { highlightId = null } = {}) {
     const control = arrow.control || defaultControlPoint(arrow.type, from, to);
     const isShot = arrow.type === "lancamento";
     const dashed = arrow.type === "passe" || isShot;
-    const pts2d = sampleCurve(from, control, to, 48, arrow.type === "drible");
+    const pts2d = sampleCurve(arrow, control, 48, arrow.type === "drible");
     const pts = pts2d.map(toWorld);
 
     const core = makeMaterial({ color, dash: dashed ? 6 : 0, gap: dashed ? 4 : 0 });
@@ -242,17 +256,14 @@ function buildArrows(diagram, toWorld, { highlightId = null } = {}) {
       add(ringGeometry(tipW, 6, 2, r.length), headMat);
       add(discGeometry(tipW, 2.2, r.length), headMat);
     } else {
-      const c = toWorld(control);
+      const c = toWorld(hasWaypoints(arrow) ? arrow.waypoints[arrow.waypoints.length - 1] : control);
       const dx = tipW.x - c.x;
       const dz = tipW.z - c.z;
       const l = Math.hypot(dx, dz) || 1;
       add(headGeometry(tipW, { x: dx / l, z: dz / l }, headSize, r.length), headMat);
     }
     if (arrow.type === "handoff") {
-      const mid = toWorld({
-        x: 0.25 * from.x + 0.5 * control.x + 0.25 * to.x,
-        y: 0.25 * from.y + 0.5 * control.y + 0.25 * to.y,
-      });
+      const mid = toWorld(positionOnArrow(arrow.control || hasWaypoints(arrow) ? arrow : { ...arrow, control }, 0.5));
       const ballMat = makeMaterial({ color: "#EA5B13" });
       add(discGeometry(mid, 4, r.length / 2), ballMat);
     }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MousePointer2, Undo2, Redo2, Trash2, Plus, Copy, Check } from "lucide-react";
+import { MousePointer2, Undo2, Redo2, Trash2, Plus, Minus, Copy, Check } from "lucide-react";
 import { ARROW_TYPES } from "../../../data";
 
 const TOKENS = [
@@ -11,13 +11,14 @@ const TOKENS = [
 ];
 
 const HINTS = {
-  mover: "Arrasta as fichas para as posicionar. Toca numa seta para a selecionar e arrasta a pega laranja para a curvar.",
-  mover3d: "Arrasta as fichas para as mover; arrastar no chão vazio roda a câmara. Toca numa seta para a selecionar e arrasta a pega laranja para a curvar.",
+  mover: "Arrasta as fichas para as posicionar. Toca numa seta para a selecionar: a pega laranja curva-a, e no drible, corte, bloqueio e lançamento podes criar pontos de mudança de direção.",
+  mover3d: "Arrasta as fichas para as mover; arrastar no chão vazio roda a câmara. Toca numa seta para a selecionar e mexer nas pegas.",
+  pontos: "Arrasta os pontos laranja para mudar a direção. Arrasta um \"+\" (pega escura a meio de um troço) para criar outro ponto. Toca num ponto sem o arrastar para o remover.",
   passe: "Arrasta da jogadora com bola até quem recebe (ou toca numa e depois na outra). O passe só desloca a bola.",
   drible: "Arrasta da jogadora com bola até onde termina o drible. A bola vai com ela.",
   corte: "Arrasta da jogadora até ao destino do corte.",
   bloqueio: "Arrasta da jogadora que bloqueia até ao sítio do bloqueio.",
-  lancamento: "Arrasta da bola (ou de quem lança) até ao cesto.",
+  lancamento: "Arrasta da jogadora com bola até ao cesto: a seta encaixa sozinha no cesto (em 3D também podes apontar para o aro).",
   handoff: "Arrasta da jogadora com bola até à companheira que a recebe.",
 };
 
@@ -70,7 +71,7 @@ function EditToolbar({ editor, viewMode, stepIndex }) {
       <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
         <Group label="Adicionar">
           {TOKENS.map((t) => (
-            <button key={t.type} type="button" onClick={() => e.addToken(t.type)} disabled={t.type === "ball" && e.hasBall} className={`${btn} ${idle}`}>
+            <button key={t.type} type="button" onClick={() => e.addToken(t.type)} className={`${btn} ${idle}`}>
               <span className={`inline-block w-3 h-3 rounded-full ${t.swatch}`} /> {t.label}
             </button>
           ))}
@@ -99,6 +100,16 @@ function EditToolbar({ editor, viewMode, stepIndex }) {
             {confirmStep ? <Check size={13} /> : <Trash2 size={13} />}
           </button>
         </Group>
+        {e.canWaypoint && (
+          <Group label="Mudança de direção">
+            <button type="button" onClick={e.addWaypoint} title="Acrescentar um ponto de mudança de direção à seta selecionada" className={`${btn} ${idle}`}>
+              <Plus size={13} /> Ponto
+            </button>
+            <button type="button" onClick={e.removeWaypoint} disabled={!e.waypointCount} title="Tirar o último ponto de mudança" className={`${btn} ${idle}`}>
+              <Minus size={13} /> Ponto
+            </button>
+          </Group>
+        )}
         <select
           id="edit-court"
           value={e.court}
@@ -111,7 +122,7 @@ function EditToolbar({ editor, viewMode, stepIndex }) {
       </div>
 
       <div className="text-[11px] text-[#8A93A3]">
-        {e.pendingFrom ? "Agora toca na jogadora (ou no ponto) de destino · toca outra vez na mesma para cancelar." : HINTS[e.mode === "mover" && viewMode === "3d" ? "mover3d" : e.mode]}
+        {e.pendingFrom ? "Agora toca na jogadora (ou no ponto) de destino · toca outra vez na mesma para cancelar." : HINTS[e.mode === "mover" && e.waypointCount ? "pontos" : e.mode === "mover" && viewMode === "3d" ? "mover3d" : e.mode]}
         {e.mode !== "mover" && viewMode === "3d" && !e.pendingFrom && <span className="text-[#5A6272]"> · Para rodar a câmara enquanto desenhas: botão direito, dois dedos ou as setas à direita.</span>}
         {e.mode !== "mover" && !e.pendingFrom && <span className="text-[#5A6272]"> · Shift ao arrastar para linha reta.</span>}
       </div>

@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { HALF_VB, FULL_VB } from "../../../data";
-import { uid, distPt, emptyDiagram, defaultControlPoint, resolveFinalDiagram } from "../../../utils";
+import { uid, distPt, emptyDiagram, defaultControlPoint, resolveFinalDiagram, positionOnArrow, hasWaypoints, arrowPolyline } from "../../../utils";
 
 const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible", "handoff"]);
 const SNAP_DIST = 14;
@@ -34,18 +34,43 @@ function historyReducer(state, action) {
   }
 }
 
-function quad(a, t) {
-  const c = a.control || defaultControlPoint(a.type, a.from, a.to);
-  const mt = 1 - t;
-  return { x: mt * mt * a.from.x + 2 * mt * t * c.x + t * t * a.to.x, y: mt * mt * a.from.y + 2 * mt * t * c.y + t * t * a.to.y };
+// Setas que aceitam pontos de mudança de direção.
+const WAYPOINT_TYPES = new Set(["drible", "corte", "bloqueio", "lancamento"]);
+
+// Seta com o ponto de controlo por omissão preenchido (para a desenhar/medir
+// tal como aparece no ecrã).
+function withControl(a) {
+  if (a.control || hasWaypoints(a) || !CURVABLE_TYPES.has(a.type)) return a;
+  return { ...a, control: defaultControlPoint(a.type, a.from, a.to) };
 }
 
 function distToArrow(a, pt) {
   if (a.at) return distPt(a.at, pt);
   if (!a.from || !a.to) return Infinity;
+  const full = withControl(a);
   let best = Infinity;
-  for (let i = 0; i <= 24; i++) best = Math.min(best, distPt(quad(a, i / 24), pt));
+  for (let i = 0; i <= 40; i++) best = Math.min(best, distPt(positionOnArrow(full, i / 40), pt));
   return best;
+}
+
+// Pegas da seta selecionada: curva (sem pontos), pontos de mudança, e "+"
+// a meio de cada troço para acrescentar um ponto novo arrastando.
+function arrowHandles(a) {
+  if (!a || a.at) return [];
+  if (hasWaypoints(a)) {
+    const poly = arrowPolyline(a);
+    const hs = a.waypoints.map((w, i) => ({ kind: "wp", index: i, x: w.x, y: w.y }));
+    for (let i = 1; i < poly.length; i++) {
+      if (distPt(poly[i - 1], poly[i]) > 34) hs.push({ kind: "add", index: i - 1, x: (poly[i - 1].x + poly[i].x) / 2, y: (poly[i - 1].y + poly[i].y) / 2 });
+    }
+    return hs;
+  }
+  if (CURVABLE_TYPES.has(a.type)) {
+    const c = a.control || defaultControlPoint(a.type, a.from, a.to);
+    return [{ kind: "control", x: c.x, y: c.y }];
+  }
+  if (WAYPOINT_TYPES.has(a.type)) return [{ kind: "add", index: 0, x: (a.from.x + a.to.x) / 2, y: (a.from.y + a.to.y) / 2 }];
+  return [];
 }
 
 function snapAngle(from, raw) {
@@ -113,16 +138,51 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
   }, [steps, drawing, idx, sceneRef, editable]);
 
   const selectedArrow = step.arrows.find((a) => a.id === selectedId);
-  const handle =
-    enabled && mode === "mover" && selectedArrow && CURVABLE_TYPES.has(selectedArrow.type)
-      ? selectedArrow.control || defaultControlPoint(selectedArrow.type, selectedArrow.from, selectedArrow.to)
-      : null;
+  const handles = enabled && mode === "mover" && !drawing ? arrowHandles(selectedArrow) : [];
+  const handlesKey = JSON.stringify(handles);
 
   useEffect(() => {
     sceneRef.current?.setEditOverlay(
-      enabled ? { selectedId: drawing ? null : selectedId, pendingId: pendingFrom?.tokenId || null, handle } : {}
+      enabled ? { selectedId: drawing ? null : selectedId, pendingId: pendingFrom?.tokenId || null, handles: JSON.parse(handlesKey) } : {}
     );
-  }, [enabled, selectedId, pendingFrom, handle, drawing, sceneRef]);
+  }, [enabled, selectedId, pendingFrom, handlesKey, drawing, sceneRef]);
+
+  const handleAt = (pt) => {
+    let best = null;
+    let bestD = 10;
+    handles.forEach((h) => {
+      const d = distPt(h, pt);
+      if (d < bestD) {
+        best = h;
+        bestD = d;
+      }
+    });
+    return best;
+  };
+
+  // Lançamento: perto de um cesto (ou a apontar para o aro em 3D) encaixa no cesto.
+  const snapToHoop = (ev, pt) => {
+    if (ev.hoop) return { x: ev.x, y: ev.y, hoop: true };
+    const rim = (ev.rims || []).find((r) => distPt(r, pt) < 30);
+    return rim ? { x: rim.x, y: rim.y, hoop: true } : null;
+  };
+
+  // Passe e lançamento movem a bola: se se começa na jogadora, usa a bola dela.
+  const ballOf = (tokenId) => {
+    const tk = step.tokens.find((t) => t.id === tokenId);
+    if (!tk || tk.type === "ball") return tk || null;
+    let best = null;
+    let bestD = 24;
+    step.tokens.forEach((b) => {
+      if (b.type !== "ball") return;
+      const d = distPt(b, tk);
+      if (d < bestD) {
+        best = b;
+        bestD = d;
+      }
+    });
+    return best;
+  };
 
   const nearestToken = (pt) => {
     let best = null;
@@ -137,7 +197,14 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     return best;
   };
 
-  const addArrow = (type, from, to, tokenId) =>
+  const addArrow = (type, from, to, tokenId) => {
+    if ((type === "passe" || type === "lancamento") && tokenId) {
+      const ball = ballOf(tokenId);
+      if (ball) {
+        from = { x: ball.x, y: ball.y };
+        tokenId = ball.id;
+      }
+    }
     commit(
       updateStep((d) => ({
         ...d,
@@ -147,6 +214,16 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         ],
       }))
     );
+  };
+
+  const updateArrow = (id, fn, replace = false) => (replace ? replaceCurrent : commit)(updateStep((d) => ({ ...d, arrows: d.arrows.map((a) => (a.id === id ? fn(a) : a)) })));
+
+  // Insere um ponto de mudança no troço `index` (0 = entre o início e o 1.º ponto).
+  const insertWaypoint = (a, index, p) => {
+    const wps = hasWaypoints(a) ? a.waypoints.slice() : [];
+    wps.splice(index, 0, { x: p.x, y: p.y });
+    return { ...a, waypoints: wps, control: undefined };
+  };
 
   const handler = (ev) => {
     const scene = sceneRef.current;
@@ -172,9 +249,16 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
 
     if (ev.phase === "down") {
       if (mode === "mover") {
-        if (handle && distPt(handle, pt) < 10) {
+        const h = handleAt(pt);
+        if (h) {
           commit((l) => l);
-          dragRef.current = { kind: "control", id: selectedId };
+          if (h.kind === "control") dragRef.current = { kind: "control", id: selectedId };
+          else if (h.kind === "wp") dragRef.current = { kind: "wp", id: selectedId, index: h.index, start: pt, moved: false };
+          else {
+            // "+" a meio de um troço: cria o ponto e começa logo a arrastá-lo.
+            updateArrow(selectedId, (a) => insertWaypoint(a, h.index, pt), true);
+            dragRef.current = { kind: "wp", id: selectedId, index: h.index, start: pt, moved: true };
+          }
           return;
         }
         const tk = nearestToken(pt);
@@ -193,7 +277,8 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         return;
       }
       const near = nearestToken(pt);
-      const from = near ? { x: near.x, y: near.y, tokenId: near.id } : { ...pt, tokenId: null };
+      const hoopPt = mode === "lancamento" && pendingFrom && !near ? snapToHoop(ev, pt) : null;
+      const from = near ? { x: near.x, y: near.y, tokenId: near.id } : { ...(hoopPt || pt), tokenId: null };
       setDrawing({ type: mode, from, to: { x: from.x, y: from.y, tokenId: null } });
       return;
     }
@@ -205,19 +290,31 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         const y = Math.max(4, Math.min(vb.h - 4, pt.y + drag.dy));
         replaceCurrent(updateStep((d) => ({ ...d, tokens: d.tokens.map((t) => (t.id === drag.id ? { ...t, x, y } : t)) })));
       } else if (drag?.kind === "control") {
-        replaceCurrent(updateStep((d) => ({ ...d, arrows: d.arrows.map((a) => (a.id === drag.id ? { ...a, control: pt } : a)) })));
+        updateArrow(drag.id, (a) => ({ ...a, control: pt }), true);
+      } else if (drag?.kind === "wp") {
+        if (distPt(pt, drag.start) > 3) drag.moved = true;
+        if (drag.moved) updateArrow(drag.id, (a) => ({ ...a, waypoints: a.waypoints.map((w, i) => (i === drag.index ? { x: pt.x, y: pt.y } : w)) }), true);
       } else if (drawing) {
-        const near = nearestToken(pt);
-        let to = near && near.id !== drawing.from.tokenId ? { x: near.x, y: near.y } : pt;
-        if (!near && ev.shiftKey) to = snapAngle(drawing.from, pt);
-        setDrawing({ ...drawing, to: { ...to, tokenId: near ? near.id : null } });
+        const hoopPt = drawing.type === "lancamento" ? snapToHoop(ev, pt) : null;
+        const near = hoopPt ? null : nearestToken(pt);
+        let to = hoopPt || (near && near.id !== drawing.from.tokenId ? { x: near.x, y: near.y } : pt);
+        if (!near && !hoopPt && ev.shiftKey) to = snapAngle(drawing.from, pt);
+        setDrawing({ ...drawing, to: { x: to.x, y: to.y, tokenId: near ? near.id : null } });
       }
       return;
     }
 
     if (ev.phase === "up") {
-      if (dragRef.current) {
+      const drag = dragRef.current;
+      if (drag) {
         dragRef.current = null;
+        // Toque num ponto de mudança sem o arrastar: remove-o.
+        if (drag.kind === "wp" && !drag.moved) {
+          updateArrow(drag.id, (a) => {
+            const wps = a.waypoints.filter((_, i) => i !== drag.index);
+            return { ...a, waypoints: wps.length ? wps : undefined };
+          }, true);
+        }
         return;
       }
       if (!drawing) return;
@@ -243,7 +340,7 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
 
   const hover = (pt, view) => {
     if (mode !== "mover") return "crosshair";
-    if ((handle && distPt(handle, pt) < 10) || nearestToken(pt)) return "move";
+    if (handleAt(pt) || nearestToken(pt)) return "move";
     return view === "3d" ? "grab" : "default";
   };
 
@@ -288,13 +385,15 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
   };
 
   const addToken = (type) => {
-    if (type === "ball" && step.tokens.some((t) => t.type === "ball")) return;
     let pref = { x: vb.w / 2, y: court === "campo" ? vb.h * 0.7 : vb.h * 0.45 };
+    let p = null;
     if (type === "ball") {
-      const holder = step.tokens.find((t) => t.type === "offense");
-      if (holder) pref = { x: holder.x + 10, y: holder.y - 8 };
+      // Bola nova vai para a primeira atacante que ainda não tem bola.
+      const balls = step.tokens.filter((t) => t.type === "ball");
+      const holder = step.tokens.find((t) => t.type === "offense" && balls.every((b) => distPt(b, t) > 24));
+      if (holder) p = { x: Math.min(vb.w - 8, holder.x + 10), y: Math.max(8, holder.y - 8) };
     }
-    const p = type === "ball" && step.tokens.some((t) => t.type === "offense") ? pref : freeSpot(pref);
+    if (!p) p = freeSpot(pref);
     const token = { id: uid(), type, number: type === "offense" || type === "defense" ? nextNumber(type) : "", x: p.x, y: p.y };
     // Fichas novas entram em todos os passos a partir deste, para a
     // jogadora não desaparecer no passo seguinte.
@@ -307,6 +406,36 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     if (!selectedId) return;
     commit(updateStep((d) => ({ ...d, tokens: d.tokens.filter((t) => t.id !== selectedId), arrows: d.arrows.filter((a) => a.id !== selectedId && a.tokenId !== selectedId) })));
     setSelectedId(null);
+  };
+
+  // Botões da barra: acrescentar / tirar ponto de mudança na seta selecionada.
+  const canWaypoint = !!selectedArrow && !selectedArrow.at && WAYPOINT_TYPES.has(selectedArrow.type);
+  const addWaypoint = () => {
+    if (!canWaypoint) return;
+    const a = withControl(selectedArrow);
+    if (hasWaypoints(a)) {
+      // No troço mais comprido.
+      const poly = arrowPolyline(a);
+      let bi = 0;
+      let bl = -1;
+      for (let i = 1; i < poly.length; i++) {
+        const l = distPt(poly[i - 1], poly[i]);
+        if (l > bl) {
+          bl = l;
+          bi = i - 1;
+        }
+      }
+      updateArrow(a.id, (x) => insertWaypoint(x, bi, { x: (poly[bi].x + poly[bi + 1].x) / 2, y: (poly[bi].y + poly[bi + 1].y) / 2 }));
+    } else {
+      updateArrow(a.id, (x) => insertWaypoint(x, 0, positionOnArrow(a, 0.5)));
+    }
+  };
+  const removeWaypoint = () => {
+    if (!canWaypoint || !hasWaypoints(selectedArrow)) return;
+    updateArrow(selectedArrow.id, (a) => {
+      const wps = a.waypoints.slice(0, -1);
+      return { ...a, waypoints: wps.length ? wps : undefined };
+    });
   };
 
   const setCourt = (c) => commit((list) => list.map((d) => ({ ...d, court: c })));
@@ -346,7 +475,10 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     redo,
     canUndo: hist.index > 0,
     canRedo: hist.index < hist.history.length - 1,
-    hasBall: step.tokens.some((t) => t.type === "ball"),
+    canWaypoint,
+    waypointCount: selectedArrow?.waypoints?.length || 0,
+    addWaypoint,
+    removeWaypoint,
   };
 }
 

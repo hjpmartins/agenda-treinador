@@ -7,7 +7,7 @@
 // saltar, lançamento ao cesto) e um ligeiro desvio lateral no drible para a
 // bola não ficar enterrada dentro da ficha.
 
-import { computeAnimatedPositions } from "../../../utils";
+import { computeAnimatedPositions, positionOnArrow, arrowPolyline, pointAlongPolyline, assignCarriedBalls } from "../../../utils";
 
 const BALL_R = 5.5;
 const PUCK_H = 4.5;
@@ -21,33 +21,35 @@ function rimPositions(court, vb) {
   return rims;
 }
 
-function quadPoint(from, control, to, t) {
-  const mt = 1 - t;
-  return {
-    x: mt * mt * from.x + 2 * mt * t * control.x + t * t * to.x,
-    y: mt * mt * from.y + 2 * mt * t * control.y + t * t * to.y,
-  };
-}
-
-// Mesma regra que positionOnArrow em utils: curva só se a seta tiver control.
+// Direção da seta no instante t (para pôr a bola ao lado de quem dribla).
 function arrowTangent(a, t) {
-  const p0 = a.control ? quadPoint(a.from, a.control, a.to, Math.max(0, t - 0.01)) : a.from;
-  const p1 = a.control ? quadPoint(a.from, a.control, a.to, Math.min(1, t + 0.01)) : a.to;
+  const p0 = positionOnArrow(a, Math.max(0, t - 0.01));
+  const p1 = positionOnArrow(a, Math.min(1, t + 0.01));
   const dx = p1.x - p0.x;
   const dy = p1.y - p0.y;
   const len = Math.hypot(dx, dy) || 1;
   return { x: dx / len, y: dy / len };
 }
 
-// Que seta está a mover a bola neste passo (pela mesma ordem de prioridade de
-// computeAnimatedPositions: hand-off > drible > seta da própria bola).
-function ballDriver(diagram, ball) {
-  if (!ball) return null;
-  const handoff = diagram.arrows.find((a) => a.type === "handoff" && a.tokenId);
-  if (handoff) return handoff;
-  const drible = diagram.arrows.find((a) => a.type === "drible" && a.tokenId);
-  if (drible) return drible;
-  return diagram.arrows.find((a) => a.tokenId === ball.id && a.to) || null;
+function pathLength(a) {
+  const pts = arrowPolyline(a);
+  let l = 0;
+  for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  return l;
+}
+
+// Que seta move cada bola neste passo: a de drible/hand-off que a leva (mesma
+// atribuição de computeAnimatedPositions) ou uma seta da própria bola.
+function ballDrivers(diagram) {
+  const carried = assignCarriedBalls(diagram);
+  const drivers = {};
+  diagram.arrows.forEach((a) => {
+    if (a.tokenId && a.to && diagram.tokens.some((tk) => tk.id === a.tokenId && tk.type === "ball")) drivers[a.tokenId] = a;
+  });
+  diagram.arrows.forEach((a) => {
+    if (carried[a.id]) drivers[carried[a.id]] = a;
+  });
+  return drivers;
 }
 
 function smoothstep(e0, e1, x) {
@@ -57,30 +59,20 @@ function smoothstep(e0, e1, x) {
 
 const easeMove = (t) => t * 0.4 + (0.5 - 0.5 * Math.cos(Math.PI * t)) * 0.6;
 
-/**
- * Devolve { positions: {id: {x, y}}, ball: {id, x, y, h, shotPhase} | null }
- * para o passo `diagram` no instante t. `shotPhase` > 0 quando a bola acabou de
- * entrar no cesto (para o aro piscar).
- */
-function sampleStep(diagram, t, vb) {
-  const te = easeMove(t);
-  const overrides = computeAnimatedPositions(diagram, te);
-  const positions = {};
-  diagram.tokens.forEach((tk) => {
-    const o = overrides[tk.id];
-    positions[tk.id] = o ? { x: o.x, y: o.y } : { x: tk.x, y: tk.y };
-  });
+function nearestRim(diagram, vb, p) {
+  return rimPositions(diagram.court, vb).reduce((best, r) => {
+    const d = Math.hypot(r.x - p.x, r.y - p.y);
+    return d < best.d ? { r, d } : best;
+  }, { r: null, d: Infinity });
+}
 
-  const ballTk = diagram.tokens.find((tk) => tk.type === "ball");
-  if (!ballTk) return { positions, ball: null };
-
+function sampleBall(diagram, ballTk, driver, positions, t, te, vb) {
   let { x, y } = positions[ballTk.id];
   let motionH = BALL_R;
   let shotPhase = 0;
-  const driver = ballDriver(diagram, ballTk);
 
   if (driver) {
-    const len = Math.hypot(driver.to.x - driver.from.x, driver.to.y - driver.from.y);
+    const len = pathLength(driver);
     const env = Math.sin(Math.PI * te);
     if (driver.type === "drible" || driver.type === "handoff") {
       // Bola ao lado de quem a leva (à direita do sentido de marcha); o
@@ -96,17 +88,23 @@ function sampleStep(diagram, t, vb) {
         motionH = BALL_R + 12 * env;
       }
     } else if (driver.type === "lancamento") {
-      const rims = rimPositions(diagram.court, vb);
-      const rim = rims.reduce((best, r) => {
-        const d = Math.hypot(r.x - driver.to.x, r.y - driver.to.y);
-        return d < best.d ? { r, d } : best;
-      }, { r: null, d: Infinity });
-      const start = driver.from;
-      if (rim.r && rim.d < 40) {
-        // Arco até ao aro (82% do tempo) e queda pela rede.
-        const k = 0.82;
+      const rim = nearestRim(diagram, vb, driver.to);
+      const wps = driver.waypoints || [];
+      // Com pontos de mudança, a bola primeiro percorre o caminho até ao
+      // último ponto (rente ao chão) e só lá é lançada.
+      const pre = wps.length ? 0.4 : 0;
+      const start = wps.length ? wps[wps.length - 1] : driver.from;
+      if (t < pre) {
+        const u = t / pre;
+        const p = pointAlongPolyline([driver.from, ...wps], u);
+        x = p.x;
+        y = p.y;
+        motionH = BALL_R + 8 * Math.sin(Math.PI * u);
+      } else if (rim.r && rim.d < 40) {
+        // Arco até ao aro e queda pela rede.
+        const k = pre + (1 - pre) * 0.82;
         if (t < k) {
-          const u = t / k;
+          const u = (t - pre) / (k - pre);
           const dist = Math.hypot(rim.r.x - start.x, rim.r.y - start.y);
           const apex = 48 + dist * 0.25;
           x = start.x + (rim.r.x - start.x) * u;
@@ -120,7 +118,11 @@ function sampleStep(diagram, t, vb) {
           shotPhase = 1 - u;
         }
       } else {
-        motionH = BALL_R + (30 + len * 0.2) * env;
+        const u = (t - pre) / (1 - pre);
+        const p = pointAlongPolyline([start, driver.to], u);
+        x = p.x;
+        y = p.y;
+        motionH = BALL_R + (30 + len * 0.2) * Math.sin(Math.PI * u);
       }
     } else if (driver.type === "passe") {
       motionH = BALL_R + 10 * env + Math.min(26, len * 0.1) * env;
@@ -137,7 +139,25 @@ function sampleStep(diagram, t, vb) {
     restH = Math.max(restH, BALL_R + PUCK_H * smoothstep(PUCK_R + BALL_R * 0.6, PUCK_R * 0.6, d));
   });
 
-  return { positions, ball: { id: ballTk.id, x, y, h: Math.max(restH, motionH), shotPhase } };
+  return { id: ballTk.id, x, y, h: Math.max(restH, motionH), shotPhase };
+}
+
+/**
+ * Devolve { positions: {id: {x, y}}, balls: [{id, x, y, h, shotPhase}] } para
+ * o passo `diagram` no instante t. `shotPhase` > 0 quando a bola acabou de
+ * entrar no cesto (para o aro piscar).
+ */
+function sampleStep(diagram, t, vb) {
+  const te = easeMove(t);
+  const overrides = computeAnimatedPositions(diagram, te);
+  const positions = {};
+  diagram.tokens.forEach((tk) => {
+    const o = overrides[tk.id];
+    positions[tk.id] = o ? { x: o.x, y: o.y } : { x: tk.x, y: tk.y };
+  });
+  const drivers = ballDrivers(diagram);
+  const balls = diagram.tokens.filter((tk) => tk.type === "ball").map((b) => sampleBall(diagram, b, drivers[b.id], positions, t, te, vb));
+  return { positions, balls };
 }
 
 export { sampleStep, rimPositions, BALL_R, PUCK_H, PUCK_R, RIM_H };

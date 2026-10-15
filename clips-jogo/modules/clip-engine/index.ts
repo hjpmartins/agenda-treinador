@@ -47,6 +47,19 @@ export type EngineStatus = {
   freeBytes: number;
   bytesPerSecond: number;
   hasMicrophone: boolean;
+  linkActive: boolean;
+  tabletConnected: boolean;
+};
+
+export type LinkInfo = {
+  ssid: string | null;
+  passphrase: string | null;
+  security: string;
+  ips: string[];
+  port: number;
+  token: string;
+  /** Preenchido se a rede própria falhou (a ligação pode ainda funcionar por outro Wi-Fi). */
+  hotspotError: string | null;
 };
 
 export type PermissionResult = { granted: boolean; canAskAgain: boolean; status: string };
@@ -73,6 +86,14 @@ declare class ClipEngineNative extends NativeModule<Events> {
   listSessions(): Promise<Session[]>;
   deleteSession(sessionId: string): Promise<void>;
   recoverSession(sessionId: string): Promise<void>;
+
+  // Ligação ao tablet (telemóvel)
+  requestLinkPermissionsAsync(): Promise<PermissionResult>;
+  startLink(): Promise<LinkInfo>;
+  stopLink(): Promise<void>;
+  // Ligação ao telemóvel (tablet)
+  joinNetwork(ssid: string, passphrase: string, security: string): Promise<void>;
+  leaveNetwork(): Promise<void>;
 }
 
 /** null em plataformas onde o motor ainda não existe (iOS nesta fase). */

@@ -31,7 +31,7 @@ export function HomeScreen({ onRecord, onRemote, onClips }: Props) {
         />
         <Button
           label="Comando"
-          sublabel="Este dispositivo pede os clips (em breve)"
+          sublabel="Este dispositivo pede os clips (tablet)"
           size="xl"
           onPress={onRemote}
           style={styles.choice}

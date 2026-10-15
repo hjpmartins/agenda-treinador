@@ -2,17 +2,20 @@ import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, BackHandler, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import {
   addEngineListener,
   CameraPreview,
   ClipEngine,
   type Clip,
   type EngineStatus,
+  type LinkInfo,
   type Quality,
 } from '../../modules/clip-engine';
 import { Button, Card, Chip, ProgressBar } from '../components/ui';
 import { lastSeconds, PRESET_SECONDS } from '../lib/clipRange';
+import { encodePairing } from '../remote/pairing';
 import { formatClock, formatHoursMinutes, recordingTimeLeftMs } from '../lib/format';
 import { colors, radius, space } from '../theme';
 
@@ -34,6 +37,9 @@ export function RecordScreen({ onBack, onClips }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [sleeping, setSleeping] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [link, setLink] = useState<LinkInfo | null>(null);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const flashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const wasFinalizing = useRef(false);
@@ -100,6 +106,36 @@ export function RecordScreen({ onBack, onClips }: Props) {
   useEffect(() => {
     if (permission === 'granted' && !recording && !finalizing) engine.setQuality(quality).catch(() => {});
   }, [engine, permission, quality, recording, finalizing]);
+
+  // Ao sair do ecrã (sem gravar), desliga a rede local.
+  const recordingRef = useRef(false);
+  recordingRef.current = recording || finalizing;
+  useEffect(() => {
+    return () => {
+      if (!recordingRef.current) engine.stopLink().catch(() => {});
+    };
+  }, [engine]);
+
+  const connectTablet = useCallback(async () => {
+    setLinkBusy(true);
+    try {
+      const perm = await engine.requestLinkPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(
+          'Permissão necessária',
+          'Para criar a rede Wi-Fi que liga ao tablet, autoriza "Dispositivos próximos" (ou Localização) para esta app.',
+          [{ text: 'Cancelar', style: 'cancel' }, { text: 'Abrir definições', onPress: () => Linking.openSettings() }]
+        );
+        return;
+      }
+      setLink(await engine.startLink());
+      setShowQr(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLinkBusy(false);
+    }
+  }, [engine]);
 
   const askPermission = useCallback(async () => {
     const p = await engine.requestPermissionsAsync();
@@ -204,7 +240,10 @@ export function RecordScreen({ onBack, onClips }: Props) {
               <Chip label={status.thermal === 'critico' ? 'Muito quente!' : 'Quente'} tone={status.thermal === 'critico' ? 'danger' : 'warn'} />
             ) : null}
             {!status.hasMicrophone ? <Chip label="Sem som" tone="warn" /> : null}
-            <Chip label="Tablet: não ligado" />
+            <Chip
+              label={status.tabletConnected ? 'Tablet ligado' : status.linkActive ? 'À espera do tablet' : 'Tablet: não ligado'}
+              tone={status.tabletConnected ? 'ok' : status.linkActive ? 'warn' : 'neutral'}
+            />
           </View>
         </View>
 
@@ -246,6 +285,12 @@ export function RecordScreen({ onBack, onClips }: Props) {
               </Text>
             </View>
             <View style={styles.panelSection}>
+              <Button
+                label={status.tabletConnected ? 'Tablet ligado ✓' : 'Ligar tablet'}
+                variant="ghost"
+                onPress={connectTablet}
+                loading={linkBusy}
+              />
               <Button label="Ecrã de repouso" variant="ghost" onPress={() => setSleeping(true)} />
               <Button label="Parar gravação" variant="danger" size="l" onPress={stop} />
             </View>
@@ -282,6 +327,12 @@ export function RecordScreen({ onBack, onClips }: Props) {
                 <View style={styles.recordInner} />
               </Pressable>
               <Text style={styles.recordLabel}>{busy ? 'A iniciar…' : 'Iniciar gravação'}</Text>
+              <Button
+                label={status.tabletConnected ? 'Tablet ligado ✓' : 'Ligar tablet'}
+                variant="ghost"
+                onPress={connectTablet}
+                loading={linkBusy}
+              />
               <Button label="Voltar" variant="ghost" onPress={onBack} />
             </View>
           </>
@@ -289,6 +340,35 @@ export function RecordScreen({ onBack, onClips }: Props) {
       </View>
 
       {/* ---------------------------------------------------- ecrã de repouso */}
+      {/* ---------------------------------------------------- QR para o tablet */}
+      <Modal visible={showQr && link != null} transparent animationType="fade" onRequestClose={() => setShowQr(false)} supportedOrientations={['landscape', 'portrait']}>
+        <View style={styles.qrBackdrop}>
+          <Card style={styles.qrCard}>
+            <View style={styles.qrBox}>
+              {link ? <QRCode value={encodePairing(link)} size={240} backgroundColor="#fff" color="#000" /> : null}
+            </View>
+            <View style={styles.qrText}>
+              <Text style={styles.h1}>Ligar o tablet</Text>
+              <Text style={styles.body}>
+                No tablet, abre a app → <Text style={{ fontWeight: '700', color: colors.text }}>Comando</Text> → Ler QR.
+                O tablet liga-se sozinho à rede deste telemóvel (sem internet).
+              </Text>
+              {link?.ssid ? (
+                <Text style={styles.muted}>
+                  Rede: {link.ssid}
+                  {status.tabletConnected ? '  ·  tablet ligado ✓' : ''}
+                </Text>
+              ) : (
+                <Text style={[styles.muted, { color: colors.warn }]}>
+                  {link?.hotspotError ?? 'Não foi possível criar a rede.'} O tablet tem de estar na mesma rede Wi-Fi que este telemóvel.
+                </Text>
+              )}
+              <Button label={status.tabletConnected ? 'Feito' : 'Fechar'} variant="primary" onPress={() => setShowQr(false)} style={{ marginTop: space(2) }} />
+            </View>
+          </Card>
+        </View>
+      </Modal>
+
       {sleeping ? (
         <Pressable style={styles.sleep} onPress={() => setSleeping(false)}>
           <View style={styles.timerBox}>
@@ -386,4 +466,8 @@ const styles = StyleSheet.create({
     gap: space(2),
   },
   sleepHint: { color: colors.muted, opacity: 0.6 },
+  qrBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
+  qrCard: { flexDirection: 'row', gap: space(3), alignItems: 'center', maxWidth: '92%' },
+  qrBox: { backgroundColor: '#fff', padding: space(2), borderRadius: radius.m },
+  qrText: { width: 300 },
 });

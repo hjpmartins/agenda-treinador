@@ -255,6 +255,10 @@ object ClipEngine {
     cutter.execute { processPendingClips(s) }
   }
 
+  /** Instante (elapsedRealtime, ms) do primeiro frame da gravação em curso; null se não está a gravar. */
+  fun recordingStartElapsedMs(): Double? =
+    if (state == STATE_RECORDING && clock.started) clock.t0BootUs / 1000.0 else null
+
   fun nowRecUs(): Long =
     if (state == STATE_RECORDING && clock.started) clock.toRecUs(SystemClock.elapsedRealtimeNanos() / 1000) else 0L
 
@@ -464,7 +468,9 @@ object ClipEngine {
       "thermal" to thermal,
       "freeBytes" to free,
       "bytesPerSecond" to bytesPerSecond,
-      "hasMicrophone" to hasPermission(Manifest.permission.RECORD_AUDIO)
+      "hasMicrophone" to hasPermission(Manifest.permission.RECORD_AUDIO),
+      "linkActive" to pt.clipsjogo.engine.link.Link.active,
+      "tabletConnected" to pt.clipsjogo.engine.link.Link.tabletConnected
     )
   }
 

@@ -55,9 +55,16 @@ jobs:
         working-directory: clips-jogo/android
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
 
+      - name: Dar nome ao APK com a versão
+        id: apk
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          cp android/app/build/outputs/apk/release/app-release.apk "clips-jogo-$VERSION.apk"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Publicar APK
         uses: actions/upload-artifact@v4
         with:
-          name: clips-jogo-apk
-          path: clips-jogo/android/app/build/outputs/apk/release/app-release.apk
+          name: clips-jogo-${{ steps.apk.outputs.version }}
+          path: clips-jogo/clips-jogo-${{ steps.apk.outputs.version }}.apk
           retention-days: 30

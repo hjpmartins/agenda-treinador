@@ -2,11 +2,13 @@ package pt.clipsjogo.engine
 
 import android.Manifest
 import android.net.Uri
+import android.os.Build
 import android.view.Surface
 import expo.modules.interfaces.permissions.Permissions
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import pt.clipsjogo.engine.link.Link
 import java.io.File
 
 class ClipEngineModule : Module() {
@@ -56,6 +58,7 @@ class ClipEngineModule : Module() {
 
     OnCreate {
       ClipEngine.init(appContext.reactContext!!)
+      Link.init(appContext.reactContext!!)
       ClipEngine.listener = object : ClipEngine.Listener {
         override fun onStateChanged(state: String) = sendEvent("onStateChange", mapOf("state" to state))
         override fun onClipUpdated(sessionId: String, clip: ClipInfo) =
@@ -124,6 +127,46 @@ class ClipEngineModule : Module() {
     AsyncFunction("recoverSession") { sessionId: String ->
       ClipEngine.recoverSession(sessionId)
     }
+
+    // ---------------------------------------------------------- ligação ao tablet
+
+    AsyncFunction("requestLinkPermissionsAsync") { promise: Promise ->
+      val perm = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.NEARBY_WIFI_DEVICES
+      else Manifest.permission.ACCESS_FINE_LOCATION
+      Permissions.askForPermissionsWithPermissionsManager(appContext.permissions, promise, perm)
+    }
+
+    AsyncFunction("startLink") { promise: Promise ->
+      Link.start { result ->
+        result.fold(
+          onSuccess = { li ->
+            promise.resolve(mapOf(
+              "ssid" to li.ssid,
+              "passphrase" to li.passphrase,
+              "security" to li.security,
+              "ips" to li.ips,
+              "port" to li.port,
+              "token" to li.token,
+              "hotspotError" to li.hotspotError
+            ))
+          },
+          onFailure = { e -> promise.reject("E_LINK", e.message ?: "Não foi possível criar a ligação.", e) }
+        )
+      }
+    }
+
+    AsyncFunction("stopLink") { Link.stop() }
+
+    AsyncFunction("joinNetwork") { ssid: String, passphrase: String, security: String, promise: Promise ->
+      Link.join(ssid, passphrase, security) { result ->
+        result.fold(
+          onSuccess = { promise.resolve(null) },
+          onFailure = { e -> promise.reject("E_JOIN", e.message ?: "Não foi possível ligar à rede.", e) }
+        )
+      }
+    }
+
+    AsyncFunction("leaveNetwork") { Link.leave() }
 
     View(CameraPreviewView::class) {}
   }

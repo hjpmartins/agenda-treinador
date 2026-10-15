@@ -11,7 +11,7 @@ App para gravar jogos de basquetebol com um telemóvel no tripé e tirar clips *
 | Fase | Conteúdo | Estado |
 |---|---|---|
 | 1 | Gravação contínua + cortes locais (botões de teste no próprio telemóvel) | ✅ Android |
-| 2 | Emparelhamento por QR + ligação offline + modo Comando | ⏳ |
+| 2 | Emparelhamento por QR + ligação offline + modo Comando (tablet Android) | ✅ a testar |
 | 3 | Envio automático dos clips para o tablet + lista no tablet | ⏳ |
 | 4 | Robustez (reconexão, fila, serviço em segundo plano) + iOS | ⏳ |
 
@@ -25,7 +25,7 @@ O APK é compilado automaticamente pelo GitHub sempre que há alterações nesta
 
 1. No GitHub, abre o repositório → separador **Actions** → workflow **"Clips de Jogo — APK Android"**.
 2. Abre a execução mais recente que esteja verde (✓).
-3. Em **Artifacts**, descarrega **`clips-jogo-apk`** (é um `.zip`) e extrai o `app-release.apk`.
+3. Em **Artifacts**, descarrega **`clips-jogo-<versão>`** (é um `.zip`) e extrai o `.apk`. A versão instalada aparece no fundo do ecrã inicial da app.
 4. Passa o `.apk` para o telemóvel (cabo USB, Google Drive, e-mail…) e abre-o.
 5. O Android pede autorização para "instalar apps desconhecidas" a partir dessa app (Ficheiros, Chrome…). Autoriza e instala.
 6. Quando há uma versão nova, repete o processo. Instala por cima da anterior e não apaga as gravações.
@@ -39,6 +39,21 @@ O APK é compilado automaticamente pelo GitHub sempre que há alterações nesta
 5. **Ecrã de repouso** apaga o ecrã para poupar bateria, mas a gravação continua. Toca no ecrã para o acordar.
 6. **Parar gravação** → confirma. A app termina os clips pendentes e cria o vídeo completo (com barra de progresso).
 7. **Ver clips**: reproduz, **Galeria** (guarda no rolo da câmara) ou **Partilhar** (WhatsApp, Drive…).
+
+## Ligar o tablet (Fase 2)
+
+1. **Telemóvel:** Gravar → **Ligar tablet**. Da primeira vez, autoriza "Dispositivos próximos" (ou Localização, em Android antigo). O telemóvel cria uma rede Wi-Fi própria, sem internet, e mostra um QR.
+2. **Tablet:** Comando → aponta para o QR → confirma a janela do Android para ligar à rede do telemóvel.
+3. O telemóvel passa a mostrar **"Tablet ligado"**, e o tablet mostra o cronómetro da gravação.
+4. No tablet:
+   - **Clip dos últimos 10/20/30/60 s:** o momento fica fixado no toque. Aparece um rascunho com **±5 s** no início e no fim e um nome opcional, que é enviado sozinho ao fim de 5 s (qualquer ajuste pausa a contagem).
+   - **Marcar início / Marcar fim:** para jogadas longas.
+   - A lista à direita mostra o estado de cada clip: "Na fila", "A processar" ou "Pronto".
+5. Se a ligação cair, a gravação continua. Os pedidos ficam "Na fila" e são enviados quando o tablet voltar a ligar-se, com os tempos certos.
+
+> Notas:
+> - Se o "Ponto de acesso" (hotspot) normal do telemóvel estiver ligado, desliga-o: o Android não deixa ter os dois ao mesmo tempo.
+> - A rede muda de nome sempre que é criada. Se saíres do ecrã Gravar, tens de voltar a ler o QR.
 
 O protocolo de teste completo, para confirmar que os cortes caem no momento certo, está em [`docs/TESTES.md`](docs/TESTES.md).
 

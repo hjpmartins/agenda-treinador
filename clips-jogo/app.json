@@ -2,7 +2,7 @@
   "expo": {
     "name": "Clips de Jogo",
     "slug": "clips-jogo",
-    "version": "0.1.2",
+    "version": "0.2.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -47,6 +47,22 @@
           "granularPermissions": [
             "video"
           ]
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "A câmara é usada para gravar o jogo e para ler o QR de ligação.",
+          "recordAudioAndroid": true,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
         }
       ]
     ]

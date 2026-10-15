@@ -1,12 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ClipsScreen } from './src/screens/ClipsScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { RecordScreen } from './src/screens/RecordScreen';
+import { RemoteScreen } from './src/screens/RemoteScreen';
 
-type Screen = 'home' | 'record' | 'clips';
+type Screen = 'home' | 'record' | 'remote' | 'clips';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
@@ -14,15 +14,17 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" hidden={screen === 'record'} />
+      <StatusBar style="light" hidden={screen === 'record' || screen === 'remote'} />
       {screen === 'home' ? (
         <HomeScreen
           onRecord={() => setScreen('record')}
-          onRemote={() => Alert.alert('Em breve', 'O modo Comando chega na próxima fase (emparelhamento por QR).')}
+          onRemote={() => setScreen('remote')}
           onClips={() => setScreen('clips')}
         />
       ) : screen === 'record' ? (
         <RecordScreen onBack={home} onClips={() => setScreen('clips')} />
+      ) : screen === 'remote' ? (
+        <RemoteScreen onBack={home} />
       ) : (
         <ClipsScreen onBack={home} />
       )}

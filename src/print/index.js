@@ -403,10 +403,11 @@ function buildPlayerPrintContent(player, sessions, clubLogo) {
   const jogosComEstatisticas = [...(sessions || [])]
     .filter((s) => s.type === "jogo" && s.estatisticas && s.estatisticas[player.id])
     .sort((a, b) => (a.data < b.data ? -1 : 1));
+  // Um campo vazio num jogo significa que a ação não aconteceu (0), não que
+  // falta o dado — entra sempre no gráfico, tal como já acontece nos totais
+  // (estatisticaNumero já trata "vazio" como 0).
   ESTATISTICAS_CAMPOS.forEach((c) => {
-    const pontos = jogosComEstatisticas
-      .filter((s) => c.madeKey || (s.estatisticas[player.id][c.key] !== "" && s.estatisticas[player.id][c.key] != null))
-      .map((s) => ({ dataLabel: formatDateShortYear(s.date), valor: estatisticaNumero(c, s.estatisticas[player.id]) }));
+    const pontos = jogosComEstatisticas.map((s) => ({ dataLabel: formatDateShortYear(s.date), valor: estatisticaNumero(c, s.estatisticas[player.id]) }));
     if (pontos.length >= 2) chartsHtml.push({ titulo: c.nome, svg: svgLineChartString(pontos, { unit: "" }) });
   });
 

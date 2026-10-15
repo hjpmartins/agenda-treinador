@@ -1,5 +1,5 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { ESTATISTICAS_CAMPOS, getTipoTeste } from "../../data";
+import { ESTATISTICAS_CAMPOS, getTipoTeste, estatisticaNumero } from "../../data";
 import { formatDateFull, formatDateShortYear } from "../../utils";
 import { Modal, EmptyState } from "../common/Modal";
 
@@ -61,14 +61,18 @@ function EvolucaoModal({ player, sessions, onClose }) {
     testesPorTipo[key].push(t);
   });
 
+  // Um campo vazio num jogo significa que a ação não aconteceu nesse jogo
+  // (0), não que falta o dado — por isso entra sempre no gráfico, tal como
+  // já acontece nos totais/médias (ver estatisticaNumero). Antes, um jogo
+  // sem nenhum ressalto, por exemplo, ficava de fora do gráfico em vez de
+  // aparecer como 0, fazendo a evolução parecer ter muito menos jogos do
+  // que os realmente disputados.
   const estatisticasChartData = (campo) =>
-    jogosComEstatisticas
-      .filter((s) => s.estatisticas[player.id][campo] !== "" && s.estatisticas[player.id][campo] != null)
-      .map((s) => ({
-        dataLabel: `${formatDateShortYear(s.date)} vs ${s.adversario || "?"}`,
-        dataRaw: s.date,
-        valor: Number(s.estatisticas[player.id][campo]),
-      }));
+    jogosComEstatisticas.map((s) => ({
+      dataLabel: `${formatDateShortYear(s.date)} vs ${s.adversario || "?"}`,
+      dataRaw: s.date,
+      valor: estatisticaNumero(campo, s.estatisticas[player.id]),
+    }));
 
   return (
     <Modal onClose={onClose} title={`Evolução — ${player.nome || "Jogador"}`} wide>
@@ -88,7 +92,7 @@ function EvolucaoModal({ player, sessions, onClose }) {
           <div className="text-xs uppercase tracking-wide text-[#8A93A3] mt-5 mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>Estatísticas de jogo</div>
           <div className="grid grid-cols-2 gap-3">
             {ESTATISTICAS_CAMPOS.map((c) => (
-              <EvolucaoChart key={c.key} title={c.nome} unidade="" data={estatisticasChartData(c.key)} />
+              <EvolucaoChart key={c.key} title={c.nome} unidade="" data={estatisticasChartData(c)} />
             ))}
           </div>
         </>

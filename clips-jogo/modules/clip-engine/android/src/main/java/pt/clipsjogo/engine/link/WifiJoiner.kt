@@ -54,7 +54,7 @@ class WifiJoiner(context: Context) {
         if (!answered) {
           answered = true
           onResult(Result.failure(IllegalStateException(
-            "Não foi possível ligar à rede \"$ssid\". Confirma que o telemóvel está perto e com a app aberta."
+            "O tablet não encontrou a rede \"$ssid\"."
           )))
         }
       }
@@ -65,7 +65,8 @@ class WifiJoiner(context: Context) {
     }
     callback = cb
     // O Android mostra uma janela a pedir para escolher a rede; o utilizador confirma.
-    cm.requestNetwork(request, cb)
+    // Se em 40 s não encontrar a rede (ex.: banda que o tablet não suporta), desiste e explica.
+    cm.requestNetwork(request, cb, 40_000)
   }
 
   fun leave() {

@@ -313,7 +313,19 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
           <Text style={styles.h2}>Clips</Text>
           <Button label="Desligar" variant="ghost" onPress={onDisconnect} />
         </View>
-        {snap.error && !connected ? <Text style={styles.warn}>{snap.error}</Text> : null}
+        {snap.error && !connected ? (
+          <Card style={styles.helpCard}>
+            <Text style={styles.warn}>{snap.error}</Text>
+            {client.pairing.ssid ? (
+              <Text style={styles.muted}>
+                Liga a Localização deste tablet e volta a ler o QR. Ou liga-te à mão em Definições → Wi-Fi:{'\n'}
+                Rede <Text style={styles.strong}>{client.pairing.ssid}</Text>
+                {'\n'}Palavra-passe <Text style={styles.strong}>{client.pairing.passphrase}</Text>
+                {'\n'}A app continua a procurar o telemóvel e liga-se sozinha.
+              </Text>
+            ) : null}
+          </Card>
+        ) : null}
         <FlatList
           data={[...snap.clips].reverse()}
           keyExtractor={(c) => c.id}
@@ -484,6 +496,7 @@ const styles = StyleSheet.create({
   },
   flashText: { color: '#fff', fontWeight: '800', fontSize: 20 },
 
+  helpCard: { backgroundColor: colors.surfaceHigh, gap: space(1) },
   side: { width: 340, backgroundColor: colors.surface, padding: space(2), gap: space(1) },
   sideHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   clipRow: {

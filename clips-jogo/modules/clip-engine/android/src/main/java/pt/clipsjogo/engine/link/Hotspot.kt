@@ -11,7 +11,7 @@ import java.net.Inet4Address
 import java.net.NetworkInterface
 
 /** Dados da rede criada pelo telemóvel, para pôr no QR. */
-data class HotspotInfo(val ssid: String, val passphrase: String, val security: String)
+data class HotspotInfo(val ssid: String, val passphrase: String, val security: String, val band: String?)
 
 /**
  * Rede Wi-Fi local criada pelo próprio telemóvel ("Local-Only Hotspot"):
@@ -52,7 +52,7 @@ class Hotspot(context: Context) {
         override fun onFailed(reason: Int) {
           val msg = when (reason) {
             ERROR_INCOMPATIBLE_MODE ->
-              "Não foi possível criar a rede: desliga o \"Hotspot / Ponto de acesso\" do telemóvel e tenta de novo."
+              "O Ponto de acesso do telemóvel está ligado: a app usa essa rede."
             ERROR_TETHERING_DISALLOWED -> "Este telemóvel não permite criar redes Wi-Fi (restrição do sistema)."
             ERROR_NO_CHANNEL -> "Não há canal Wi-Fi disponível. Tenta desligar e ligar o Wi-Fi."
             else -> "Não foi possível criar a rede Wi-Fi local (erro $reason)."
@@ -86,10 +86,16 @@ class Hotspot(context: Context) {
         SoftApConfiguration.SECURITY_TYPE_OPEN -> "open"
         else -> "wpa2" // WPA2 ou transição WPA2/WPA3: WPA2 funciona
       }
-      return ssid?.let { HotspotInfo(it, c.passphrase ?: "", security) }
+      val band = when {
+        c.band and SoftApConfiguration.BAND_6GHZ != 0 && c.band and SoftApConfiguration.BAND_2GHZ == 0 -> "6 GHz"
+        c.band and SoftApConfiguration.BAND_5GHZ != 0 && c.band and SoftApConfiguration.BAND_2GHZ == 0 -> "5 GHz"
+        c.band and SoftApConfiguration.BAND_2GHZ != 0 -> "2,4 GHz"
+        else -> null
+      }
+      return ssid?.let { HotspotInfo(it, c.passphrase ?: "", security, band) }
     }
     val c = res.wifiConfiguration ?: return null
-    return HotspotInfo(c.SSID.trim('"'), c.preSharedKey?.trim('"') ?: "", "wpa2")
+    return HotspotInfo(c.SSID.trim('"'), c.preSharedKey?.trim('"') ?: "", "wpa2", null)
   }
 
   companion object {

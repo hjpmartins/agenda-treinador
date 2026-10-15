@@ -353,14 +353,23 @@ export function RecordScreen({ onBack, onClips }: Props) {
                 No tablet, abre a app → <Text style={{ fontWeight: '700', color: colors.text }}>Comando</Text> → Ler QR.
                 O tablet liga-se sozinho à rede deste telemóvel (sem internet).
               </Text>
+              {status.tabletConnected ? <Text style={styles.okText}>Tablet ligado ✓</Text> : null}
               {link?.ssid ? (
-                <Text style={styles.muted}>
-                  Rede: {link.ssid}
-                  {status.tabletConnected ? '  ·  tablet ligado ✓' : ''}
-                </Text>
+                <>
+                  <Text style={styles.muted}>
+                    Rede: <Text style={styles.strong}>{link.ssid}</Text>
+                    {'\n'}Palavra-passe: <Text style={styles.strong}>{link.passphrase}</Text>
+                    {link.band ? `\nBanda: ${link.band}` : ''}
+                  </Text>
+                  <Text style={[styles.muted, { marginTop: space(1) }]}>
+                    O tablet não encontra a rede? Liga a Localização no tablet. Se continuar, liga o Ponto de acesso do
+                    telemóvel (banda 2,4 GHz), liga o tablet a essa rede nas definições e toca outra vez em "Ligar tablet".
+                  </Text>
+                </>
               ) : (
-                <Text style={[styles.muted, { color: colors.warn }]}>
-                  {link?.hotspotError ?? 'Não foi possível criar a rede.'} O tablet tem de estar na mesma rede Wi-Fi que este telemóvel.
+                <Text style={styles.muted}>
+                  {link?.hotspotError ? `${link.hotspotError} ` : ''}O tablet tem de estar ligado à mesma rede Wi-Fi que
+                  este telemóvel (por exemplo, o Ponto de acesso dele) antes de ler o QR.
                 </Text>
               )}
               <Button label={status.tabletConnected ? 'Feito' : 'Fechar'} variant="primary" onPress={() => setShowQr(false)} style={{ marginTop: space(2) }} />
@@ -469,5 +478,6 @@ const styles = StyleSheet.create({
   qrBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
   qrCard: { flexDirection: 'row', gap: space(3), alignItems: 'center', maxWidth: '92%' },
   qrBox: { backgroundColor: '#fff', padding: space(2), borderRadius: radius.m },
-  qrText: { width: 300 },
+  qrText: { width: 320 },
+  strong: { color: colors.text, fontWeight: '700' },
 });

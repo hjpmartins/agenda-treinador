@@ -21,6 +21,9 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+  <!-- Barra flutuante do comando por cima de outras apps (tablet) -->
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
   <!-- Atualizações da app a partir da própria app -->
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 

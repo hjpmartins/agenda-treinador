@@ -166,16 +166,18 @@ object Link {
     }
 
     override fun requestClip(body: JSONObject): JSONObject {
-      val sessionId = body.optString("sessionId").ifEmpty { null }
+      // JSON null chega como "null" em optString: tratar como ausente.
+      fun str(key: String) = if (body.isNull(key)) null else body.optString(key).ifEmpty { null }
+      val sessionId = str("sessionId")
       val current = ClipEngine.currentSession() ?: throw IllegalStateException("O telemóvel não está a gravar.")
       if (sessionId != null && sessionId != current.id) {
         throw IllegalStateException("Este pedido era para uma gravação que já terminou.")
       }
       val clip = ClipEngine.requestClip(
-        body.optString("id").ifEmpty { null },
+        str("id"),
         (body.getDouble("startMs") * 1000).toLong(),
         (body.getDouble("endMs") * 1000).toLong(),
-        body.optString("name").ifEmpty { null }
+        str("name")
       )
       return clipJson(current.id, clip)
     }

@@ -9,6 +9,7 @@ import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import pt.clipsjogo.engine.link.Link
+import pt.clipsjogo.engine.overlay.FloatingRemote
 import java.io.File
 
 class ClipEngineModule : Module() {
@@ -214,6 +215,28 @@ class ClipEngineModule : Module() {
     }
 
     Function("clearUpdates") { Updater.clear(appContext.reactContext!!) }
+
+    // ---------------------------------------------------------- barra flutuante (tablet)
+
+    OnActivityEntersBackground { FloatingRemote.onAppBackground() }
+    OnActivityEntersForeground { FloatingRemote.onAppForeground() }
+
+    Function("canDrawOverlays") { FloatingRemote.canDraw(appContext.reactContext!!) }
+
+    Function("openOverlayPermissionSettings") {
+      FloatingRemote.openPermissionSettings(appContext.reactContext!!)
+    }
+
+    Function("armFloatingBar") { urls: List<String>, token: String ->
+      FloatingRemote.arm(appContext.reactContext!!, FloatingRemote.Config(urls, token))
+    }
+
+    Function("disarmFloatingBar") { FloatingRemote.disarm() }
+
+    /** Põe a app em segundo plano (volta à app anterior, ex.: estatísticas). */
+    Function("moveToBackground") {
+      appContext.currentActivity?.moveTaskToBack(true) ?: false
+    }
 
     View(CameraPreviewView::class) {}
   }

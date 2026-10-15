@@ -66,6 +66,22 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
 7. **Reiniciar a app do tablet:** no Comando aparece **"Ligar ao último telemóvel"** (sem ler o QR outra vez, se o telemóvel continuar com a mesma rede — por exemplo, o Ponto de acesso). Os pedidos que estavam "Na fila" continuam lá.
 8. Se a ligação cair, a gravação continua. Os pedidos ficam "Na fila" e são enviados quando o tablet voltar a ligar-se, com os tempos certos.
 
+### Barra flutuante (estatísticas e clips no mesmo tablet)
+
+Para usar outra app em ecrã inteiro (ex.: estatísticas) e pedir clips ao mesmo tempo:
+
+1. No Comando, já ligado ao telemóvel, carrega em **Barra flutuante**.
+2. Da primeira vez, o Android pede **"Mostrar sobre outras apps"** para o Clips de Jogo: ativa e volta à app; carrega outra vez em **Barra flutuante**.
+3. A app vai para trás e aparece uma barra pequena por cima de tudo: **`● 12:34` `10s` `20s` `30s` `60s` `Início` `↗`**.
+   - **10s/20s/30s/60s**: pede logo o clip dos últimos segundos (o cronómetro mostra "✓ 20s").
+   - **Início** → **Fim**: marca o início e depois o fim do clip. Toque longo cancela a marca.
+   - **Arrastar o cronómetro** muda a barra de sítio; **um toque no cronómetro** encolhe-a (fica só o cronómetro) ou expande-a.
+   - **↗** volta à app de clips (a barra esconde-se enquanto estás nela e reaparece quando sais).
+   - "·1" ao lado do cronómetro = pedidos à espera de serem enviados ao telemóvel.
+4. Para desligar, abre a app e carrega em **Barra flutuante: ligada**.
+
+Os clips pedidos pela barra aparecem na lista do Comando e são copiados para o tablet quando voltas à app.
+
 > Notas:
 > - Se o "Ponto de acesso" (hotspot) normal do telemóvel estiver ligado, desliga-o: o Android não deixa ter os dois ao mesmo tempo.
 > - A rede muda de nome sempre que é criada. Se saíres do ecrã Gravar, tens de voltar a ler o QR.

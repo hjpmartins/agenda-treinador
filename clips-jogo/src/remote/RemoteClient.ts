@@ -176,6 +176,12 @@ export class RemoteClient {
     ClipEngine?.leaveNetwork().catch(() => {});
   }
 
+  /** Endereços do telemóvel, o que está a funcionar primeiro (para a barra flutuante). */
+  get phoneUrls(): string[] {
+    const all = this.pairing.ips.map((ip) => `http://${ip}:${this.pairing.port}`);
+    return this.baseUrl ? [this.baseUrl, ...all.filter((u) => u !== this.baseUrl)] : all;
+  }
+
   /** Tempo de gravação agora (ms), no relógio do telemóvel. */
   recordingTimeNow(): number | null {
     if (!this.snapshot.recording || !this.lastRecording) return null;

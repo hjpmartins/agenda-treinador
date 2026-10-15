@@ -4,14 +4,16 @@ import { pickMimeType } from "./mediaRecorderUtil";
 // momento — gravar diretamente do <canvas> ao vivo dava vídeos com má
 // qualidade (canvas pequeno num telemóvel em pé) e proporções estranhas
 // (bandas pretas), consoante o tamanho que o estúdio calhasse ter aberto.
-// 16:9 é a proporção que as apps (incluindo o WhatsApp) tratam melhor.
-// As duas dimensões são múltiplas de 16 (960 e 544, não os 540 exatos do
-// 16:9), para bater certo com o tamanho de bloco que os codecs de vídeo
-// usam internamente — só "par" (como chega a bastar para imagens/GIFs) já
-// não é garantia suficiente para vídeo em processadores mais exigentes (ex:
-// o do WhatsApp do lado do servidor).
+// Quadrado (1:1) em vez de 16:9: num telemóvel (vertical, o aparelho mais
+// comum para receber isto no WhatsApp) uma GIF/vídeo "paisagem" aparece
+// pequena, cercada de preto — ao quadrado ocupa bem o ecrã de lado a lado
+// tanto na vertical como na horizontal (tablet/PC continuam a ver bem,
+// só deixa de esticar de ponta a ponta nesses). As duas dimensões são
+// múltiplas de 16 (tamanho de bloco que os codecs de vídeo usam por dentro
+// — só "par", como chega para imagens/GIFs, já não bastava para alguns
+// processadores de vídeo do lado do servidor, como o do WhatsApp).
 const EXPORT_WIDTH = 960;
-const EXPORT_HEIGHT = 544;
+const EXPORT_HEIGHT = 960;
 
 // Grava a sequência de diagramas numa cena 3D própria, criada só para isto —
 // escondida fora do ecrã, com tamanho fixo — em vez da cena ao vivo que o

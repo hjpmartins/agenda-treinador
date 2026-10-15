@@ -13,7 +13,8 @@ import java.io.FileInputStream
  *  - GET  /api/clips    lista de clips e estado de cada um;
  *  - GET  /api/clips/<id>/file   o ficheiro MP4 do clip (aceita Range, para retomar);
  *  - GET  /api/clips/<id>/light  prepara/consulta a cópia leve (720p) para ver no tablet;
- *  - GET  /api/clips/<id>/file?q=leve   a cópia leve (ou o original, se não foi possível fazê-la).
+ *  - GET  /api/clips/<id>/file?q=leve   a cópia leve (ou o original, se não foi possível fazê-la);
+ *  - POST /api/recording/start | /api/recording/stop   iniciar/parar a gravação a partir do tablet.
  *
  * Todos os pedidos levam o código do QR (cabeçalho X-Token), para que outros
  * dispositivos na mesma rede não consigam pedir clips.
@@ -29,6 +30,8 @@ class LinkServer(
     fun clips(): JSONObject
     fun clipFile(id: String, light: Boolean = false): File?
     fun clipLight(id: String): JSONObject
+    fun startRecording(): JSONObject
+    fun stopRecording(): JSONObject
   }
 
   @Volatile var lastSeenElapsedMs = 0L
@@ -62,6 +65,8 @@ class LinkServer(
           val file = api.clipFile(id, light) ?: return json(Response.Status.NOT_FOUND, JSONObject().put("error", "Clip ainda não está pronto"))
           serveFile(file, session.headers["range"])
         }
+        session.method == Method.POST && session.uri == "/api/recording/start" -> json(Response.Status.OK, api.startRecording())
+        session.method == Method.POST && session.uri == "/api/recording/stop" -> json(Response.Status.OK, api.stopRecording())
         session.method == Method.GET && LIGHT_ROUTE.matches(session.uri) -> {
           val id = LIGHT_ROUTE.find(session.uri)!!.groupValues[1]
           json(Response.Status.OK, api.clipLight(id))

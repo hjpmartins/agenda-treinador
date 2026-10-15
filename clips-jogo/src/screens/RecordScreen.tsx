@@ -73,6 +73,11 @@ export function RecordScreen({ onBack, onClips }: Props) {
     const subs = [
       addEngineListener('onStateChange', ({ state }) => {
         setStatus(engine.getStatus());
+        if (state === 'recording') {
+          // Pode ter sido iniciada pelo tablet.
+          setJustFinished(false);
+          setClips({});
+        }
         if (state === 'finalizing') {
           wasFinalizing.current = true;
           setFinalizeProgress(0);

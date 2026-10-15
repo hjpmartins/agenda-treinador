@@ -77,6 +77,9 @@ object ClipEngine {
   /** Segmentador ativo (só durante a gravação). Só usado na thread do encoder. */
   private var activeMuxer: SegmentMuxer? = null
   private var previewQuality = "1080p"
+
+  /** Qualidade escolhida no ecrã Gravar (usada quando o tablet inicia a gravação). */
+  val selectedQuality: String get() = previewQuality
   @Volatile private var videoEncoder: VideoEncoder? = null
   private var audioEncoder: AudioEncoder? = null
   @Volatile private var recordingDone = true

@@ -28,6 +28,9 @@ data class LinkInfo(
  *  - No tablet: liga-se à rede do QR (join/leave); os pedidos HTTP são feitos em JS.
  */
 object Link {
+  /** Rotação do ecrã do telemóvel (dada pelo módulo), para o tablet poder iniciar a gravação. */
+  @Volatile var displayRotation: () -> Int = { 90 }
+
   private const val TAG = "ClipEngine/Link"
   private val PORTS = listOf(8765, 8766, 8767)
 
@@ -193,6 +196,22 @@ object Link {
       if (!light) return original
       // Sem cópia leve (ainda a preparar ou falhou): entrega o original.
       return pt.clipsjogo.engine.media.LightCopies.fileFor(original).takeIf { it.exists() } ?: original
+    }
+
+    override fun startRecording(): JSONObject {
+      when (ClipEngine.state) {
+        ClipEngine.STATE_RECORDING -> return JSONObject().put("ok", true)
+        ClipEngine.STATE_FINALIZING -> throw IllegalStateException("O telemóvel ainda está a terminar a gravação anterior.")
+        ClipEngine.STATE_PREVIEW -> {}
+        else -> throw IllegalStateException("Abre o ecrã Gravar no telemóvel (com o ecrã ligado).")
+      }
+      val id = ClipEngine.startRecording(ClipEngine.selectedQuality, displayRotation())
+      return JSONObject().put("ok", true).put("sessionId", id)
+    }
+
+    override fun stopRecording(): JSONObject {
+      ClipEngine.stopRecording()
+      return JSONObject().put("ok", true)
     }
 
     override fun clipLight(id: String): JSONObject {

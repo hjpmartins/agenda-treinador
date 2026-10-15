@@ -60,6 +60,7 @@ class ClipEngineModule : Module() {
     OnCreate {
       ClipEngine.init(appContext.reactContext!!)
       Link.init(appContext.reactContext!!)
+      Link.displayRotation = { displayRotationDegrees() }
       ClipEngine.listener = object : ClipEngine.Listener {
         override fun onStateChanged(state: String) = sendEvent("onStateChange", mapOf("state" to state))
         override fun onClipUpdated(sessionId: String, clip: ClipInfo) =

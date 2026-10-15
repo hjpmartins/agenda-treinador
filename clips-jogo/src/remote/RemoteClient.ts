@@ -226,6 +226,20 @@ export class RemoteClient {
     this.downloadNext();
   }
 
+  /** Inicia a gravação no telemóvel (tem de estar no ecrã Gravar). Lança erro com o motivo. */
+  async startRecording(): Promise<void> {
+    if (!this.baseUrl) throw new Error('Sem ligação ao telemóvel.');
+    await fetchJson(`${this.baseUrl}/api/recording/start`, this.pairing.token, { method: 'POST', body: '{}' }, 12000);
+    this.pollStatus();
+  }
+
+  /** Para a gravação no telemóvel (o vídeo completo é criado lá). */
+  async stopRecording(): Promise<void> {
+    if (!this.baseUrl) throw new Error('Sem ligação ao telemóvel.');
+    await fetchJson(`${this.baseUrl}/api/recording/stop`, this.pairing.token, { method: 'POST', body: '{}' }, 12000);
+    this.pollStatus();
+  }
+
   /** Tempo de gravação agora (ms), no relógio do telemóvel. */
   recordingTimeNow(): number | null {
     if (!this.snapshot.recording || !this.lastRecording) return null;
@@ -326,7 +340,9 @@ export class RemoteClient {
         ? 'O telemóvel está a terminar a gravação'
         : status.state === 'recording'
           ? 'A sincronizar com o telemóvel…'
-          : `O telemóvel não está a gravar (estado: ${status.state})`;
+          : status.state === 'preview'
+            ? 'Pronto a gravar — carrega em Iniciar gravação'
+            : 'Abre o ecrã Gravar no telemóvel (com o ecrã ligado)';
     return { recording: false, notRecordingReason: reason };
   }
 

@@ -283,6 +283,38 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
     ClipEngine.moveToBackground();
   };
 
+  const [recBusy, setRecBusy] = useState(false);
+  const phoneState = snap.phone?.state;
+  const startRec = async () => {
+    setRecBusy(true);
+    try {
+      await client.startRecording();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch (e) {
+      Alert.alert('Não foi possível iniciar', e instanceof Error ? e.message : String(e));
+    } finally {
+      setRecBusy(false);
+    }
+  };
+  const stopRec = () =>
+    Alert.alert('Parar a gravação no telemóvel?', 'O vídeo completo é criado no telemóvel. Os clips já pedidos são terminados.', [
+      { text: 'Continuar a gravar', style: 'cancel' },
+      {
+        text: 'Parar',
+        style: 'destructive',
+        onPress: async () => {
+          setRecBusy(true);
+          try {
+            await client.stopRecording();
+          } catch (e) {
+            Alert.alert('Não foi possível parar', e instanceof Error ? e.message : String(e));
+          } finally {
+            setRecBusy(false);
+          }
+        },
+      },
+    ]);
+
   const canClip = recording;
   const queued = snap.clips.filter((c) => c.status === 'queued').length;
   const { compact, stacked, sideWidth } = useLayout();
@@ -296,6 +328,18 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
             {recording ? <View style={[styles.recDot, compact && styles.recDotCompact]} /> : null}
             <Text style={[styles.timer, compact && styles.timerCompact]}>{recording ? formatClock(recMs!) : '--:--'}</Text>
           </View>
+          {connected && !recording && phoneState === 'preview' ? (
+            <Button
+              label="● Iniciar gravação"
+              variant="danger"
+              size={compact ? 'm' : 'l'}
+              loading={recBusy}
+              onPress={startRec}
+            />
+          ) : null}
+          {connected && recording ? (
+            <Button label="■ Parar" variant="ghost" loading={recBusy} onPress={stopRec} style={compact && styles.smallButton} />
+          ) : null}
           <View style={styles.chips}>
             <Chip label={connectionChip.label} tone={connectionChip.tone} />
             {connected && !recording ? (

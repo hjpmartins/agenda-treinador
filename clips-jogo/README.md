@@ -66,6 +66,17 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
 7. **Reiniciar a app do tablet:** no Comando aparece **"Ligar ao último telemóvel"** (sem ler o QR outra vez, se o telemóvel continuar com a mesma rede — por exemplo, o Ponto de acesso). Os pedidos que estavam "Na fila" continuam lá.
 8. Se a ligação cair, a gravação continua. Os pedidos ficam "Na fila" e são enviados quando o tablet voltar a ligar-se, com os tempos certos.
 
+### Iniciar e parar a gravação a partir do tablet
+
+Para deixar o telemóvel no tripé (ex.: na bancada) antes do jogo e só começar a gravar no início:
+
+1. No telemóvel: **Gravar** → **Ligar tablet** → lê o QR com o tablet. Deixa o telemóvel **neste ecrã** (podes usar o
+   **Ecrã de repouso**; não bloqueies o telemóvel). Liga-o a uma powerbank: a câmara fica ligada à espera.
+2. No tablet aparece **"Pronto a gravar"** e o botão **● Iniciar gravação**. No início do jogo, carrega nele.
+3. No fim, **■ Parar** (pede confirmação). O vídeo completo é criado no telemóvel.
+
+Se o telemóvel não estiver no ecrã Gravar, o tablet diz "Abre o ecrã Gravar no telemóvel".
+
 ### Distância e qualidade da ligação
 
 - No Comando, o aviso **"Wi-Fi bom/razoável/fraco · -62 dBm · 2,4 GHz · 35 ms"** mostra o sinal do tablet, a banda,

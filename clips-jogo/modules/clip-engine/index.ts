@@ -55,8 +55,6 @@ export type LinkInfo = {
   ssid: string | null;
   passphrase: string | null;
   security: string;
-  /** Banda da rede criada ("2,4 GHz", "5 GHz", "6 GHz"), se o Android a indicar. */
-  band: string | null;
   ips: string[];
   port: number;
   token: string;

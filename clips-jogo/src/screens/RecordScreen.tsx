@@ -359,7 +359,6 @@ export function RecordScreen({ onBack, onClips }: Props) {
                   <Text style={styles.muted}>
                     Rede: <Text style={styles.strong}>{link.ssid}</Text>
                     {'\n'}Palavra-passe: <Text style={styles.strong}>{link.passphrase}</Text>
-                    {link.band ? `\nBanda: ${link.band}` : ''}
                   </Text>
                   <Text style={[styles.muted, { marginTop: space(1) }]}>
                     O tablet não encontra a rede? Liga a Localização no tablet. Se continuar, liga o Ponto de acesso do

@@ -144,7 +144,6 @@ class ClipEngineModule : Module() {
               "ssid" to li.ssid,
               "passphrase" to li.passphrase,
               "security" to li.security,
-              "band" to li.band,
               "ips" to li.ips,
               "port" to li.port,
               "token" to li.token,

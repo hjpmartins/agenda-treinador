@@ -98,6 +98,10 @@ class ClipEngineModule : Module() {
 
     Function("getStatus") { ClipEngine.status() }
 
+    Function("getLastCrash") { CrashLog.read() }
+
+    Function("clearLastCrash") { CrashLog.clear() }
+
     Function("getRecordingTimeMs") { ClipEngine.nowRecUs() / 1000.0 }
 
     AsyncFunction("setQuality") { quality: String ->

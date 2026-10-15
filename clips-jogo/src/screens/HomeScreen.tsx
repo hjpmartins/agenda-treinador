@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { isEngineAvailable } from '../../modules/clip-engine';
-import { Button } from '../components/ui';
+import { ClipEngine, isEngineAvailable } from '../../modules/clip-engine';
+import { Button, Card } from '../components/ui';
 import { colors, space } from '../theme';
 import appConfig from '../../app.json';
 
@@ -12,6 +13,14 @@ type Props = {
 };
 
 export function HomeScreen({ onRecord, onRemote, onClips }: Props) {
+  const [crash, setCrash] = useState<string | null>(() => {
+    try {
+      return ClipEngine?.getLastCrash() ?? null;
+    } catch {
+      return null;
+    }
+  });
+
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
@@ -44,6 +53,25 @@ export function HomeScreen({ onRecord, onRemote, onClips }: Props) {
         </Text>
       ) : null}
 
+      {crash ? (
+        <Card style={styles.crash}>
+          <Text style={styles.crashTitle}>A app fechou inesperadamente da última vez</Text>
+          <Text style={styles.crashHint}>Tira uma captura de ecrã a esta mensagem e envia-a a quem está a desenvolver a app.</Text>
+          <ScrollView style={styles.crashBox}>
+            <Text style={styles.crashText} selectable>
+              {crash}
+            </Text>
+          </ScrollView>
+          <Button
+            label="OK"
+            onPress={() => {
+              ClipEngine?.clearLastCrash();
+              setCrash(null);
+            }}
+          />
+        </Card>
+      ) : null}
+
       <View>
         <Button label="Ver gravações e clips" variant="ghost" onPress={onClips} />
         <Text style={styles.version}>Versão {appConfig.expo.version}</Text>
@@ -60,5 +88,10 @@ const styles = StyleSheet.create({
   choices: { gap: space(2) },
   choice: { minHeight: 140 },
   version: { color: colors.muted, textAlign: 'center', fontSize: 12, marginTop: space(1) },
+  crash: { gap: 8, borderWidth: 1, borderColor: colors.danger },
+  crashTitle: { color: colors.danger, fontWeight: '800', fontSize: 16 },
+  crashHint: { color: colors.muted, fontSize: 13 },
+  crashBox: { maxHeight: 180, backgroundColor: colors.bg, borderRadius: 8, padding: 8 },
+  crashText: { color: colors.text, fontSize: 11, fontFamily: 'monospace' },
   notice: { color: colors.warn, textAlign: 'center', marginBottom: space(1) },
 });

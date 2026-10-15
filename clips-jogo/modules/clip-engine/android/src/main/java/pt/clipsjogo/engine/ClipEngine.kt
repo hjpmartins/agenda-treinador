@@ -86,6 +86,7 @@ object ClipEngine {
   fun init(context: Context) {
     if (::appContext.isInitialized) return
     appContext = context.applicationContext
+    CrashLog.install(appContext)
     storage = Storage(appContext)
     // Sessões que ficaram a meio (app fechada à força, bateria, crash) ficam marcadas para recuperar.
     io.execute {

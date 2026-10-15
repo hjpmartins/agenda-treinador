@@ -26,8 +26,8 @@ class RecordingService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    val notification = buildNotification()
     try {
+      val notification = buildNotification()
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
@@ -89,11 +89,16 @@ class RecordingService : Service() {
     private const val CHANNEL_ID = "gravacao"
     private const val NOTIFICATION_ID = 1001
 
+    /**
+     * Arranca com startService (a app está à vista) e o serviço promove-se a si
+     * próprio. Com startForegroundService, se o Android recusasse a notificação,
+     * o sistema fechava a app inteira — assim, no pior caso, só se perde a
+     * proteção em segundo plano e a gravação continua.
+     */
     fun start(context: Context) {
       val intent = Intent(context, RecordingService::class.java)
       try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
-        else context.startService(intent)
+        context.startService(intent)
       } catch (e: Exception) {
         Log.e(TAG, "Falha a iniciar o serviço", e)
       }

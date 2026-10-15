@@ -54,7 +54,7 @@ class ClipEngineModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ClipEngine")
 
-    Events("onStateChange", "onClipUpdate", "onFinalizeProgress", "onError")
+    Events("onStateChange", "onClipUpdate", "onFinalizeProgress", "onError", "onUpdateProgress")
 
     OnCreate {
       ClipEngine.init(appContext.reactContext!!)
@@ -182,6 +182,38 @@ class ClipEngineModule : Module() {
     AsyncFunction("leaveNetwork") { Link.leave() }
 
     AsyncFunction("keepWifiAwake") { Link.keepWifiAwake() }
+
+    // ---------------------------------------------------------- atualizações
+
+    Function("getDownloadedUpdate") { version: String ->
+      Updater.downloaded(appContext.reactContext!!, version)
+    }
+
+    AsyncFunction("downloadUpdate") { url: String, version: String, promise: Promise ->
+      val context = appContext.reactContext!!
+      Thread({
+        try {
+          val path = Updater.download(context, url, version) { done, total ->
+            sendEvent("onUpdateProgress", mapOf("bytes" to done.toDouble(), "total" to total.toDouble()))
+          }
+          promise.resolve(path)
+        } catch (e: Exception) {
+          promise.reject("E_UPDATE", "Não foi possível descarregar a atualização: ${e.message ?: e.javaClass.simpleName}", e)
+        }
+      }, "clips-update").start()
+    }
+
+    Function("canInstallUpdates") { Updater.canInstall(appContext.reactContext!!) }
+
+    Function("openInstallPermissionSettings") {
+      Updater.openInstallPermissionSettings(appContext.reactContext!!)
+    }
+
+    AsyncFunction("installUpdate") { path: String ->
+      Updater.install(appContext.reactContext!!, path)
+    }
+
+    Function("clearUpdates") { Updater.clear(appContext.reactContext!!) }
 
     View(CameraPreviewView::class) {}
   }

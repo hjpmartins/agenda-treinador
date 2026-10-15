@@ -14,6 +14,8 @@ concurrency:
 jobs:
   android:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     timeout-minutes: 60
     defaults:
       run:
@@ -68,3 +70,20 @@ jobs:
           name: clips-jogo-${{ steps.apk.outputs.version }}
           path: clips-jogo/clips-jogo-${{ steps.apk.outputs.version }}.apk
           retention-days: 30
+
+      # A app procura as Releases "clips-jogo-v<versão>" e atualiza-se sozinha.
+      - name: Publicar versão para atualização na app
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.apk.outputs.version }}
+        run: |
+          TAG="clips-jogo-v$VERSION"
+          APK="clips-jogo-$VERSION.apk"
+          git log -1 --format=%B "$GITHUB_SHA" | grep -v -E '^(Co-Authored-By|Claude-Session):' > notas.txt
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+            gh release edit "$TAG" --notes-file notas.txt
+          else
+            gh release create "$TAG" "$APK" --target "$GITHUB_SHA" --title "Clips de Jogo $VERSION" --notes-file notas.txt
+          fi

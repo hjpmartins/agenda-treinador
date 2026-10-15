@@ -69,6 +69,7 @@ type Events = {
   onClipUpdate(clip: Clip): void;
   onFinalizeProgress(e: { sessionId: string; progress: number }): void;
   onError(e: { message: string }): void;
+  onUpdateProgress(e: { bytes: number; total: number }): void;
 };
 
 declare class ClipEngineNative extends NativeModule<Events> {
@@ -99,6 +100,16 @@ declare class ClipEngineNative extends NativeModule<Events> {
   leaveNetwork(): Promise<void>;
   /** Mantém o Wi-Fi fora do modo de poupança (tablet ligado à mão à rede do telemóvel). */
   keepWifiAwake(): Promise<void>;
+
+  // Atualizações da app
+  /** Caminho do APK desta versão se já foi descarregado, senão null. */
+  getDownloadedUpdate(version: string): string | null;
+  downloadUpdate(url: string, version: string): Promise<string>;
+  /** Android 8+: a app tem autorização para instalar apps? */
+  canInstallUpdates(): boolean;
+  openInstallPermissionSettings(): void;
+  installUpdate(path: string): Promise<void>;
+  clearUpdates(): void;
 }
 
 /** null em plataformas onde o motor ainda não existe (iOS nesta fase). */

@@ -21,14 +21,26 @@ App para gravar jogos de basquetebol com um telemóvel no tripé e tirar clips *
 
 ## Instalar no Android (sem computador)
 
-O APK é compilado automaticamente pelo GitHub sempre que há alterações nesta pasta.
+O APK é compilado automaticamente pelo GitHub sempre que há alterações nesta pasta e publicado como
+**Release** `clips-jogo-v<versão>` (separador **Releases** do repositório, à direita na página inicial).
 
-1. No GitHub, abre o repositório → separador **Actions** → workflow **"Clips de Jogo — APK Android"**.
-2. Abre a execução mais recente que esteja verde (✓).
-3. Em **Artifacts**, descarrega **`clips-jogo-<versão>`** (é um `.zip`) e extrai o `.apk`. A versão instalada aparece no fundo do ecrã inicial da app.
-4. Passa o `.apk` para o telemóvel (cabo USB, Google Drive, e-mail…) e abre-o.
-5. O Android pede autorização para "instalar apps desconhecidas" a partir dessa app (Ficheiros, Chrome…). Autoriza e instala.
-6. Quando há uma versão nova, repete o processo. Instala por cima da anterior e não apaga as gravações.
+**Primeira instalação**
+
+1. No telemóvel, abre a página **Releases** do repositório no browser.
+2. Na versão mais recente ("Clips de Jogo x.y.z"), em **Assets**, toca em **`clips-jogo-x.y.z.apk`**.
+3. Abre o ficheiro descarregado. O Android pede autorização para "instalar apps desconhecidas" a partir do browser. Autoriza e instala.
+
+**Atualizações (a partir da própria app, com internet)**
+
+- Ao abrir a app, se houver versão nova, aparece um cartão **"Nova versão … disponível"** no ecrã inicial, com o que mudou.
+  Também podes carregar em **Procurar atualizações** (no fundo do ecrã inicial).
+- **Atualizar agora** → descarrega → o Android mostra o ecrã de instalação → **Atualizar**.
+- Da primeira vez, o Android pede para autorizar o Clips de Jogo a instalar apps: **Abrir definições** → ativa
+  **"Permitir desta fonte"** → volta atrás. Em alguns telemóveis a app fecha nesse momento: abre-a outra vez e carrega em
+  **Atualizar agora** (o download já feito é reaproveitado).
+- A atualização instala por cima e não apaga gravações, clips nem a ligação ao tablet. Atualiza o telemóvel **e** o tablet.
+
+A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em **Actions** → execução → **Artifacts** (30 dias).
 
 ## Testar a Fase 1 (só com o telemóvel)
 

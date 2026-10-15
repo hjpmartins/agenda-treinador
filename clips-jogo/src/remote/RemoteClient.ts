@@ -350,19 +350,7 @@ export class RemoteClient {
     this.transferProgress[next.id] = 0;
     this.publishClips();
     const dest = destinationFor(next.sessionId, next.id);
-    try {
-      await File.downloadFileAsync(`${this.baseUrl}/api/clips/${encodeURIComponent(next.id)}/file`, dest, {
-        headers: { 'X-Token': this.pairing.token },
-        idempotent: true,
-        onProgress: ({ bytesWritten, totalBytes }) => {
-          const total = totalBytes > 0 ? totalBytes : next.sizeBytes;
-          this.lastTransferAt = now();
-          if (total > 0) {
-            this.transferProgress[next.id] = Math.min(1, bytesWritten / total);
-            this.publishClips();
-          }
-        },
-      });
+    const register = () =>
       addReceived({
         id: next.id,
         sessionId: next.sessionId,
@@ -375,6 +363,25 @@ export class RemoteClient {
         phone: this.snapshot.phone?.device ?? 'telemóvel',
         uri: dest.uri,
       });
+    try {
+      if (dest.exists && next.sizeBytes > 0 && dest.size === next.sizeBytes) {
+        // Já copiado pela barra flutuante enquanto a app estava em segundo plano.
+        register();
+      } else {
+        await File.downloadFileAsync(`${this.baseUrl}/api/clips/${encodeURIComponent(next.id)}/file`, dest, {
+          headers: { 'X-Token': this.pairing.token },
+          idempotent: true,
+          onProgress: ({ bytesWritten, totalBytes }) => {
+            const total = totalBytes > 0 ? totalBytes : next.sizeBytes;
+            this.lastTransferAt = now();
+            if (total > 0) {
+              this.transferProgress[next.id] = Math.min(1, bytesWritten / total);
+              this.publishClips();
+            }
+          },
+        });
+        register();
+      }
     } catch {
       this.failedDownloads[next.id] = (this.failedDownloads[next.id] ?? 0) + 1;
       try {

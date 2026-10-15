@@ -8,6 +8,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import org.json.JSONObject
+import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -23,7 +24,8 @@ import java.util.concurrent.TimeUnit
  * plano os temporizadores do JavaScript param.
  */
 object FloatingRemote {
-  data class Config(val urls: List<String>, val token: String)
+  /** skipIds: clips que o tablet já tem (ou apagou), para não os voltar a copiar. */
+  data class Config(val urls: List<String>, val token: String, val skipIds: Set<String> = emptySet())
 
   private val main = Handler(Looper.getMainLooper())
   private var appContext: Context? = null
@@ -46,7 +48,7 @@ object FloatingRemote {
     appContext = context.applicationContext
     config = cfg
     armed = true
-    Client.start(cfg)
+    Client.start(appContext!!, cfg)
   }
 
   fun disarm() {
@@ -67,9 +69,12 @@ object FloatingRemote {
     val ctx = appContext ?: return
     if (!armed || bar != null || !canDraw(ctx)) return
     bar = OverlayBar(ctx, Actions).also { it.attach() }
+    Client.downloadsActive = true
   }
 
   private fun hide() {
+    // Com a app à frente, é ela que copia os clips (com progresso no ecrã).
+    Client.downloadsActive = false
     bar?.detach()
     bar = null
   }
@@ -130,6 +135,9 @@ object FloatingRemote {
     @Volatile private var generation = 0
 
     private var cfg: Config? = null
+    private var filesDir: File? = null
+    @Volatile var downloadsActive = false
+    private val failedDownloads = HashMap<String, Int>()
     private var baseUrl: String? = null
     private val samples = ArrayList<Sample>()
     private var recStartElapsedMs: Double? = null
@@ -141,12 +149,13 @@ object FloatingRemote {
 
     private fun nowMs(): Double = SystemClock.elapsedRealtimeNanos() / 1_000_000.0
 
-    fun start(c: Config) {
-      synchronized(lock) { cfg = c; baseUrl = null }
+    fun start(context: Context, c: Config) {
+      synchronized(lock) { cfg = c; baseUrl = null; filesDir = context.filesDir }
       if (running) return
       running = true
       val gen = ++generation
       thread = Thread({ loop(gen) }, "clips-barra").apply { isDaemon = true; start() }
+      Thread({ downloadLoop(gen) }, "clips-barra-copia").apply { isDaemon = true; start() }
     }
 
     fun stop() {
@@ -188,6 +197,67 @@ object FloatingRemote {
         } catch (_: Exception) {
         }
         wake.poll(1000, TimeUnit.MILLISECONDS)
+      }
+    }
+
+    /**
+     * Com a barra visível, copia para o tablet os clips já prontos no telemóvel,
+     * para o mesmo sítio onde a app os guarda (a app só os regista ao voltar).
+     */
+    private fun downloadLoop(gen: Int) {
+      while (running && gen == generation) {
+        try {
+          if (downloadsActive) downloadOne()
+        } catch (_: Exception) {
+        }
+        try {
+          Thread.sleep(3000)
+        } catch (_: InterruptedException) {
+          return
+        }
+      }
+    }
+
+    private fun downloadOne() {
+      val c = synchronized(lock) { cfg } ?: return
+      val dir = synchronized(lock) { filesDir } ?: return
+      val url = baseUrl ?: return
+      val clips = http("GET", "$url/api/clips", c.token, null, 4000).optJSONArray("clips") ?: return
+      for (i in 0 until clips.length()) {
+        if (!downloadsActive || !running) return
+        val clip = clips.getJSONObject(i)
+        val id = clip.optString("id")
+        if (id.isEmpty() || clip.optString("status") != "ready" || id in c.skipIds) continue
+        if ((failedDownloads[id] ?: 0) >= 5) continue
+        val session = clip.optString("sessionId").replace(Regex("[^A-Za-z0-9_-]"), "_")
+        val dest = File(File(dir, "recebidos/$session"), "$id.mp4")
+        val size = clip.optLong("sizeBytes")
+        if (dest.exists() && dest.length() == size) continue
+        try {
+          download("$url/api/clips/${java.net.URLEncoder.encode(id, "UTF-8")}/file", c.token, dest, size)
+        } catch (e: Exception) {
+          failedDownloads[id] = (failedDownloads[id] ?: 0) + 1
+        }
+      }
+    }
+
+    private fun download(url: String, token: String, dest: File, expectedSize: Long) {
+      dest.parentFile?.mkdirs()
+      val part = File(dest.path + ".part")
+      val conn = URL(url).openConnection() as HttpURLConnection
+      try {
+        conn.connectTimeout = 4000
+        conn.readTimeout = 15_000
+        conn.setRequestProperty("X-Token", token)
+        if (conn.responseCode != 200) throw HttpError(conn.responseCode)
+        conn.inputStream.use { input -> part.outputStream().use { input.copyTo(it, 64 * 1024) } }
+        if (expectedSize > 0 && part.length() != expectedSize) throw IOException("Cópia incompleta")
+        if (!part.renameTo(dest)) throw IOException("Não foi possível guardar")
+      } catch (e: Exception) {
+        part.delete()
+        throw e
+      } finally {
+        conn.disconnect()
       }
     }
 

@@ -227,8 +227,8 @@ class ClipEngineModule : Module() {
       FloatingRemote.openPermissionSettings(appContext.reactContext!!)
     }
 
-    Function("armFloatingBar") { urls: List<String>, token: String ->
-      FloatingRemote.arm(appContext.reactContext!!, FloatingRemote.Config(urls, token))
+    Function("armFloatingBar") { urls: List<String>, token: String, skipIds: List<String> ->
+      FloatingRemote.arm(appContext.reactContext!!, FloatingRemote.Config(urls, token, skipIds.toSet()))
     }
 
     Function("disarmFloatingBar") { FloatingRemote.disarm() }

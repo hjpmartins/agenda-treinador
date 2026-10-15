@@ -23,6 +23,7 @@ import { formatClock, formatDuration, formatHoursMinutes, recordingTimeLeftMs } 
 import { loadLastPairing } from '../remote/persist';
 import { decodePairing, type Pairing } from '../remote/pairing';
 import { RemoteClient, type RemoteClip, type RemoteSnapshot } from '../remote/RemoteClient';
+import { knownReceivedIds } from '../remote/receivedLibrary';
 import { colors, radius, space } from '../theme';
 
 type Props = { onBack: () => void };
@@ -270,7 +271,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
       );
       return;
     }
-    ClipEngine.armFloatingBar(client.phoneUrls, client.pairing.token);
+    ClipEngine.armFloatingBar(client.phoneUrls, client.pairing.token, knownReceivedIds());
     setFloatingOn(true);
     ClipEngine.moveToBackground();
   };

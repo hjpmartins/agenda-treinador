@@ -66,6 +66,11 @@ function deleted(): Set<string> {
 }
 
 /** Já está no tablet, ou foi apagado de propósito (não voltar a transferir). */
+/** Clips que o tablet já tem ou apagou (para a barra flutuante não os copiar). */
+export function knownReceivedIds(): string[] {
+  return [...deleted(), ...listReceived().map((c) => c.id)];
+}
+
 export function hasReceived(id: string): boolean {
   return deleted().has(id) || listReceived().some((c) => c.id === id);
 }

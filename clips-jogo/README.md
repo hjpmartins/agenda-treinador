@@ -80,7 +80,7 @@ Para usar outra app em ecrã inteiro (ex.: estatísticas) e pedir clips ao mesmo
    - "·1" ao lado do cronómetro = pedidos à espera de serem enviados ao telemóvel.
 4. Para desligar, abre a app e carrega em **Barra flutuante: ligada**.
 
-Os clips pedidos pela barra aparecem na lista do Comando e são copiados para o tablet quando voltas à app.
+Os clips pedidos pela barra aparecem na lista do Comando. Enquanto a barra está visível, os clips prontos vão sendo copiados para o tablet em segundo plano; ao voltar à app ficam logo "No tablet ✓".
 
 > Notas:
 > - Se o "Ponto de acesso" (hotspot) normal do telemóvel estiver ligado, desliga-o: o Android não deixa ter os dois ao mesmo tempo.

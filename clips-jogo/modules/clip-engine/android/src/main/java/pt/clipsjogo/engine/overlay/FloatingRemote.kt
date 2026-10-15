@@ -25,7 +25,15 @@ import java.util.concurrent.TimeUnit
  */
 object FloatingRemote {
   /** skipIds: clips que o tablet já tem (ou apagou), para não os voltar a copiar. */
-  data class Config(val urls: List<String>, val token: String, val skipIds: Set<String> = emptySet())
+  data class Config(
+    val urls: List<String>,
+    val token: String,
+    val skipIds: Set<String> = emptySet(),
+    /** false = "copiar só quando eu pedir": a barra não copia vídeos, a ligação fica só para os pedidos. */
+    val autoDownload: Boolean = true,
+    /** Pedir a cópia leve (720p) em vez do original. */
+    val light: Boolean = false,
+  )
 
   private val main = Handler(Looper.getMainLooper())
   private var appContext: Context? = null
@@ -207,7 +215,7 @@ object FloatingRemote {
     private fun downloadLoop(gen: Int) {
       while (running && gen == generation) {
         try {
-          if (downloadsActive) downloadOne()
+          if (downloadsActive && synchronized(lock) { cfg?.autoDownload } == true) downloadOne()
         } catch (_: Exception) {
         }
         try {
@@ -231,10 +239,23 @@ object FloatingRemote {
         if ((failedDownloads[id] ?: 0) >= 5) continue
         val session = clip.optString("sessionId").replace(Regex("[^A-Za-z0-9_-]"), "_")
         val dest = File(File(dir, "recebidos/$session"), "$id.mp4")
-        val size = clip.optLong("sizeBytes")
-        if (dest.exists() && dest.length() == size) continue
+        val marker = File(dest.path + ".ok")
+        if (dest.exists() && marker.exists()) continue
+        val enc = java.net.URLEncoder.encode(id, "UTF-8")
         try {
-          download("$url/api/clips/${java.net.URLEncoder.encode(id, "UTF-8")}/file", c.token, dest, size)
+          var size = clip.optLong("sizeBytes")
+          var query = ""
+          var kind = "original"
+          if (c.light) {
+            val light = http("GET", "$url/api/clips/$enc/light", c.token, null, 4000)
+            when (light.optString("state")) {
+              "preparing" -> continue // o telemóvel ainda a preparar: tenta na volta seguinte
+              "ready" -> { query = "?q=leve"; kind = "leve"; size = light.optLong("sizeBytes") }
+            }
+          }
+          download("$url/api/clips/$enc/file$query", c.token, dest, size)
+          // Marca de cópia completa: a app regista o clip ao voltar.
+          marker.writeText(kind)
         } catch (e: Exception) {
           failedDownloads[id] = (failedDownloads[id] ?: 0) + 1
         }

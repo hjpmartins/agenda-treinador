@@ -66,6 +66,19 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
 7. **Reiniciar a app do tablet:** no Comando aparece **"Ligar ao último telemóvel"** (sem ler o QR outra vez, se o telemóvel continuar com a mesma rede — por exemplo, o Ponto de acesso). Os pedidos que estavam "Na fila" continuam lá.
 8. Se a ligação cair, a gravação continua. Os pedidos ficam "Na fila" e são enviados quando o tablet voltar a ligar-se, com os tempos certos.
 
+### Distância e qualidade da ligação
+
+- No Comando, o aviso **"Wi-Fi bom/razoável/fraco · -62 dBm · 2,4 GHz · 35 ms"** mostra o sinal do tablet, a banda,
+  o tempo de resposta do telemóvel e as falhas nos últimos ~30 s. Verde = bom; amarelo = no limite; vermelho = muda os
+  aparelhos de sítio. Usa-o para escolher onde pôr o telemóvel e o tablet antes do jogo.
+- Para mais alcance, põe o **Ponto de acesso** do telemóvel em **2,4 GHz** (Definições → Ponto de acesso → Banda) e o
+  telemóvel alto no tripé, acima das cabeças.
+- **Copiar clips para o tablet**: "Logo que prontos" (normal) ou "Quando eu pedir" — durante o jogo a ligação fica só
+  para os pedidos; no intervalo ou no fim, carrega em **Copiar agora (N)**.
+- **Original (1080p)** ou **Leve (720p, ~4x menor)**: na cópia leve, o telemóvel prepara uma versão mais pequena de cada
+  clip só para ver no banco ("A preparar (leve)" → "A transferir"). O clip em qualidade máxima fica sempre no telemóvel.
+  Se a cópia leve falhar, o tablet recebe o original.
+
 ### Barra flutuante (estatísticas e clips no mesmo tablet)
 
 Para usar outra app em ecrã inteiro (ex.: estatísticas) e pedir clips ao mesmo tempo:

@@ -2,8 +2,9 @@ import { File } from 'expo-file-system';
 import { ClipEngine } from '../../modules/clip-engine';
 import { ClockSync, recordingTimeAt } from './clockSync';
 import type { Pairing } from './pairing';
-import { loadQueue, saveLastPairing, saveQueue } from './persist';
-import { addReceived, destinationFor, findReceived, hasReceived } from './receivedLibrary';
+import { LinkStats } from '../lib/linkQuality';
+import { loadQueue, loadSettings, saveLastPairing, saveQueue, saveSettings } from './persist';
+import { addReceived, copiedMarkerFor, destinationFor, findReceived, hasReceived } from './receivedLibrary';
 
 /** Estado do telemóvel, tal como devolvido por GET /api/status. */
 export type PhoneStatus = {
@@ -35,6 +36,8 @@ export type RemoteClip = {
   localUri?: string | null;
   /** Progresso da transferência (0..1) enquanto está a ser copiado para o tablet. */
   transfer?: number | null;
+  /** O telemóvel está a preparar a cópia leve deste clip. */
+  preparingLight?: boolean;
 };
 
 export type ConnectionState = 'joining' | 'connecting' | 'connected' | 'lost';
@@ -51,6 +54,15 @@ export type RemoteSnapshot = {
   recording: boolean;
   /** Porque é que não se pode pedir clips agora (para mostrar ao utilizador). */
   notRecordingReason: string | null;
+  /** Qualidade da ligação nos últimos ~30 s: tempo de resposta (mediana) e pedidos falhados. */
+  link: { rttMs: number | null; failures: number; total: number };
+  /** Copiar os clips para o tablet logo que ficam prontos (ou só ao carregar em "Copiar agora"). */
+  autoDownload: boolean;
+  /** "Copiar agora" a decorrer (modo manual). */
+  copying: boolean;
+  /** Clips prontos no telemóvel que ainda não estão no tablet. */
+  readyToCopy: number;
+  quality: 'original' | 'leve';
 };
 
 type QueuedRequest = {
@@ -111,6 +123,10 @@ export class RemoteClient {
   private downloading: string | null = null;
   private transferProgress: Record<string, number> = {};
   private failedDownloads: Record<string, number> = {};
+  private stats = new LinkStats();
+  private copyRequested = false;
+  /** Clips cuja cópia leve está a ser preparada no telemóvel: até quando esperar antes de perguntar outra vez. */
+  private lightWait: Record<string, number> = {};
   private snapshot: RemoteSnapshot = {
     connection: 'joining',
     error: null,
@@ -118,6 +134,11 @@ export class RemoteClient {
     clips: [],
     recording: false,
     notRecordingReason: null,
+    link: { rttMs: null, failures: 0, total: 0 },
+    autoDownload: loadSettings().autoDownload,
+    quality: loadSettings().quality,
+    copying: false,
+    readyToCopy: 0,
   };
   /** Última gravação confirmada pelo telemóvel (sessão + instante de início no relógio dele). */
   private lastRecording: { sessionId: string | null; recStartElapsedMs: number } | null = null;
@@ -135,6 +156,10 @@ export class RemoteClient {
 
   private persistQueue() {
     saveQueue(this.pairing.token, this.queue);
+  }
+
+  get state(): RemoteSnapshot {
+    return this.snapshot;
   }
 
   subscribe(listener: (s: RemoteSnapshot) => void): () => void {
@@ -180,6 +205,25 @@ export class RemoteClient {
   get phoneUrls(): string[] {
     const all = this.pairing.ips.map((ip) => `http://${ip}:${this.pairing.port}`);
     return this.baseUrl ? [this.baseUrl, ...all.filter((u) => u !== this.baseUrl)] : all;
+  }
+
+  /** Copiar os clips logo que ficam prontos (true) ou só com "Copiar agora" (false). */
+  setAutoDownload(on: boolean) {
+    saveSettings({ ...loadSettings(), autoDownload: on });
+    this.emit({ autoDownload: on });
+    if (on) this.downloadNext();
+  }
+
+  setQuality(quality: 'original' | 'leve') {
+    saveSettings({ ...loadSettings(), quality });
+    this.emit({ quality });
+  }
+
+  /** Modo manual: copia agora todos os clips prontos. */
+  copyNow() {
+    this.copyRequested = true;
+    this.emit({ copying: true });
+    this.downloadNext();
   }
 
   /** Tempo de gravação agora (ms), no relógio do telemóvel. */
@@ -237,7 +281,10 @@ export class RemoteClient {
   private async pollStatusOnce() {
     if (!this.baseUrl) {
       this.baseUrl = await this.findBaseUrl();
-      if (!this.baseUrl) return this.markLost();
+      if (!this.baseUrl) {
+        this.recordPoll(false, null);
+        return this.markLost();
+      }
     }
     const sentAt = now();
     try {
@@ -248,6 +295,7 @@ export class RemoteClient {
         this.serverClips = [];
       }
       this.sync.addSample(sentAt, status.elapsedMs, receivedAt);
+      this.recordPoll(true, receivedAt - sentAt);
       this.lastOkAt = receivedAt;
       this.emit({ connection: 'connected', error: null, phone: status, ...this.updateRecording(status) });
       this.publishClips();
@@ -256,6 +304,7 @@ export class RemoteClient {
         this.emit({ connection: 'lost', error: (e as Error).message });
         return;
       }
+      this.recordPoll(false, null);
       this.markLost();
     }
   }
@@ -279,6 +328,11 @@ export class RemoteClient {
           ? 'A sincronizar com o telemóvel…'
           : `O telemóvel não está a gravar (estado: ${status.state})`;
     return { recording: false, notRecordingReason: reason };
+  }
+
+  private recordPoll(ok: boolean, rttMs: number | null) {
+    this.stats.add({ ok, rttMs });
+    this.emit({ link: this.stats.summary() });
   }
 
   private markLost() {
@@ -342,14 +396,29 @@ export class RemoteClient {
    */
   private async downloadNext() {
     if (this.downloading || this.stopped || !this.baseUrl || this.snapshot.connection !== 'connected') return;
+    if (!this.snapshot.autoDownload && !this.copyRequested) return;
+    const t = now();
     const next = this.serverClips.find(
-      (c) => c.status === 'ready' && !hasReceived(c.id) && (this.failedDownloads[c.id] ?? 0) < 5
+      (c) =>
+        c.status === 'ready' &&
+        !hasReceived(c.id) &&
+        (this.failedDownloads[c.id] ?? 0) < 5 &&
+        (this.lightWait[c.id] ?? 0) <= t
     );
-    if (!next) return;
+    if (!next) {
+      const waitingLight = this.serverClips.some((c) => (this.lightWait[c.id] ?? 0) > t && !hasReceived(c.id));
+      if (this.copyRequested && !waitingLight) {
+        this.copyRequested = false;
+        this.emit({ copying: false });
+      }
+      return;
+    }
     this.downloading = next.id;
     this.transferProgress[next.id] = 0;
     this.publishClips();
     const dest = destinationFor(next.sessionId, next.id);
+    const marker = copiedMarkerFor(dest);
+    let leve = false;
     const register = () =>
       addReceived({
         id: next.id,
@@ -359,16 +428,40 @@ export class RemoteClient {
         endMs: next.endMs,
         createdAtMs: next.createdAtMs,
         receivedAtMs: Date.now(),
-        sizeBytes: next.sizeBytes,
+        sizeBytes: dest.exists ? dest.size : next.sizeBytes,
         phone: this.snapshot.phone?.device ?? 'telemóvel',
         uri: dest.uri,
+        leve,
       });
     try {
-      if (dest.exists && next.sizeBytes > 0 && dest.size === next.sizeBytes) {
+      if (marker.exists && dest.exists) {
         // Já copiado pela barra flutuante enquanto a app estava em segundo plano.
+        try {
+          leve = marker.textSync().trim() === 'leve';
+          marker.delete();
+        } catch {
+          // ignora
+        }
         register();
       } else {
-        await File.downloadFileAsync(`${this.baseUrl}/api/clips/${encodeURIComponent(next.id)}/file`, dest, {
+        let query = '';
+        if (this.snapshot.quality === 'leve') {
+          const light = await fetchJson(
+            `${this.baseUrl}/api/clips/${encodeURIComponent(next.id)}/light`,
+            this.pairing.token
+          );
+          if (light.state === 'preparing') {
+            // O telemóvel está a fazer a cópia leve: pergunta outra vez daqui a pouco.
+            this.lightWait[next.id] = now() + 2500;
+            return;
+          }
+          if (light.state === 'ready') {
+            leve = true;
+            query = '?q=leve';
+          }
+        }
+        delete this.lightWait[next.id];
+        await File.downloadFileAsync(`${this.baseUrl}/api/clips/${encodeURIComponent(next.id)}/file${query}`, dest, {
           headers: { 'X-Token': this.pairing.token },
           idempotent: true,
           onProgress: ({ bytesWritten, totalBytes }) => {
@@ -427,7 +520,9 @@ export class RemoteClient {
       ...c,
       localUri: findReceived(c.id)?.uri ?? null,
       transfer: this.transferProgress[c.id] ?? null,
+      preparingLight: (this.lightWait[c.id] ?? 0) > now() && !findReceived(c.id),
     }));
-    this.emit({ clips: withLocal });
+    const readyToCopy = this.serverClips.filter((c) => c.status === 'ready' && !hasReceived(c.id)).length;
+    this.emit({ clips: withLocal, readyToCopy });
   }
 }

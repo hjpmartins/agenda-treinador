@@ -182,10 +182,23 @@ object Link {
       return clipJson(current.id, clip)
     }
 
-    override fun clipFile(id: String): java.io.File? {
+    private fun originalFile(id: String): java.io.File? {
       val s = ClipEngine.currentSession() ?: return null
       val clip = s.clips.firstOrNull { it.id == id && it.status == ClipInfo.STATUS_READY } ?: return null
       return clip.fileName?.let { java.io.File(s.clipsDir, it) }?.takeIf { it.exists() }
+    }
+
+    override fun clipFile(id: String, light: Boolean): java.io.File? {
+      val original = originalFile(id) ?: return null
+      if (!light) return original
+      // Sem cópia leve (ainda a preparar ou falhou): entrega o original.
+      return pt.clipsjogo.engine.media.LightCopies.fileFor(original).takeIf { it.exists() } ?: original
+    }
+
+    override fun clipLight(id: String): JSONObject {
+      val original = originalFile(id) ?: return JSONObject().put("state", "missing")
+      val (state, size) = pt.clipsjogo.engine.media.LightCopies.request(original)
+      return JSONObject().put("state", state).put("sizeBytes", size)
     }
 
     override fun clips(): JSONObject {

@@ -248,6 +248,7 @@ function ReceivedSection({
                     <Text style={styles.muted}>
                       {formatClock(c.startMs)} – {formatClock(c.endMs)} ({formatDuration(c.endMs - c.startMs)}) ·{' '}
                       {formatBytes(c.sizeBytes)}
+                      {c.leve ? ' · cópia leve' : ''}
                     </Text>
                   </View>
                   <Pressable onPress={() => onDelete(c)} hitSlop={12} style={styles.trash}>

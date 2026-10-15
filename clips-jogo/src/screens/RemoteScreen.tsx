@@ -19,6 +19,7 @@ import { ClipEngine } from '../../modules/clip-engine';
 import { PlayerModal, run, saveToGallery, share } from '../components/media';
 import { Button, Card, Chip } from '../components/ui';
 import { ADJUST_STEP_MS, fromMarks, lastSeconds, normalize, PRESET_SECONDS, type ClipRange } from '../lib/clipRange';
+import { classifySignal, formatBand, overallQuality } from '../lib/linkQuality';
 import { formatClock, formatDuration, formatHoursMinutes, recordingTimeLeftMs } from '../lib/format';
 import { loadLastPairing } from '../remote/persist';
 import { decodePairing, type Pairing } from '../remote/pairing';
@@ -146,14 +147,20 @@ function ScanView({ onPaired, onBack }: { onPaired: (p: Pairing) => void; onBack
 type Draft = ClipRange & { name: string; createdAt: number };
 
 function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconnect: () => void }) {
-  const [snap, setSnap] = useState<RemoteSnapshot>({
-    connection: 'joining',
-    error: null,
-    phone: null,
-    clips: [],
-    recording: false,
-    notRecordingReason: null,
-  });
+  const [snap, setSnap] = useState<RemoteSnapshot>(() => client.state);
+  const [wifi, setWifi] = useState<ReturnType<NonNullable<typeof ClipEngine>['getWifiSignal']> | null>(null);
+  useEffect(() => {
+    const read = () => {
+      try {
+        setWifi(ClipEngine?.getWifiSignal() ?? null);
+      } catch {
+        // sem informação de sinal
+      }
+    };
+    read();
+    const t = setInterval(read, 2000);
+    return () => clearInterval(t);
+  }, []);
   const [recMs, setRecMs] = useState<number | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -271,7 +278,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
       );
       return;
     }
-    ClipEngine.armFloatingBar(client.phoneUrls, client.pairing.token, knownReceivedIds());
+    ClipEngine.armFloatingBar(client.phoneUrls, client.pairing.token, knownReceivedIds(), snap.autoDownload, snap.quality === 'leve');
     setFloatingOn(true);
     ClipEngine.moveToBackground();
   };
@@ -312,6 +319,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
               <Chip label={snap.phone.thermal === 'critico' ? 'Telemóvel muito quente!' : 'Telemóvel quente'} tone={snap.phone.thermal === 'critico' ? 'danger' : 'warn'} />
             ) : null}
             {queued > 0 ? <Chip label={`${queued} na fila`} tone="warn" /> : null}
+            {connected || snap.link.total > 0 ? <SignalChip wifi={wifi} link={snap.link} /> : null}
           </View>
         </View>
 
@@ -393,6 +401,34 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
           variant={floatingOn ? 'primary' : 'secondary'}
           onPress={openFloating}
         />
+        <View style={styles.copyBox}>
+          <Text style={styles.label}>Copiar clips para o tablet</Text>
+          <Segmented
+            value={snap.autoDownload ? 'auto' : 'manual'}
+            options={[
+              { value: 'auto', label: 'Logo que prontos' },
+              { value: 'manual', label: 'Quando eu pedir' },
+            ]}
+            onChange={(v) => client.setAutoDownload(v === 'auto')}
+          />
+          <Segmented
+            value={snap.quality}
+            options={[
+              { value: 'original', label: 'Original (1080p)' },
+              { value: 'leve', label: 'Leve (720p, ~4x menor)' },
+            ]}
+            onChange={(v) => client.setQuality(v)}
+          />
+          {!snap.autoDownload ? (
+            <Button
+              label={snap.copying ? 'A copiar…' : `Copiar agora (${snap.readyToCopy})`}
+              variant="primary"
+              disabled={snap.readyToCopy === 0 && !snap.copying}
+              onPress={() => client.copyNow()}
+              style={compact && styles.smallButton}
+            />
+          ) : null}
+        </View>
         {snap.error && !connected ? (
           <Card style={styles.helpCard}>
             <Text style={styles.warn}>{snap.error}</Text>
@@ -418,6 +454,49 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
       </View>
 
       {playing ? <PlayerModal uri={playing.uri} title={playing.title} onClose={() => setPlaying(null)} /> : null}
+    </View>
+  );
+}
+
+/** Sinal Wi-Fi + tempo de resposta + falhas: para escolher onde pôr o telemóvel e o tablet. */
+function SignalChip({
+  wifi,
+  link,
+}: {
+  wifi: { rssi: number | null; frequencyMHz: number | null } | null;
+  link: RemoteSnapshot['link'];
+}) {
+  const rssi = wifi?.rssi ?? null;
+  const parts = [`Wi-Fi ${classifySignal(rssi).label}`];
+  if (rssi != null) parts.push(`${rssi} dBm`);
+  const band = formatBand(wifi?.frequencyMHz ?? null);
+  if (band) parts.push(band);
+  if (link.rttMs != null) parts.push(`${link.rttMs} ms`);
+  if (link.failures > 0) parts.push(`${link.failures} falhas/${link.total}s`);
+  const tone = overallQuality(rssi, link.rttMs, link.failures, link.total);
+  return <Chip label={parts.join(' · ')} tone={tone} />;
+}
+
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <View style={styles.segmented}>
+      {options.map((o) => (
+        <Pressable
+          key={o.value}
+          onPress={() => onChange(o.value)}
+          style={[styles.segment, o.value === value && styles.segmentOn]}
+        >
+          <Text style={[styles.segmentText, o.value === value && styles.segmentTextOn]}>{o.label}</Text>
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -487,6 +566,8 @@ function ClipRow({ clip, compact, onPlay }: { clip: RemoteClip; compact: boolean
     ? { label: 'No tablet ✓', color: colors.ok }
     : transferring
       ? { label: `A transferir ${Math.round((clip.transfer ?? 0) * 100)}%`, color: colors.accent }
+      : clip.preparingLight
+        ? { label: 'A preparar (leve)', color: colors.accent }
       : clip.status === 'ready'
         ? { label: 'Pronto', color: colors.accent }
         : CLIP_STATUS[clip.status];
@@ -615,6 +696,12 @@ const styles = StyleSheet.create({
   },
   flashText: { color: '#fff', fontWeight: '800', fontSize: 20 },
 
+  copyBox: { gap: 6 },
+  segmented: { flexDirection: 'row', backgroundColor: colors.surfaceHigh, borderRadius: radius.s, padding: 3, gap: 3 },
+  segment: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.s - 2 },
+  segmentOn: { backgroundColor: colors.accent },
+  segmentText: { color: colors.muted, fontWeight: '700', fontSize: 14 },
+  segmentTextOn: { color: '#fff' },
   helpCard: { backgroundColor: colors.surfaceHigh, gap: space(1) },
   side: { width: 340, backgroundColor: colors.surface, padding: space(2), gap: space(1) },
   sideCompact: { padding: space(1) },

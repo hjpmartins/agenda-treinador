@@ -184,6 +184,8 @@ class ClipEngineModule : Module() {
 
     AsyncFunction("keepWifiAwake") { Link.keepWifiAwake() }
 
+    Function("getWifiSignal") { pt.clipsjogo.engine.link.WifiSignal.read(appContext.reactContext!!) }
+
     // ---------------------------------------------------------- atualizações
 
     Function("getDownloadedUpdate") { version: String ->
@@ -227,8 +229,8 @@ class ClipEngineModule : Module() {
       FloatingRemote.openPermissionSettings(appContext.reactContext!!)
     }
 
-    Function("armFloatingBar") { urls: List<String>, token: String, skipIds: List<String> ->
-      FloatingRemote.arm(appContext.reactContext!!, FloatingRemote.Config(urls, token, skipIds.toSet()))
+    Function("armFloatingBar") { urls: List<String>, token: String, skipIds: List<String>, autoDownload: Boolean, light: Boolean ->
+      FloatingRemote.arm(appContext.reactContext!!, FloatingRemote.Config(urls, token, skipIds.toSet(), autoDownload, light))
     }
 
     Function("disarmFloatingBar") { FloatingRemote.disarm() }

@@ -12,6 +12,8 @@ export type ReceivedClip = {
   sizeBytes: number;
   phone: string;
   uri: string;
+  /** Cópia leve (720p) — o original fica no telemóvel. */
+  leve?: boolean;
 };
 
 const dir = () => new Directory(Paths.document, 'recebidos');
@@ -80,6 +82,11 @@ export function findReceived(id: string): ReceivedClip | undefined {
 }
 
 /** Ficheiro de destino para um clip (pasta por gravação). */
+/** Marca de "cópia completa" escrita pela barra flutuante ao lado do ficheiro. */
+export function copiedMarkerFor(dest: File): File {
+  return new File(dest.parentDirectory, `${dest.name}.ok`);
+}
+
 export function destinationFor(sessionId: string, clipId: string): File {
   const sessionDir = new Directory(dir(), sessionId.replace(/[^A-Za-z0-9_-]/g, '_'));
   sessionDir.create({ intermediates: true, idempotent: true });

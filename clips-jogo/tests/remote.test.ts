@@ -30,3 +30,27 @@ test('relógio: tempo de gravação a partir do início no telemóvel', () => {
   assert.equal(recordingTimeAt(s, 1_000, null), null);
   assert.equal(recordingTimeAt(new ClockSync(), 1_000, 440_000), null);
 });
+
+import { classifySignal, formatBand, LinkStats, overallQuality } from '../src/lib/linkQuality.ts';
+
+test('classificação do sinal Wi-Fi', () => {
+  assert.equal(classifySignal(-50).label, 'bom');
+  assert.equal(classifySignal(-65).label, 'razoável');
+  assert.equal(classifySignal(-75).label, 'fraco');
+  assert.equal(classifySignal(-85).label, 'muito fraco');
+  assert.equal(classifySignal(null).tone, 'neutral');
+  assert.equal(formatBand(2437), '2,4 GHz');
+  assert.equal(formatBand(5180), '5 GHz');
+});
+
+test('estatísticas da ligação: mediana do tempo de resposta e falhas', () => {
+  const s = new LinkStats(5);
+  [20, 30, 400, 25].forEach((rttMs) => s.add({ ok: true, rttMs }));
+  s.add({ ok: false, rttMs: null });
+  assert.deepEqual(s.summary(), { rttMs: 30, failures: 1, total: 5 });
+  s.add({ ok: true, rttMs: 22 }); // a mais antiga sai
+  assert.equal(s.summary().total, 5);
+  assert.equal(overallQuality(-55, 30, 0, 10), 'ok');
+  assert.equal(overallQuality(-55, 30, 3, 10), 'danger');
+  assert.equal(overallQuality(-74, 30, 0, 10), 'warn');
+});

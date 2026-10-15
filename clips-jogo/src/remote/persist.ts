@@ -30,3 +30,12 @@ export function loadQueue<T>(token: string): T[] {
   return saved && saved.token === token ? saved.items : [];
 }
 export const saveQueue = <T>(token: string, items: T[]) => write('fila.json', { token, items });
+
+export type CommandSettings = {
+  /** false = os clips só são copiados para o tablet quando se carrega em "Copiar agora". */
+  autoDownload: boolean;
+  /** Qualidade da cópia no tablet: original (1080p) ou leve (720p, ~4x mais pequena). */
+  quality: 'original' | 'leve';
+};
+export const loadSettings = (): CommandSettings => ({ autoDownload: true, quality: 'original', ...read<Partial<CommandSettings>>('definicoes.json', {}) });
+export const saveSettings = (s: CommandSettings) => write('definicoes.json', s);

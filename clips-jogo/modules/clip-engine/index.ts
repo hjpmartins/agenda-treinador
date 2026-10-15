@@ -100,13 +100,15 @@ declare class ClipEngineNative extends NativeModule<Events> {
   leaveNetwork(): Promise<void>;
   /** Mantém o Wi-Fi fora do modo de poupança (tablet ligado à mão à rede do telemóvel). */
   keepWifiAwake(): Promise<void>;
+  /** Sinal Wi-Fi deste aparelho: rssi em dBm (≥ -60 bom, < -75 fraco). */
+  getWifiSignal(): { rssi: number | null; frequencyMHz: number | null; linkSpeedMbps: number | null };
 
   // Barra flutuante (tablet): pede clips por cima de outras apps
   canDrawOverlays(): boolean;
   openOverlayPermissionSettings(): void;
   /** A barra aparece sempre que a app sair do ecrã, até disarmFloatingBar(). */
   /** skipIds: clips que o tablet já tem ou apagou (a barra não os volta a copiar). */
-  armFloatingBar(urls: string[], token: string, skipIds: string[]): void;
+  armFloatingBar(urls: string[], token: string, skipIds: string[], autoDownload: boolean, light: boolean): void;
   disarmFloatingBar(): void;
   moveToBackground(): boolean;
 

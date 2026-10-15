@@ -345,7 +345,10 @@ object ClipEngine {
   fun deleteClip(sessionId: String, clipId: String) {
     val s = findSession(sessionId) ?: return
     val clip = s.clips.firstOrNull { it.id == clipId } ?: return
-    clip.fileName?.let { File(s.clipsDir, it).delete() }
+    clip.fileName?.let { File(s.clipsDir, it) }?.let { f ->
+      f.delete()
+      pt.clipsjogo.engine.media.LightCopies.fileFor(f).delete()
+    }
     s.clips.remove(clip)
     io.execute { storage.saveClips(s) }
   }

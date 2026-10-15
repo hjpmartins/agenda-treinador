@@ -13,7 +13,7 @@ App para gravar jogos de basquetebol com um telemóvel no tripé e tirar clips *
 | 1 | Gravação contínua + cortes locais (botões de teste no próprio telemóvel) | ✅ Android |
 | 2 | Emparelhamento por QR + ligação offline + modo Comando (tablet Android) | ✅ a testar |
 | 3 | Envio automático dos clips para o tablet + lista no tablet | ✅ a testar |
-| 4 | Robustez (reconexão, fila, serviço em segundo plano) + iOS | ⏳ |
+| 4 | Robustez: gravação com ecrã bloqueado, Wi-Fi sempre acordado, fila e último telemóvel guardados no tablet | ✅ a testar |
 
 > **iPhone/iPad:** o motor de gravação para iOS ainda não está feito. Nesta versão a app abre em iOS, mas o botão "Gravar" fica desativado. Mais abaixo está o que vai ser preciso para instalar em iPhone/iPad.
 
@@ -50,7 +50,9 @@ O APK é compilado automaticamente pelo GitHub sempre que há alterações nesta
    - **Marcar início / Marcar fim:** para jogadas longas.
    - A lista à direita mostra o estado de cada clip: "Na fila", "A processar" ou "Pronto".
 5. Cada clip pronto é **copiado sozinho para o tablet** ("A transferir 40%" → "No tablet ✓"). Podes vê-lo, guardá-lo na galeria do tablet ou partilhá-lo logo no ecrã Comando. Ficam também em **Ver gravações e clips → Recebidos**, mesmo depois de desligar.
-6. Se a ligação cair, a gravação continua. Os pedidos ficam "Na fila" e são enviados quando o tablet voltar a ligar-se, com os tempos certos.
+6. **Ecrã bloqueado / outra app:** a gravação continua (aparece a notificação "A gravar o jogo"). Ao voltar à app, a pré-visualização reaparece. Nota: ao sair e voltar à app, a câmara reconfigura-se e pode perder-se uma fração de segundo de imagem — durante o jogo, prefere o **Ecrã de repouso**.
+7. **Reiniciar a app do tablet:** no Comando aparece **"Ligar ao último telemóvel"** (sem ler o QR outra vez, se o telemóvel continuar com a mesma rede — por exemplo, o Ponto de acesso). Os pedidos que estavam "Na fila" continuam lá.
+8. Se a ligação cair, a gravação continua. Os pedidos ficam "Na fila" e são enviados quando o tablet voltar a ligar-se, com os tempos certos.
 
 > Notas:
 > - Se o "Ponto de acesso" (hotspot) normal do telemóvel estiver ligado, desliga-o: o Android não deixa ter os dois ao mesmo tempo.

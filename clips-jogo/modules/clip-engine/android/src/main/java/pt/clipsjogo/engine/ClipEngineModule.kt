@@ -74,10 +74,19 @@ class ClipEngineModule : Module() {
     }
 
     AsyncFunction("requestPermissionsAsync") { promise: Promise ->
-      Permissions.askForPermissionsWithPermissionsManager(
-        appContext.permissions, promise,
-        Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO
-      )
+      // Notificações (Android 13+): para a notificação "A gravar o jogo". Se recusar, grava na mesma.
+      val perms = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+      if (Build.VERSION.SDK_INT >= 33) perms.add(Manifest.permission.POST_NOTIFICATIONS)
+      Permissions.askForPermissionsWithPermissionsManager(appContext.permissions, object : expo.modules.kotlin.Promise {
+        override fun resolve(value: Any?) {
+          // Só câmara e microfone decidem se se pode gravar.
+          Permissions.getPermissionsWithPermissionsManager(
+            appContext.permissions, promise,
+            Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO
+          )
+        }
+        override fun reject(code: String?, message: String?, cause: Throwable?) = promise.reject(code, message, cause)
+      }, *perms.toTypedArray())
     }
 
     AsyncFunction("getPermissionsAsync") { promise: Promise ->
@@ -167,6 +176,8 @@ class ClipEngineModule : Module() {
     }
 
     AsyncFunction("leaveNetwork") { Link.leave() }
+
+    AsyncFunction("keepWifiAwake") { Link.keepWifiAwake() }
 
     View(CameraPreviewView::class) {}
   }

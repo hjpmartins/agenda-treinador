@@ -219,6 +219,8 @@ object ClipEngine {
 
     session = s
     lastSession = s
+    // Mantém câmara, microfone e servidor vivos com o ecrã bloqueado ou noutra app.
+    RecordingService.start(appContext)
     audioEncoder = audio
     // A partir daqui os frames passam a ser guardados (a gravação começa no próximo keyframe).
     encoderHandler.post {
@@ -362,6 +364,7 @@ object ClipEngine {
     } finally {
       synchronized(this) {
         if (session === s) session = null
+        RecordingService.stop(appContext)
         setState(if (previewSurface != null) STATE_PREVIEW else STATE_IDLE)
         refreshPipeline()
       }

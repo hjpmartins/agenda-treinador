@@ -18,7 +18,8 @@ import {
 import { PlayerModal, run, saveToGallery, share } from '../components/media';
 import { Button, Card, Chip } from '../components/ui';
 import { ADJUST_STEP_MS, fromMarks, lastSeconds, normalize, PRESET_SECONDS, type ClipRange } from '../lib/clipRange';
-import { formatClock, formatDuration } from '../lib/format';
+import { formatClock, formatDuration, formatHoursMinutes, recordingTimeLeftMs } from '../lib/format';
+import { loadLastPairing } from '../remote/persist';
 import { decodePairing, type Pairing } from '../remote/pairing';
 import { RemoteClient, type RemoteClip, type RemoteSnapshot } from '../remote/RemoteClient';
 import { colors, radius, space } from '../theme';
@@ -79,6 +80,7 @@ function ScanView({ onPaired, onBack }: { onPaired: (p: Pairing) => void; onBack
   const [permission, requestPermission] = useCameraPermissions();
   const [invalid, setInvalid] = useState(false);
   const handled = useRef(false);
+  const [last] = useState(() => loadLastPairing());
 
   if (!permission) return <View style={styles.root} />;
 
@@ -117,6 +119,17 @@ function ScanView({ onPaired, onBack }: { onPaired: (p: Pairing) => void; onBack
           3. Se o Android perguntar, confirma a ligação à rede do telemóvel.
         </Text>
         {invalid ? <Text style={styles.warn}>Este QR não é da app Clips de Jogo.</Text> : null}
+        {last ? (
+          <Button
+            label="Ligar ao último telemóvel"
+            sublabel={last.ssid ? `Rede ${last.ssid}` : last.ips[0]}
+            variant="primary"
+            onPress={() => {
+              handled.current = true;
+              onPaired(last);
+            }}
+          />
+        ) : null}
         <Button label="Voltar" variant="ghost" onPress={onBack} />
       </View>
     </View>
@@ -245,6 +258,17 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
                 label={`Telemóvel ${snap.phone.batteryPercent}%${snap.phone.charging ? ' ⚡' : ''}`}
                 tone={snap.phone.charging || snap.phone.batteryPercent >= 30 ? 'neutral' : 'warn'}
               />
+            ) : null}
+            {snap.phone?.freeBytes != null && snap.phone.bytesPerSecond ? (
+              (() => {
+                const left = recordingTimeLeftMs(snap.phone.freeBytes, snap.phone.bytesPerSecond);
+                return left < 60 * 60_000 ? (
+                  <Chip label={`Espaço no telemóvel: ${formatHoursMinutes(left)}`} tone={left < 20 * 60_000 ? 'danger' : 'warn'} />
+                ) : null;
+              })()
+            ) : null}
+            {snap.phone?.thermal && snap.phone.thermal !== 'normal' ? (
+              <Chip label={snap.phone.thermal === 'critico' ? 'Telemóvel muito quente!' : 'Telemóvel quente'} tone={snap.phone.thermal === 'critico' ? 'danger' : 'warn'} />
             ) : null}
             {queued > 0 ? <Chip label={`${queued} na fila`} tone="warn" /> : null}
           </View>

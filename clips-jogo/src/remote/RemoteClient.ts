@@ -2,6 +2,7 @@ import { File } from 'expo-file-system';
 import { ClipEngine } from '../../modules/clip-engine';
 import { ClockSync, recordingTimeAt } from './clockSync';
 import type { Pairing } from './pairing';
+import { loadQueue, saveLastPairing, saveQueue } from './persist';
 import { addReceived, destinationFor, findReceived, hasReceived } from './receivedLibrary';
 
 /** Estado do telemóvel, tal como devolvido por GET /api/status. */
@@ -14,6 +15,8 @@ export type PhoneStatus = {
   batteryPercent: number | null;
   charging: boolean;
   thermal: string;
+  freeBytes?: number;
+  bytesPerSecond?: number;
 };
 
 export type RemoteClip = {
@@ -59,7 +62,7 @@ function randomId(): string {
   return `${hex()}${hex()}-${hex()}-${hex()}-${hex()}-${hex()}${hex()}${hex()}`;
 }
 
-async function fetchJson(url: string, token: string, init: RequestInit = {}, timeoutMs = 2500): Promise<any> {
+async function fetchJson(url: string, token: string, init: RequestInit = {}, timeoutMs = 4000): Promise<any> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -103,7 +106,19 @@ export class RemoteClient {
   private failedDownloads: Record<string, number> = {};
   private snapshot: RemoteSnapshot = { connection: 'joining', error: null, phone: null, clips: [] };
 
-  constructor(readonly pairing: Pairing) {}
+  /** Momento da última transferência com progresso (uma transferência a decorrer prova que há ligação). */
+  private lastTransferAt = 0;
+  private polling = false;
+
+  constructor(readonly pairing: Pairing) {
+    // Pedidos que ficaram por enviar (ex.: a app do tablet fechou sem ligação).
+    this.queue = loadQueue<QueuedRequest>(pairing.token);
+    saveLastPairing(pairing);
+  }
+
+  private persistQueue() {
+    saveQueue(this.pairing.token, this.queue);
+  }
 
   subscribe(listener: (s: RemoteSnapshot) => void): () => void {
     this.listeners.add(listener);
@@ -127,6 +142,7 @@ export class RemoteClient {
         this.emit({ error: e instanceof Error ? e.message : String(e) });
       }
     }
+    if (!ssid) ClipEngine?.keepWifiAwake().catch(() => {});
     if (this.stopped) return;
     this.emit({ connection: 'connecting' });
     this.timers.push(setInterval(() => this.pollStatus(), 1000));
@@ -163,6 +179,7 @@ export class RemoteClient {
       createdAtMs: Date.now(),
     };
     this.queue.push(req);
+    this.persistQueue();
     this.publishClips();
     this.flushQueue();
     return req.id;
@@ -184,7 +201,16 @@ export class RemoteClient {
   }
 
   private async pollStatus() {
-    if (this.stopped) return;
+    if (this.stopped || this.polling) return;
+    this.polling = true;
+    try {
+      await this.pollStatusOnce();
+    } finally {
+      this.polling = false;
+    }
+  }
+
+  private async pollStatusOnce() {
     if (!this.baseUrl) {
       this.baseUrl = await this.findBaseUrl();
       if (!this.baseUrl) return this.markLost();
@@ -211,7 +237,9 @@ export class RemoteClient {
   }
 
   private markLost() {
-    if (now() - this.lastOkAt > 4000 && this.snapshot.connection !== 'joining') {
+    // Durante uma transferência o telemóvel responde mais devagar: não é perda de ligação.
+    if (now() - this.lastTransferAt < 5000) return;
+    if (now() - this.lastOkAt > 8000 && this.snapshot.connection !== 'joining') {
       this.emit({ connection: this.lastOkAt === 0 ? 'connecting' : 'lost' });
       // O endereço pode ter mudado (ex.: telemóvel recriou a rede): volta a procurar.
       this.baseUrl = null;
@@ -243,12 +271,14 @@ export class RemoteClient {
             body: JSON.stringify(req),
           });
           this.queue = this.queue.filter((q) => q.id !== req.id);
+          this.persistQueue();
           this.serverClips = [...this.serverClips.filter((c) => c.id !== clip.id), clip];
         } catch (e) {
           const status = (e as any)?.status;
           if (status === 409 || status === 400) {
             // O telemóvel recusou (ex.: gravação já terminou): não vale a pena insistir.
             this.queue = this.queue.filter((q) => q.id !== req.id);
+            this.persistQueue();
             this.serverClips = [...this.serverClips, this.failedClip(req, (e as Error).message)];
           } else {
             break; // sem ligação: tenta mais tarde, pela mesma ordem
@@ -281,6 +311,7 @@ export class RemoteClient {
         idempotent: true,
         onProgress: ({ bytesWritten, totalBytes }) => {
           const total = totalBytes > 0 ? totalBytes : next.sizeBytes;
+          this.lastTransferAt = now();
           if (total > 0) {
             this.transferProgress[next.id] = Math.min(1, bytesWritten / total);
             this.publishClips();

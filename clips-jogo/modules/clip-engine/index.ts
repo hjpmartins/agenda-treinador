@@ -94,6 +94,8 @@ declare class ClipEngineNative extends NativeModule<Events> {
   // Ligação ao telemóvel (tablet)
   joinNetwork(ssid: string, passphrase: string, security: string): Promise<void>;
   leaveNetwork(): Promise<void>;
+  /** Mantém o Wi-Fi fora do modo de poupança (tablet ligado à mão à rede do telemóvel). */
+  keepWifiAwake(): Promise<void>;
 }
 
 /** null em plataformas onde o motor ainda não existe (iOS nesta fase). */

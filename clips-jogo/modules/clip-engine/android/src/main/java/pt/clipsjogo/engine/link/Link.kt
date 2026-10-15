@@ -1,6 +1,7 @@
 package pt.clipsjogo.engine.link
 
 import android.content.Context
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.SystemClock
 import android.util.Log
@@ -36,8 +37,38 @@ object Link {
   private var joiner: WifiJoiner? = null
   private var info: LinkInfo? = null
 
+  private var wifiLock: WifiManager.WifiLock? = null
+
   fun init(context: Context) {
     appContext = context.applicationContext
+  }
+
+  /**
+   * Código de acesso fixo deste telemóvel: assim, se a app reiniciar, o tablet
+   * volta a ligar-se sem ler o QR outra vez.
+   */
+  private fun persistentToken(): String {
+    val prefs = appContext.getSharedPreferences("clipsjogo", Context.MODE_PRIVATE)
+    prefs.getString("token", null)?.let { return it }
+    return randomToken().also { prefs.edit().putString("token", it).apply() }
+  }
+
+  /** Impede o Wi-Fi de entrar em poupança de energia (causa cortes de ligação). */
+  @Synchronized
+  private fun holdWifi(hold: Boolean) {
+    if (hold && wifiLock == null) {
+      val wm = appContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+      @Suppress("DEPRECATION")
+      val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+      else WifiManager.WIFI_MODE_FULL_HIGH_PERF
+      wifiLock = wm.createWifiLock(mode, "ClipsJogo:ligacao").apply {
+        setReferenceCounted(false)
+        acquire()
+      }
+    } else if (!hold) {
+      wifiLock?.let { if (it.isHeld) it.release() }
+      wifiLock = null
+    }
   }
 
   val tabletConnected: Boolean get() = server?.tabletConnected == true
@@ -51,7 +82,8 @@ object Link {
     if (current != null && server != null && (hotspot?.active == true || current.ssid == null)) {
       return onResult(Result.success(current.copy(ips = NetUtils.localIPv4Addresses().ifEmpty { current.ips })))
     }
-    val token = info?.token ?: randomToken()
+    val token = persistentToken()
+    holdWifi(true)
     val srv = server ?: startServer(token) ?: return onResult(
       Result.failure(IllegalStateException("Não foi possível abrir a ligação local (portas ocupadas)."))
     )
@@ -93,6 +125,7 @@ object Link {
     server = null
     hotspot?.stop()
     info = null
+    holdWifi(false)
   }
 
   private fun startServer(token: String): LinkServer? {
@@ -180,10 +213,15 @@ object Link {
 
   fun join(ssid: String, passphrase: String, security: String, onResult: (Result<Unit>) -> Unit) {
     val j = joiner ?: WifiJoiner(appContext).also { joiner = it }
+    holdWifi(true)
     j.join(ssid, passphrase, security, onResult)
   }
 
+  /** Tablet ligado à mão (sem dados de rede no QR): mantém na mesma o Wi-Fi acordado. */
+  fun keepWifiAwake() = holdWifi(true)
+
   fun leave() {
+    holdWifi(false)
     joiner?.leave()
   }
 }

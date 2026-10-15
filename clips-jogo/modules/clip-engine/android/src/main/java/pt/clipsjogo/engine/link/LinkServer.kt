@@ -31,8 +31,13 @@ class LinkServer(
   @Volatile var lastSeenElapsedMs = 0L
     private set
 
+  /**
+   * O tablet pergunta de segundo a segundo, mas com a rede ocupada (ex.: a
+   * transferir um clip) uma resposta pode demorar: só dizemos "à espera do
+   * tablet" após 15 s sem notícias dele.
+   */
   val tabletConnected: Boolean
-    get() = lastSeenElapsedMs > 0 && SystemClock.elapsedRealtime() - lastSeenElapsedMs < 5_000
+    get() = lastSeenElapsedMs > 0 && SystemClock.elapsedRealtime() - lastSeenElapsedMs < 15_000
 
   override fun serve(session: IHTTPSession): Response {
     val tok = session.headers["x-token"] ?: session.parameters["token"]?.firstOrNull()

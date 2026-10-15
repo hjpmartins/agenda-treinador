@@ -44,6 +44,13 @@ export type RemoteSnapshot = {
   error: string | null;
   phone: PhoneStatus | null;
   clips: RemoteClip[];
+  /**
+   * Se o telemóvel está a gravar, com tolerância: uma resposta isolada a dizer
+   * o contrário não bloqueia os botões (só 3 seguidas).
+   */
+  recording: boolean;
+  /** Porque é que não se pode pedir clips agora (para mostrar ao utilizador). */
+  notRecordingReason: string | null;
 };
 
 type QueuedRequest = {
@@ -104,7 +111,17 @@ export class RemoteClient {
   private downloading: string | null = null;
   private transferProgress: Record<string, number> = {};
   private failedDownloads: Record<string, number> = {};
-  private snapshot: RemoteSnapshot = { connection: 'joining', error: null, phone: null, clips: [] };
+  private snapshot: RemoteSnapshot = {
+    connection: 'joining',
+    error: null,
+    phone: null,
+    clips: [],
+    recording: false,
+    notRecordingReason: null,
+  };
+  /** Última gravação confirmada pelo telemóvel (sessão + instante de início no relógio dele). */
+  private lastRecording: { sessionId: string | null; recStartElapsedMs: number } | null = null;
+  private notRecordingStreak = 0;
 
   /** Momento da última transferência com progresso (uma transferência a decorrer prova que há ligação). */
   private lastTransferAt = 0;
@@ -161,11 +178,12 @@ export class RemoteClient {
 
   /** Tempo de gravação agora (ms), no relógio do telemóvel. */
   recordingTimeNow(): number | null {
-    return recordingTimeAt(this.sync, now(), this.snapshot.phone?.recStartElapsedMs ?? null);
+    if (!this.snapshot.recording || !this.lastRecording) return null;
+    return recordingTimeAt(this.sync, now(), this.lastRecording.recStartElapsedMs);
   }
 
   get isRecording(): boolean {
-    return this.snapshot.phone?.state === 'recording' && this.recordingTimeNow() != null;
+    return this.snapshot.recording && this.recordingTimeNow() != null;
   }
 
   /** Pede um clip. startMs/endMs em tempo de gravação (já calculados no momento do toque). */
@@ -225,7 +243,7 @@ export class RemoteClient {
       }
       this.sync.addSample(sentAt, status.elapsedMs, receivedAt);
       this.lastOkAt = receivedAt;
-      this.emit({ connection: 'connected', error: null, phone: status });
+      this.emit({ connection: 'connected', error: null, phone: status, ...this.updateRecording(status) });
       this.publishClips();
     } catch (e) {
       if ((e as any)?.status === 403) {
@@ -234,6 +252,27 @@ export class RemoteClient {
       }
       this.markLost();
     }
+  }
+
+  private updateRecording(status: PhoneStatus): Pick<RemoteSnapshot, 'recording' | 'notRecordingReason'> {
+    if (status.state === 'recording' && status.recStartElapsedMs != null) {
+      this.lastRecording = { sessionId: status.sessionId, recStartElapsedMs: status.recStartElapsedMs };
+      this.notRecordingStreak = 0;
+      return { recording: true, notRecordingReason: null };
+    }
+    this.notRecordingStreak++;
+    const sameSession = this.lastRecording && (status.sessionId == null || status.sessionId === this.lastRecording.sessionId);
+    // Respostas isoladas (ex.: a câmara a reconfigurar ao bloquear o ecrã) não bloqueiam os botões.
+    if (this.lastRecording && sameSession && status.state !== 'finalizing' && this.notRecordingStreak < 3) {
+      return { recording: true, notRecordingReason: null };
+    }
+    const reason =
+      status.state === 'finalizing'
+        ? 'O telemóvel está a terminar a gravação'
+        : status.state === 'recording'
+          ? 'A sincronizar com o telemóvel…'
+          : `O telemóvel não está a gravar (estado: ${status.state})`;
+    return { recording: false, notRecordingReason: reason };
   }
 
   private markLost() {

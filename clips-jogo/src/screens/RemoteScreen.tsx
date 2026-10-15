@@ -141,7 +141,14 @@ function ScanView({ onPaired, onBack }: { onPaired: (p: Pairing) => void; onBack
 type Draft = ClipRange & { name: string; createdAt: number };
 
 function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconnect: () => void }) {
-  const [snap, setSnap] = useState<RemoteSnapshot>({ connection: 'joining', error: null, phone: null, clips: [] });
+  const [snap, setSnap] = useState<RemoteSnapshot>({
+    connection: 'joining',
+    error: null,
+    phone: null,
+    clips: [],
+    recording: false,
+    notRecordingReason: null,
+  });
   const [recMs, setRecMs] = useState<number | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -156,7 +163,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
     return () => clearInterval(t);
   }, [client]);
 
-  const recording = snap.phone?.state === 'recording' && recMs != null;
+  const recording = snap.recording && recMs != null;
   const connected = snap.connection === 'connected';
 
   const feedback = useCallback(
@@ -252,7 +259,9 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
           </View>
           <View style={styles.chips}>
             <Chip label={connectionChip.label} tone={connectionChip.tone} />
-            {connected && !recording ? <Chip label="O telemóvel não está a gravar" tone="warn" /> : null}
+            {connected && !recording ? (
+              <Chip label={snap.notRecordingReason ?? 'A sincronizar com o telemóvel…'} tone="warn" />
+            ) : null}
             {snap.phone?.batteryPercent != null ? (
               <Chip
                 label={`Telemóvel ${snap.phone.batteryPercent}%${snap.phone.charging ? ' ⚡' : ''}`}

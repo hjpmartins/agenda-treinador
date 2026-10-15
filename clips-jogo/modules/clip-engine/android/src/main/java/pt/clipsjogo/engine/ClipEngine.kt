@@ -260,7 +260,7 @@ object ClipEngine {
 
   /** Instante (elapsedRealtime, ms) do primeiro frame da gravação em curso; null se não está a gravar. */
   fun recordingStartElapsedMs(): Double? =
-    if (state == STATE_RECORDING && clock.started) clock.t0BootUs / 1000.0 else null
+    if (session != null && !recordingDone && clock.started) clock.t0BootUs / 1000.0 else null
 
   fun nowRecUs(): Long =
     if (state == STATE_RECORDING && clock.started) clock.toRecUs(SystemClock.elapsedRealtimeNanos() / 1000) else 0L

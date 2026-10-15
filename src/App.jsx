@@ -12,7 +12,7 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { DashboardView } from "./components/dashboard/DashboardView";
 import { PlayersView } from "./components/players/PlayersView";
 import { PlayerModal } from "./components/players/PlayerModal";
-import { SessionsView, RealizadosView } from "./components/sessions/SessionsViews";
+import { SessionsView } from "./components/sessions/SessionsViews";
 import { SessionModal } from "./components/sessions/SessionModal";
 import { ImportModal } from "./components/sessions/ImportModal";
 import { JogosView } from "./components/jogos/JogosViews";
@@ -577,8 +577,7 @@ export default function App() {
           tab={tab}
           setTab={setTab}
           playerCount={teamPlayers.length}
-          sessionCount={seasonSessions.filter((s) => s.type === "treino" && s.realizado !== true).length}
-          realizadosCount={seasonSessions.filter((s) => s.type === "treino" && s.realizado === true).length}
+          sessionCount={seasonSessions.filter((s) => s.type === "treino").length}
           jogosCount={seasonSessions.filter((s) => s.type === "jogo").length}
           libraryCount={library.length}
           publicLibraryCount={publicLibrary.length}
@@ -627,20 +626,10 @@ export default function App() {
               )}
               {tab === "treinos" && (
                 <SessionsView
-                  sessions={seasonSessions.filter((s) => s.type === "treino" && s.realizado !== true)}
+                  sessions={seasonSessions.filter((s) => s.type === "treino")}
                   players={teamPlayers}
                   clubLogo={clubLogo}
                   onAdd={() => setSessionModal({ ...emptySession, date: todayStr() })}
-                  onEdit={(s) => setSessionModal(s)}
-                  onDelete={deleteSession}
-                  onTransfer={(s) => setTransferModal(s)}
-                />
-              )}
-              {tab === "realizados" && (
-                <RealizadosView
-                  sessions={seasonSessions.filter((s) => s.type === "treino" && s.realizado === true)}
-                  players={teamPlayers}
-                  clubLogo={clubLogo}
                   onEdit={(s) => setSessionModal(s)}
                   onDelete={deleteSession}
                   onTransfer={(s) => setTransferModal(s)}

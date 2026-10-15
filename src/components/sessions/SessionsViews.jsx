@@ -4,35 +4,43 @@ import { printSession } from "../../print";
 import { ViewHeader, EmptyState } from "../common/Modal";
 
 function SessionsView({ sessions, players, clubLogo, onAdd, onEdit, onDelete, onTransfer }) {
-  const sorted = [...sessions].sort((a, b) => (a.date < b.date ? 1 : -1));
+  const porRealizar = sessions.filter((s) => s.realizado !== true).sort((a, b) => (a.date < b.date ? 1 : -1));
+  const realizados = sessions.filter((s) => s.realizado === true).sort((a, b) => (a.date < b.date ? 1 : -1));
   return (
     <div>
-      <ViewHeader title="Treinos e jogos" subtitle={`${sessions.length} registo${sessions.length === 1 ? "" : "s"} por realizar/planeado${sessions.length === 1 ? "" : "s"}`} onAdd={onAdd} addLabel="Novo registo" />
-      {sorted.length === 0 ? (
-        <EmptyState text="Sem treinos ou jogos planeados. Cria o primeiro registo — depois de realizado, marca-o como concluído e ele passa para a aba Realizados." />
+      <ViewHeader title="Treinos" subtitle={`${sessions.length} registo${sessions.length === 1 ? "" : "s"}`} onAdd={onAdd} addLabel="Novo registo" />
+      {sessions.length === 0 ? (
+        <EmptyState text="Sem treinos planeados. Cria o primeiro registo — depois de realizado, marca-o como concluído e ele passa para a secção Realizados." />
       ) : (
-        <div className="space-y-2">
-          {sorted.map((s) => (
-            <SessionRow key={s.id} s={s} players={players} clubLogo={clubLogo} onEdit={() => onEdit(s)} onDelete={() => onDelete(s.id)} onTransfer={() => onTransfer(s)} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RealizadosView({ sessions, players, clubLogo, onEdit, onDelete, onTransfer }) {
-  const sorted = [...sessions].sort((a, b) => (a.date < b.date ? 1 : -1));
-  return (
-    <div>
-      <ViewHeader title="Treinos realizados" subtitle={`${sessions.length} treino${sessions.length === 1 ? "" : "s"} concluído${sessions.length === 1 ? "" : "s"}`} />
-      {sorted.length === 0 ? (
-        <EmptyState text="Ainda não marcaste nenhum treino como realizado. Vai à aba Treinos, edita um registo e marca 'Sim' em 'Este treino foi realizado?'." />
-      ) : (
-        <div className="space-y-2">
-          {sorted.map((s) => (
-            <SessionRow key={s.id} s={s} players={players} clubLogo={clubLogo} onEdit={() => onEdit(s)} onDelete={() => onDelete(s.id)} onTransfer={() => onTransfer(s)} />
-          ))}
+        <div className="space-y-6">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-[#8A93A3] mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>
+              Por realizar{porRealizar.length > 0 && ` (${porRealizar.length})`}
+            </div>
+            {porRealizar.length === 0 ? (
+              <EmptyState text="Sem treinos por realizar." small />
+            ) : (
+              <div className="space-y-2">
+                {porRealizar.map((s) => (
+                  <SessionRow key={s.id} s={s} players={players} clubLogo={clubLogo} onEdit={() => onEdit(s)} onDelete={() => onDelete(s.id)} onTransfer={() => onTransfer(s)} />
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-[#8A93A3] mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>
+              Realizados{realizados.length > 0 && ` (${realizados.length})`}
+            </div>
+            {realizados.length === 0 ? (
+              <EmptyState text="Ainda não marcaste nenhum treino como realizado." small />
+            ) : (
+              <div className="space-y-2">
+                {realizados.map((s) => (
+                  <SessionRow key={s.id} s={s} players={players} clubLogo={clubLogo} onEdit={() => onEdit(s)} onDelete={() => onDelete(s.id)} onTransfer={() => onTransfer(s)} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -113,4 +121,4 @@ function SessionRow({ s, players, clubLogo, onEdit, onDelete, onTransfer }) {
   );
 }
 
-export { SessionsView, RealizadosView, SessionRow };
+export { SessionsView, SessionRow };

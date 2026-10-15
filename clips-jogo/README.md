@@ -91,6 +91,16 @@ Para deixar o telemóvel no tripé (ex.: na bancada) antes do jogo e só começa
 
 Se o telemóvel não estiver no ecrã Gravar, o tablet diz "Abre o ecrã Gravar no telemóvel".
 
+### Onde ficam os vídeos
+
+- Só dentro da app (telemóvel: `Android/data/pt.clipsjogo.app/files/sessions/`; tablet: memória interna da app).
+  Não aparecem na Galeria nem vão para a nuvem.
+- Para guardar um vídeo: **Galeria** (copia para a galeria do aparelho) ou **Partilhar** (WhatsApp, YouTube, Drive…).
+- **Ficam só os últimos 3 jogos**, no telemóvel e no tablet: no fim de cada gravação (telemóvel) ou quando chega o
+  primeiro clip de um jogo novo (tablet), o mais antigo é apagado. Em "Ver gravações e clips", o jogo que vai ser apagado
+  a seguir mostra o aviso **"Será apagado no próximo jogo"**.
+- Desinstalar a app ou "Limpar dados" apaga tudo; as atualizações não apagam nada.
+
 ### Calor e bateria
 
 - **Modo espera** (ecrã Gravar, antes de começar): apaga o ecrã e desliga a câmara até a gravação começar — o telemóvel

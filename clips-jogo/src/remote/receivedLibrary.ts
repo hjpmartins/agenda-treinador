@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { sessionsToPrune } from '../lib/retention';
 
 /** Um clip que já está guardado no tablet. */
 export type ReceivedClip = {
@@ -67,12 +68,12 @@ function deleted(): Set<string> {
   return deletedIds;
 }
 
-/** Já está no tablet, ou foi apagado de propósito (não voltar a transferir). */
 /** Clips que o tablet já tem ou apagou (para a barra flutuante não os copiar). */
 export function knownReceivedIds(): string[] {
   return [...deleted(), ...listReceived().map((c) => c.id)];
 }
 
+/** Já está no tablet, ou foi apagado de propósito (não voltar a transferir). */
 export function hasReceived(id: string): boolean {
   return deleted().has(id) || listReceived().some((c) => c.id === id);
 }
@@ -81,20 +82,33 @@ export function findReceived(id: string): ReceivedClip | undefined {
   return listReceived().find((c) => c.id === id);
 }
 
-/** Ficheiro de destino para um clip (pasta por gravação). */
 /** Marca de "cópia completa" escrita pela barra flutuante ao lado do ficheiro. */
 export function copiedMarkerFor(dest: File): File {
   return new File(dest.parentDirectory, `${dest.name}.ok`);
 }
 
+const sessionDirFor = (sessionId: string) => new Directory(dir(), sessionId.replace(/[^A-Za-z0-9_-]/g, '_'));
+
+/** Ficheiro de destino para um clip (pasta por gravação). */
 export function destinationFor(sessionId: string, clipId: string): File {
-  const sessionDir = new Directory(dir(), sessionId.replace(/[^A-Za-z0-9_-]/g, '_'));
+  const sessionDir = sessionDirFor(sessionId);
   sessionDir.create({ intermediates: true, idempotent: true });
   return new File(sessionDir, `${clipId}.mp4`);
 }
 
 export function addReceived(clip: ReceivedClip) {
-  save([...listReceived().filter((c) => c.id !== clip.id), clip]);
+  const all = [...listReceived().filter((c) => c.id !== clip.id), clip];
+  // Ficam só os últimos jogos: os mais antigos são apagados quando chega um clip de um jogo novo.
+  const prune = new Set(sessionsToPrune(all));
+  for (const sessionId of prune) {
+    try {
+      const d = sessionDirFor(sessionId);
+      if (d.exists) d.delete();
+    } catch {
+      // ignora
+    }
+  }
+  save(all.filter((c) => !prune.has(c.sessionId)));
 }
 
 export function deleteReceived(id: string) {

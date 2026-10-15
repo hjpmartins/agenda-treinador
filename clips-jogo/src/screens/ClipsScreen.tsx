@@ -6,6 +6,7 @@ import { AnalysisPlayer, type AnalysisItem } from '../components/AnalysisPlayer'
 import { PlayerModal, run, saveToGallery, share } from '../components/media';
 import { MotivePicker } from '../components/MotivePicker';
 import { groupByMotive } from '../lib/annotations';
+import { KEEP_GAMES, nextToPrune } from '../lib/retention';
 import { allNotes, getMotives, getNotes, setNotes, useNotesVersion } from '../remote/notesStore';
 import { Button, Card } from '../components/ui';
 import {
@@ -39,6 +40,11 @@ export function ClipsScreen({ onBack }: Props) {
   const [received, setReceived] = useState<ReceivedClip[]>(() => listReceived());
   const [analysis, setAnalysis] = useState<{ items: AnalysisItem[]; index: number } | null>(null);
   const [motiveFor, setMotiveFor] = useState<string | null>(null);
+  const phoneNextToPrune = nextToPrune(
+    (sessions ?? [])
+      .filter((x) => x.status !== 'recording' && x.status !== 'finalizing')
+      .map((x) => ({ sessionId: x.id, createdAtMs: x.startedAtMs }))
+  );
   useEffect(() => subscribeReceived(setReceived), []);
   // Motivos escolhidos na barra flutuante que ainda não foram registados.
   useEffect(() => {
@@ -140,6 +146,11 @@ export function ClipsScreen({ onBack }: Props) {
             ) : null
           }
           keyExtractor={(s) => s.id}
+          ListFooterComponent={
+            <Text style={[styles.muted, { textAlign: 'center' }]}>
+              Ficam guardados os últimos {KEEP_GAMES} jogos. Para guardar um vídeo, usa Galeria ou Partilhar.
+            </Text>
+          }
           contentContainerStyle={{ gap: space(2), paddingBottom: space(4) }}
           renderItem={({ item: s }) => (
             <Card>
@@ -154,6 +165,8 @@ export function ClipsScreen({ onBack }: Props) {
                   <Button label="Apagar" variant="ghost" onPress={() => deleteSession(s)} />
                 ) : null}
               </View>
+
+              {phoneNextToPrune === s.id ? <PruneWarning /> : null}
 
               {s.status === 'interrupted' ? (
                 <View style={styles.warnBox}>
@@ -255,6 +268,7 @@ function ReceivedSection({
   useNotesVersion();
   const notes = allNotes();
   const toItem = (c: ReceivedClip): AnalysisItem => ({ id: c.id, uri: c.uri, title: c.name });
+  const willPrune = nextToPrune(clips);
   const bySession = new Map<string, ReceivedClip[]>();
   for (const c of [...clips].sort((a, b) => b.createdAtMs - a.createdAtMs)) {
     bySession.set(c.sessionId, [...(bySession.get(c.sessionId) ?? []), c]);
@@ -267,6 +281,7 @@ function ReceivedSection({
           <Text style={[styles.muted, { marginBottom: space(1) }]}>
             Do {list[0].phone} · {list.length} clip{list.length === 1 ? '' : 's'}
           </Text>
+          {willPrune === sessionId ? <PruneWarning /> : null}
           {groupByMotive(list, notes, getMotives()).length > 0 ? (
             <View style={styles.motiveRow}>
               <Text style={styles.muted}>Ver seguidos:</Text>
@@ -315,6 +330,16 @@ function ReceivedSection({
             ))}
         </Card>
       ))}
+    </View>
+  );
+}
+
+function PruneWarning() {
+  return (
+    <View style={styles.warnBox}>
+      <Text style={styles.warnText}>
+        Será apagado no próximo jogo (ficam só os últimos {KEEP_GAMES}). Guarda na Galeria ou partilha o que quiseres manter.
+      </Text>
     </View>
   );
 }

@@ -49,6 +49,9 @@ object ClipEngine {
   const val STATE_RECORDING = "recording"
   const val STATE_FINALIZING = "finalizing"
 
+  /** Jogos guardados no telemóvel (os mais antigos são apagados no fim de cada gravação). */
+  const val KEEP_SESSIONS = 3
+
   private const val TAG = "ClipEngine"
   private const val SEGMENT_US = 2_000_000L
   private const val MAX_PART_BYTES = 3_500_000_000L
@@ -397,6 +400,7 @@ object ClipEngine {
         setState(if (previewSurface != null) STATE_PREVIEW else STATE_IDLE)
         refreshPipeline()
       }
+      pruneOldSessions()
     }
   }
 
@@ -468,6 +472,27 @@ object ClipEngine {
     check(session?.id != id) { "Não é possível apagar a gravação em curso." }
     findSession(id)?.dir?.deleteRecursively()
     if (lastSession?.id == id) lastSession = null
+  }
+
+  /**
+   * Os jogos são para aprender logo: ficam só os [KEEP_SESSIONS] mais recentes
+   * (o que se quiser guardar vai antes para a galeria ou é partilhado).
+   */
+  private fun pruneOldSessions() {
+    try {
+      val current = session?.id
+      storage.loadAll()
+        .filter { it.id != current && it.status != SessionInfo.STATUS_RECORDING && it.status != SessionInfo.STATUS_FINALIZING }
+        .sortedByDescending { it.startedAtMs }
+        .drop(KEEP_SESSIONS)
+        .forEach { old ->
+          Log.i(TAG, "A apagar jogo antigo ${old.id}")
+          old.dir.deleteRecursively()
+          if (lastSession?.id == old.id) lastSession = null
+        }
+    } catch (e: Exception) {
+      Log.w(TAG, "Falha a apagar jogos antigos", e)
+    }
   }
 
   fun currentSession(): SessionInfo? = session ?: lastSession

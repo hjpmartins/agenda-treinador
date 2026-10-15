@@ -33,7 +33,19 @@ object FloatingRemote {
     val autoDownload: Boolean = true,
     /** Pedir a cópia leve (720p) em vez do original. */
     val light: Boolean = false,
+    /** Motivos para escolher logo a seguir a pedir um clip. */
+    val motives: List<String> = emptyList(),
   )
+
+  private const val MOTIVES_PREFS = "clips_barra_motivos"
+
+  /** Motivos escolhidos na barra (id do clip → motivo), para a app registar ao voltar. */
+  fun takeMotives(context: Context): Map<String, String> {
+    val prefs = context.getSharedPreferences(MOTIVES_PREFS, Context.MODE_PRIVATE)
+    val all = prefs.all.mapNotNull { (k, v) -> (v as? String)?.let { k to it } }.toMap()
+    prefs.edit().clear().apply()
+    return all
+  }
 
   private val main = Handler(Looper.getMainLooper())
   private var appContext: Context? = null
@@ -93,13 +105,22 @@ object FloatingRemote {
 
     val markStart: Long? get() = markStartMs
 
+    var lastRequestId: String? = null
+      private set
+
+    fun motives(): List<String> = config?.motives ?: emptyList()
+
+    fun setMotive(context: Context, clipId: String, motive: String) {
+      context.getSharedPreferences(MOTIVES_PREFS, Context.MODE_PRIVATE).edit().putString(clipId, motive).apply()
+    }
+
     fun recordingNowMs(): Long? = Client.recordingNowMs()
     fun connectionOk(): Boolean = Client.connectionOk()
     fun pending(): Int = Client.pendingCount()
 
     fun preset(seconds: Int): Boolean {
       val now = Client.recordingNowMs() ?: return false
-      Client.request(now - seconds * 1000L, now)
+      lastRequestId = Client.request(now - seconds * 1000L, now)
       return true
     }
 
@@ -112,7 +133,7 @@ object FloatingRemote {
         true
       } else {
         markStartMs = null
-        Client.request(minOf(start, now), maxOf(start, now))
+        lastRequestId = Client.request(minOf(start, now), maxOf(start, now))
         false
       }
     }
@@ -183,7 +204,7 @@ object FloatingRemote {
       maxOf(0.0, nowMs() + best.offsetMs - start).toLong()
     }
 
-    fun request(startMs: Long, endMs: Long) {
+    fun request(startMs: Long, endMs: Long): String {
       val s = maxOf(0L, startMs)
       val e = maxOf(s + MIN_CLIP_MS, endMs)
       val req = JSONObject()
@@ -195,6 +216,7 @@ object FloatingRemote {
         .put("createdAtMs", System.currentTimeMillis())
       synchronized(lock) { queue.add(req) }
       wake.offer(Unit)
+      return req.getString("id")
     }
 
     private fun loop(gen: Int) {

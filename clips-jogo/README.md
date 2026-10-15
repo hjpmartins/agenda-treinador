@@ -66,6 +66,20 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
 7. **Reiniciar a app do tablet:** no Comando aparece **"Ligar ao último telemóvel"** (sem ler o QR outra vez, se o telemóvel continuar com a mesma rede — por exemplo, o Ponto de acesso). Os pedidos que estavam "Na fila" continuam lá.
 8. Se a ligação cair, a gravação continua. Os pedidos ficam "Na fila" e são enviados quando o tablet voltar a ligar-se, com os tempos certos.
 
+### Analisar clips no tablet (motivos, desenhar, cortar, desconto de tempo)
+
+- **Motivo de cada clip** (um por clip): ao pedir o clip no Comando (fila de motivos no painel do clip), na **barra
+  flutuante** (os motivos aparecem ~6 s depois de pedir — tocar é opcional), ou depois, tocando em "+ motivo" na lista.
+  A lista de motivos edita-se em "Motivo… → Editar lista".
+- **▶ Ver** abre o leitor de análise: câmara lenta (0,25x / 0,5x / 1x), imagem a imagem (◀ 1 / 1 ▶), −3 s e barra para
+  arrastar.
+- **✏ Desenhar**: com a imagem parada, seta, círculo ou traço livre, em amarelo, vermelho ou branco; desfazer/apagar.
+  Podes desenhar em vários momentos do mesmo clip; ao reproduzir, a imagem **para em cada desenho** (▶ para continuar).
+  Os desenhos ficam guardados (marcas amarelas na barra).
+- **✂ Cortar**: "Início aqui" / "Fim aqui" — o clip passa a ver-se só nessa parte (o ficheiro original não muda).
+- **Desconto** (botão no Comando): clips deste jogo agrupados por motivo; toca num motivo e os clips passam seguidos.
+- Em **Ver gravações e clips → Recebidos**, cada jogo tem "Ver seguidos" por motivo, para a análise durante a semana.
+
 ### Iniciar e parar a gravação a partir do tablet
 
 Para deixar o telemóvel no tripé (ex.: na bancada) antes do jogo e só começar a gravar no início:

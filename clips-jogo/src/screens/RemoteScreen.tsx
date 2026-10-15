@@ -5,10 +5,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Animated,
   BackHandler,
   FlatList,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,7 +19,11 @@ import {
   View,
 } from 'react-native';
 import { ClipEngine } from '../../modules/clip-engine';
-import { PlayerModal, run, saveToGallery, share } from '../components/media';
+import { AnalysisPlayer, type AnalysisItem } from '../components/AnalysisPlayer';
+import { run, saveToGallery, share } from '../components/media';
+import { MotiveChips, MotivePicker } from '../components/MotivePicker';
+import { groupByMotive } from '../lib/annotations';
+import { allNotes, getMotives, getNotes, setNotes, useNotesVersion } from '../remote/notesStore';
 import { Button, Card, Chip } from '../components/ui';
 import { ADJUST_STEP_MS, fromMarks, lastSeconds, normalize, PRESET_SECONDS, type ClipRange } from '../lib/clipRange';
 import { classifySignal, formatBand, overallQuality } from '../lib/linkQuality';
@@ -144,7 +151,7 @@ function ScanView({ onPaired, onBack }: { onPaired: (p: Pairing) => void; onBack
 
 // ======================================================================== comando
 
-type Draft = ClipRange & { name: string; createdAt: number };
+type Draft = ClipRange & { name: string; createdAt: number; motive: string | null };
 
 function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconnect: () => void }) {
   const [snap, setSnap] = useState<RemoteSnapshot>(() => client.state);
@@ -166,7 +173,10 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
   const [countdown, setCountdown] = useState<number | null>(null);
   const [markStart, setMarkStart] = useState<number | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
-  const [playing, setPlaying] = useState<{ uri: string; title: string } | null>(null);
+  const [playing, setPlaying] = useState<{ items: AnalysisItem[]; index: number } | null>(null);
+  const [motiveFor, setMotiveFor] = useState<string | null>(null);
+  const [showDesconto, setShowDesconto] = useState(false);
+  useNotesVersion();
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => client.subscribe(setSnap), [client]);
@@ -191,7 +201,8 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
 
   const send = useCallback(
     (d: Draft) => {
-      client.requestClip(d.startMs, d.endMs, d.name);
+      const id = client.requestClip(d.startMs, d.endMs, d.name);
+      if (d.motive) setNotes(id, { motive: d.motive });
       setDraft(null);
       setCountdown(null);
       feedback(`Clip pedido · ${formatDuration(d.endMs - d.startMs)}`);
@@ -213,9 +224,12 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
   const newDraft = useCallback(
     (range: ClipRange) => {
       // Se já havia um rascunho por enviar, envia-o antes de criar o novo.
-      if (draft) client.requestClip(draft.startMs, draft.endMs, draft.name);
+      if (draft) {
+        const id = client.requestClip(draft.startMs, draft.endMs, draft.name);
+        if (draft.motive) setNotes(id, { motive: draft.motive });
+      }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      setDraft({ ...range, name: '', createdAt: Date.now() });
+      setDraft({ ...range, name: '', createdAt: Date.now(), motive: null });
       setCountdown(AUTO_SEND_SECONDS);
     },
     [client, draft]
@@ -260,6 +274,20 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
   // Barra flutuante: fica por cima de outras apps (ex.: estatísticas) quando esta sai do ecrã.
   const [floatingOn, setFloatingOn] = useState(false);
   useEffect(() => () => ClipEngine?.disarmFloatingBar(), []);
+  // Motivos escolhidos na barra flutuante: registam-se quando a app volta à frente.
+  useEffect(() => {
+    const take = () => {
+      try {
+        const picked = ClipEngine?.takeBarMotives() ?? {};
+        for (const [id, motive] of Object.entries(picked)) setNotes(id, { motive });
+      } catch {
+        // ignora
+      }
+    };
+    take();
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && take());
+    return () => sub.remove();
+  }, []);
   const openFloating = () => {
     if (!ClipEngine) return;
     if (floatingOn) {
@@ -278,7 +306,14 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
       );
       return;
     }
-    ClipEngine.armFloatingBar(client.phoneUrls, client.pairing.token, knownReceivedIds(), snap.autoDownload, snap.quality === 'leve');
+    ClipEngine.armFloatingBar(
+      client.phoneUrls,
+      client.pairing.token,
+      knownReceivedIds(),
+      snap.autoDownload,
+      snap.quality === 'leve',
+      getMotives()
+    );
     setFloatingOn(true);
     ClipEngine.moveToBackground();
   };
@@ -377,6 +412,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
               setCountdown(null);
               setDraft((d) => (d ? { ...d, name } : d));
             }}
+            onMotive={(motive) => setDraft((d) => (d ? { ...d, motive } : d))}
             onCancel={() => {
               setDraft(null);
               setCountdown(null);
@@ -437,6 +473,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
       <View style={[styles.side, compact && styles.sideCompact, stacked ? styles.sideStacked : { width: sideWidth }]}>
         <View style={styles.sideHeader}>
           <Text style={styles.h2}>Clips</Text>
+          <Button label="Desconto" variant="primary" onPress={() => setShowDesconto(true)} style={compact && styles.smallButton} />
           <Button label="Desligar" variant="ghost" onPress={onDisconnect} style={compact && styles.smallButton} />
         </View>
         <Button
@@ -492,12 +529,36 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
           ListEmptyComponent={<Text style={styles.muted}>Os clips pedidos aparecem aqui.</Text>}
           contentContainerStyle={{ gap: space(1) }}
           renderItem={({ item }) => (
-            <ClipRow clip={item} compact={compact} onPlay={(uri) => setPlaying({ uri, title: item.name })} />
+            <ClipRow
+              clip={item}
+              compact={compact}
+              onPlay={(uri) => setPlaying({ items: [{ id: item.id, uri, title: item.name }], index: 0 })}
+              onMotive={() => setMotiveFor(item.id)}
+            />
           )}
         />
       </View>
 
-      {playing ? <PlayerModal uri={playing.uri} title={playing.title} onClose={() => setPlaying(null)} /> : null}
+      {playing ? <AnalysisPlayer items={playing.items} startIndex={playing.index} onClose={() => setPlaying(null)} /> : null}
+      <MotivePicker
+        visible={motiveFor != null}
+        current={motiveFor ? getNotes(motiveFor).motive ?? null : null}
+        onPick={(m) => {
+          if (motiveFor) setNotes(motiveFor, { motive: m });
+          setMotiveFor(null);
+        }}
+        onClose={() => setMotiveFor(null)}
+      />
+      {showDesconto ? (
+        <DescontoModal
+          clips={snap.clips}
+          onPlay={(items) => {
+            setShowDesconto(false);
+            setPlaying({ items, index: 0 });
+          }}
+          onClose={() => setShowDesconto(false)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -551,6 +612,7 @@ function DraftPanel({
   countdown,
   onAdjust,
   onName,
+  onMotive,
   onCancel,
   onSend,
 }: {
@@ -559,6 +621,7 @@ function DraftPanel({
   countdown: number | null;
   onAdjust: (which: 'start' | 'end', delta: number) => void;
   onName: (name: string) => void;
+  onMotive: (motive: string | null) => void;
   onCancel: () => void;
   onSend: () => void;
 }) {
@@ -579,6 +642,7 @@ function DraftPanel({
           onSubmitEditing={onSend}
         />
       </View>
+      <MotiveChips value={draft.motive} onChange={onMotive} />
       <View style={[styles.draftRow, styles.wrap]}>
         <Text style={styles.label}>Início</Text>
         <Button label="−5s" onPress={() => onAdjust('start', -ADJUST_STEP_MS)} />
@@ -595,6 +659,59 @@ function DraftPanel({
   );
 }
 
+/** Desconto de tempo: clips deste jogo já no tablet, agrupados por motivo, para ver seguidos. */
+function DescontoModal({
+  clips,
+  onPlay,
+  onClose,
+}: {
+  clips: RemoteClip[];
+  onPlay: (items: AnalysisItem[]) => void;
+  onClose: () => void;
+}) {
+  const notes = allNotes();
+  const groups = groupByMotive(clips, notes, getMotives());
+  const toItems = (list: RemoteClip[]): AnalysisItem[] =>
+    list.filter((c) => c.localUri).map((c) => ({ id: c.id, uri: c.localUri!, title: c.name }));
+  const withoutMotive = clips.filter((c) => c.localUri && !notes[c.id]?.motive);
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose} supportedOrientations={['landscape', 'portrait']}>
+      <Pressable style={styles.descBackdrop} onPress={onClose}>
+        <Pressable onPress={() => {}} style={styles.descCard}>
+          <Text style={styles.h2}>Desconto de tempo</Text>
+          <Text style={styles.muted}>Escolhe um motivo: os clips passam seguidos, com os desenhos.</Text>
+          <ScrollView contentContainerStyle={{ gap: space(1) }}>
+            {groups.length === 0 ? <Text style={styles.muted}>Ainda não há clips com motivo neste jogo.</Text> : null}
+            {groups.map((g) => {
+              const items = toItems(g.clips);
+              const missing = g.clips.length - items.length;
+              return (
+                <Button
+                  key={g.motive}
+                  label={`${g.motive} (${items.length})`}
+                  sublabel={missing > 0 ? `${missing} ainda a copiar para o tablet` : undefined}
+                  variant="primary"
+                  size="l"
+                  disabled={items.length === 0}
+                  onPress={() => onPlay(items)}
+                />
+              );
+            })}
+            {withoutMotive.length > 0 ? (
+              <Button
+                label={`Sem motivo (${withoutMotive.length})`}
+                variant="secondary"
+                onPress={() => onPlay(toItems(withoutMotive))}
+              />
+            ) : null}
+          </ScrollView>
+          <Button label="Fechar" variant="ghost" onPress={onClose} />
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 const CLIP_STATUS: Record<RemoteClip['status'], { label: string; color: string }> = {
   queued: { label: 'Na fila', color: colors.warn },
   pending: { label: 'À espera', color: colors.accent },
@@ -603,7 +720,18 @@ const CLIP_STATUS: Record<RemoteClip['status'], { label: string; color: string }
   failed: { label: 'Falhou', color: colors.danger },
 };
 
-function ClipRow({ clip, compact, onPlay }: { clip: RemoteClip; compact: boolean; onPlay: (uri: string) => void }) {
+function ClipRow({
+  clip,
+  compact,
+  onPlay,
+  onMotive,
+}: {
+  clip: RemoteClip;
+  compact: boolean;
+  onPlay: (uri: string) => void;
+  onMotive: () => void;
+}) {
+  const motive = getNotes(clip.id).motive;
   const local = clip.localUri;
   const transferring = clip.transfer != null;
   const st = local
@@ -627,6 +755,9 @@ function ClipRow({ clip, compact, onPlay }: { clip: RemoteClip; compact: boolean
             {formatClock(clip.startMs)} – {formatClock(clip.endMs)}
           </Text>
           {clip.error ? <Text style={styles.warn}>{clip.error}</Text> : null}
+          <Pressable onPress={onMotive} hitSlop={6}>
+            <Text style={motive ? styles.motive : styles.motiveEmpty}>{motive ?? '+ motivo'}</Text>
+          </Pressable>
         </View>
         <View style={[styles.badge, { borderColor: st.color }]}>
           {busy ? <ActivityIndicator size="small" color={st.color} /> : null}
@@ -750,7 +881,19 @@ const styles = StyleSheet.create({
   side: { width: 340, backgroundColor: colors.surface, padding: space(2), gap: space(1) },
   sideCompact: { padding: space(1) },
   sideStacked: { flex: 1 },
-  sideHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sideHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space(1) },
+  motive: { color: colors.accent, fontWeight: '700', marginTop: 2 },
+  motiveEmpty: { color: colors.muted, marginTop: 2 },
+  descBackdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: space(2) },
+  descCard: {
+    width: '100%',
+    maxWidth: 560,
+    maxHeight: '90%',
+    gap: space(1.5),
+    backgroundColor: colors.surface,
+    borderRadius: radius.l,
+    padding: space(2),
+  },
   clipHeader: { flexDirection: 'row', alignItems: 'center', gap: space(1) },
   clipActions: { flexDirection: 'row', gap: space(1) },
   clipRow: {

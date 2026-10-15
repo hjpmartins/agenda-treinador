@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, BackHandler, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addEngineListener, ClipEngine, type Clip, type Session } from '../../modules/clip-engine';
+import { AnalysisPlayer, type AnalysisItem } from '../components/AnalysisPlayer';
 import { PlayerModal, run, saveToGallery, share } from '../components/media';
+import { MotivePicker } from '../components/MotivePicker';
+import { groupByMotive } from '../lib/annotations';
+import { allNotes, getMotives, getNotes, setNotes, useNotesVersion } from '../remote/notesStore';
 import { Button, Card } from '../components/ui';
 import {
   deleteReceived,
@@ -33,7 +37,17 @@ export function ClipsScreen({ onBack }: Props) {
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [playing, setPlaying] = useState<{ uri: string; title: string } | null>(null);
   const [received, setReceived] = useState<ReceivedClip[]>(() => listReceived());
+  const [analysis, setAnalysis] = useState<{ items: AnalysisItem[]; index: number } | null>(null);
+  const [motiveFor, setMotiveFor] = useState<string | null>(null);
   useEffect(() => subscribeReceived(setReceived), []);
+  // Motivos escolhidos na barra flutuante que ainda não foram registados.
+  useEffect(() => {
+    try {
+      for (const [id, motive] of Object.entries(ClipEngine?.takeBarMotives() ?? {})) setNotes(id, { motive });
+    } catch {
+      // ignora
+    }
+  }, []);
 
   const reload = useCallback(async () => {
     if (!ClipEngine) return setSessions([]);
@@ -114,7 +128,8 @@ export function ClipsScreen({ onBack }: Props) {
             received.length > 0 ? (
               <ReceivedSection
                 clips={received}
-                onPlay={(c) => setPlaying({ uri: c.uri, title: c.name })}
+                onPlay={(items, index) => setAnalysis({ items, index })}
+                onMotive={(c) => setMotiveFor(c.id)}
                 onDelete={(c) =>
                   Alert.alert('Apagar do tablet?', c.name, [
                     { text: 'Cancelar', style: 'cancel' },
@@ -211,6 +226,16 @@ export function ClipsScreen({ onBack }: Props) {
       )}
 
       {playing ? <PlayerModal uri={playing.uri} title={playing.title} onClose={() => setPlaying(null)} /> : null}
+      {analysis ? <AnalysisPlayer items={analysis.items} startIndex={analysis.index} onClose={() => setAnalysis(null)} /> : null}
+      <MotivePicker
+        visible={motiveFor != null}
+        current={motiveFor ? getNotes(motiveFor).motive ?? null : null}
+        onPick={(m) => {
+          if (motiveFor) setNotes(motiveFor, { motive: m });
+          setMotiveFor(null);
+        }}
+        onClose={() => setMotiveFor(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -219,12 +244,17 @@ export function ClipsScreen({ onBack }: Props) {
 function ReceivedSection({
   clips,
   onPlay,
+  onMotive,
   onDelete,
 }: {
   clips: ReceivedClip[];
-  onPlay: (c: ReceivedClip) => void;
+  onPlay: (items: AnalysisItem[], index: number) => void;
+  onMotive: (c: ReceivedClip) => void;
   onDelete: (c: ReceivedClip) => void;
 }) {
+  useNotesVersion();
+  const notes = allNotes();
+  const toItem = (c: ReceivedClip): AnalysisItem => ({ id: c.id, uri: c.uri, title: c.name });
   const bySession = new Map<string, ReceivedClip[]>();
   for (const c of [...clips].sort((a, b) => b.createdAtMs - a.createdAtMs)) {
     bySession.set(c.sessionId, [...(bySession.get(c.sessionId) ?? []), c]);
@@ -237,6 +267,22 @@ function ReceivedSection({
           <Text style={[styles.muted, { marginBottom: space(1) }]}>
             Do {list[0].phone} · {list.length} clip{list.length === 1 ? '' : 's'}
           </Text>
+          {groupByMotive(list, notes, getMotives()).length > 0 ? (
+            <View style={styles.motiveRow}>
+              <Text style={styles.muted}>Ver seguidos:</Text>
+              {groupByMotive(
+                list.slice().sort((a, b) => a.startMs - b.startMs),
+                notes,
+                getMotives()
+              ).map((g) => (
+                <Pressable key={g.motive} onPress={() => onPlay(g.clips.map(toItem), 0)} style={styles.motiveChip}>
+                  <Text style={styles.motiveChipText}>
+                    {g.motive} ({g.clips.length})
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           {list
             .slice()
             .sort((a, b) => a.startMs - b.startMs)
@@ -250,13 +296,18 @@ function ReceivedSection({
                       {formatBytes(c.sizeBytes)}
                       {c.leve ? ' · cópia leve' : ''}
                     </Text>
+                    <Pressable onPress={() => onMotive(c)} hitSlop={6}>
+                      <Text style={notes[c.id]?.motive ? styles.motiveText : styles.muted}>
+                        {notes[c.id]?.motive ?? '+ motivo'}
+                      </Text>
+                    </Pressable>
                   </View>
                   <Pressable onPress={() => onDelete(c)} hitSlop={12} style={styles.trash}>
                     <Text style={styles.trashText}>✕</Text>
                   </Pressable>
                 </View>
                 <View style={styles.actions}>
-                  <Button label="▶ Ver" onPress={() => onPlay(c)} style={styles.action} />
+                  <Button label="▶ Ver" onPress={() => onPlay([toItem(c)], 0)} style={styles.action} />
                   <Button label="Galeria" onPress={() => run(() => saveToGallery(c.uri))} style={styles.action} />
                   <Button label="Partilhar" onPress={() => run(() => share(c.uri))} style={styles.action} />
                 </View>
@@ -275,6 +326,15 @@ function sessionLabel(id: string): string {
 }
 
 const styles = StyleSheet.create({
+  motiveRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space(1), marginBottom: space(1) },
+  motiveChip: {
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    paddingHorizontal: space(1.5),
+    paddingVertical: 6,
+  },
+  motiveChipText: { color: '#fff', fontWeight: '700' },
+  motiveText: { color: colors.accent, fontWeight: '700', marginTop: 2 },
   root: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: space(2) },
   header: { flexDirection: 'row', alignItems: 'center', gap: space(2), paddingVertical: space(2) },
   title: { color: colors.text, fontSize: 24, fontWeight: '800' },

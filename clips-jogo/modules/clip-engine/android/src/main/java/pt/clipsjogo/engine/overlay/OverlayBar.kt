@@ -14,6 +14,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import kotlin.math.abs
@@ -42,6 +43,11 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
   private val ui = Handler(Looper.getMainLooper())
 
   private val root = LinearLayout(context)
+  private val row = LinearLayout(context)
+  private val motiveScroll = HorizontalScrollView(context)
+  private val motiveRow = LinearLayout(context)
+  private var motiveClipId: String? = null
+  private val hideMotives = Runnable { showMotives(null) }
   private val timer = TextView(context)
   private val group = LinearLayout(context)
   private val presetViews = ArrayList<TextView>()
@@ -92,10 +98,12 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
   }
 
   init {
-    root.orientation = LinearLayout.HORIZONTAL
-    root.gravity = Gravity.CENTER_VERTICAL
+    root.orientation = LinearLayout.VERTICAL
     root.background = rounded(SURFACE, 16, BORDER)
     root.setPadding(dp(6), dp(6), dp(6), dp(6))
+    row.orientation = LinearLayout.HORIZONTAL
+    row.gravity = Gravity.CENTER_VERTICAL
+    root.addView(row)
 
     timer.setTextColor(TEXT)
     timer.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
@@ -105,7 +113,7 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
     timer.setPadding(dp(8), 0, dp(8), 0)
     timer.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(46))
     timer.setOnTouchListener(DragListener())
-    root.addView(timer)
+    row.addView(timer)
 
     group.orientation = LinearLayout.HORIZONTAL
     group.gravity = Gravity.CENTER_VERTICAL
@@ -114,6 +122,7 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
         if (actions.preset(s)) {
           v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
           flash("✓ ${s}s", OK)
+          showMotives(actions.lastRequestId)
         } else {
           flash("Sem gravação", WARN)
         }
@@ -132,7 +141,11 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
       setOnClickListener { v ->
         when (actions.mark()) {
           true -> { v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY); flash("Início ✓", OK) }
-          false -> { v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY); flash("✓ clip", OK) }
+          false -> {
+            v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            flash("✓ clip", OK)
+            showMotives(actions.lastRequestId)
+          }
           null -> flash("Sem gravação", WARN)
         }
         refresh()
@@ -147,7 +160,18 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
     group.addView(markView)
 
     group.addView(button("↗", SURFACE_HIGH, 42) { actions.openApp(context) })
-    root.addView(group)
+    row.addView(group)
+
+    // Motivos: aparecem uns segundos depois de pedir um clip (tocar é opcional).
+    motiveRow.orientation = LinearLayout.HORIZONTAL
+    motiveScroll.isHorizontalScrollBarEnabled = false
+    motiveScroll.addView(motiveRow)
+    // Mesma largura que a barra (desliza para ver mais motivos).
+    motiveScroll.layoutParams = LinearLayout.LayoutParams(
+      LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+    ).apply { topMargin = dp(6) }
+    motiveScroll.visibility = View.GONE
+    root.addView(motiveScroll)
   }
 
   fun attach() {
@@ -157,7 +181,42 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
     ui.post(tick)
   }
 
+  /** Mostra os motivos para o clip acabado de pedir (null esconde). */
+  private fun showMotives(clipId: String?) {
+    ui.removeCallbacks(hideMotives)
+    val motives = actions.motives()
+    motiveClipId = clipId
+    if (clipId == null || motives.isEmpty() || collapsed) {
+      motiveScroll.visibility = View.GONE
+      return
+    }
+    motiveRow.removeAllViews()
+    for (m in motives) {
+      motiveRow.addView(TextView(context).apply {
+        text = m
+        setTextColor(TEXT)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        typeface = Typeface.DEFAULT_BOLD
+        gravity = Gravity.CENTER
+        setPadding(dp(12), 0, dp(12), 0)
+        background = rounded(SURFACE_HIGH, 18, BORDER)
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)).apply { marginEnd = dp(5) }
+        isClickable = true
+        setOnClickListener { v ->
+          val id = motiveClipId ?: return@setOnClickListener
+          actions.setMotive(context, id, m)
+          v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+          flash("✓ $m", OK)
+          showMotives(null)
+        }
+      })
+    }
+    motiveScroll.visibility = View.VISIBLE
+    ui.postDelayed(hideMotives, 6000)
+  }
+
   fun detach() {
+    ui.removeCallbacks(hideMotives)
     ui.removeCallbacks(tick)
     try {
       wm.removeView(root)
@@ -174,6 +233,7 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
 
   private fun applyCollapsed() {
     group.visibility = if (collapsed) View.GONE else View.VISIBLE
+    if (collapsed) motiveScroll.visibility = View.GONE
   }
 
   private fun refresh() {

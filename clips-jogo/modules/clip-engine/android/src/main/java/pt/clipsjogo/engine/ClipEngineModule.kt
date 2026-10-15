@@ -242,9 +242,12 @@ class ClipEngineModule : Module() {
       FloatingRemote.openPermissionSettings(appContext.reactContext!!)
     }
 
-    Function("armFloatingBar") { urls: List<String>, token: String, skipIds: List<String>, autoDownload: Boolean, light: Boolean ->
-      FloatingRemote.arm(appContext.reactContext!!, FloatingRemote.Config(urls, token, skipIds.toSet(), autoDownload, light))
+    Function("armFloatingBar") { urls: List<String>, token: String, skipIds: List<String>, autoDownload: Boolean, light: Boolean, motives: List<String> ->
+      FloatingRemote.arm(appContext.reactContext!!, FloatingRemote.Config(urls, token, skipIds.toSet(), autoDownload, light, motives))
     }
+
+    /** Motivos escolhidos na barra flutuante desde a última vez (id do clip → motivo). */
+    Function("takeBarMotives") { FloatingRemote.takeMotives(appContext.reactContext!!) }
 
     Function("disarmFloatingBar") { FloatingRemote.disarm() }
 

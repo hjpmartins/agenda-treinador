@@ -114,7 +114,16 @@ declare class ClipEngineNative extends NativeModule<Events> {
   openOverlayPermissionSettings(): void;
   /** A barra aparece sempre que a app sair do ecrã, até disarmFloatingBar(). */
   /** skipIds: clips que o tablet já tem ou apagou (a barra não os volta a copiar). */
-  armFloatingBar(urls: string[], token: string, skipIds: string[], autoDownload: boolean, light: boolean): void;
+  armFloatingBar(
+    urls: string[],
+    token: string,
+    skipIds: string[],
+    autoDownload: boolean,
+    light: boolean,
+    motives: string[]
+  ): void;
+  /** Motivos escolhidos na barra flutuante desde a última chamada (id do clip → motivo). */
+  takeBarMotives(): Record<string, string>;
   disarmFloatingBar(): void;
   moveToBackground(): boolean;
 

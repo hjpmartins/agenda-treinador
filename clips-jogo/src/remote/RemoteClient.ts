@@ -1,6 +1,8 @@
+import { File } from 'expo-file-system';
 import { ClipEngine } from '../../modules/clip-engine';
 import { ClockSync, recordingTimeAt } from './clockSync';
 import type { Pairing } from './pairing';
+import { addReceived, destinationFor, findReceived, hasReceived } from './receivedLibrary';
 
 /** Estado do telemóvel, tal como devolvido por GET /api/status. */
 export type PhoneStatus = {
@@ -26,6 +28,10 @@ export type RemoteClip = {
   createdAtMs: number;
   sizeBytes: number;
   error: string | null;
+  /** Cópia no tablet: ficheiro local quando já foi transferido. */
+  localUri?: string | null;
+  /** Progresso da transferência (0..1) enquanto está a ser copiado para o tablet. */
+  transfer?: number | null;
 };
 
 export type ConnectionState = 'joining' | 'connecting' | 'connected' | 'lost';
@@ -92,6 +98,9 @@ export class RemoteClient {
   private serverClips: RemoteClip[] = [];
   private lastOkAt = 0;
   private stopped = false;
+  private downloading: string | null = null;
+  private transferProgress: Record<string, number> = {};
+  private failedDownloads: Record<string, number> = {};
   private snapshot: RemoteSnapshot = { connection: 'joining', error: null, phone: null, clips: [] };
 
   constructor(readonly pairing: Pairing) {}
@@ -123,6 +132,7 @@ export class RemoteClient {
     this.timers.push(setInterval(() => this.pollStatus(), 1000));
     this.timers.push(setInterval(() => this.pollClips(), 2000));
     this.timers.push(setInterval(() => this.flushQueue(), 2000));
+    this.timers.push(setInterval(() => this.downloadNext(), 3000));
     this.pollStatus();
   }
 
@@ -214,6 +224,7 @@ export class RemoteClient {
       const body = await fetchJson(`${this.baseUrl}/api/clips`, this.pairing.token);
       this.serverClips = body.clips ?? [];
       this.publishClips();
+      this.downloadNext();
     } catch {
       // o pollStatus trata do estado da ligação
     }
@@ -250,6 +261,60 @@ export class RemoteClient {
     }
   }
 
+  /**
+   * Copia para o tablet, um de cada vez, os clips que já estão prontos no
+   * telemóvel. Se a ligação cair a meio, volta a tentar mais tarde.
+   */
+  private async downloadNext() {
+    if (this.downloading || this.stopped || !this.baseUrl || this.snapshot.connection !== 'connected') return;
+    const next = this.serverClips.find(
+      (c) => c.status === 'ready' && !hasReceived(c.id) && (this.failedDownloads[c.id] ?? 0) < 5
+    );
+    if (!next) return;
+    this.downloading = next.id;
+    this.transferProgress[next.id] = 0;
+    this.publishClips();
+    const dest = destinationFor(next.sessionId, next.id);
+    try {
+      await File.downloadFileAsync(`${this.baseUrl}/api/clips/${encodeURIComponent(next.id)}/file`, dest, {
+        headers: { 'X-Token': this.pairing.token },
+        idempotent: true,
+        onProgress: ({ bytesWritten, totalBytes }) => {
+          const total = totalBytes > 0 ? totalBytes : next.sizeBytes;
+          if (total > 0) {
+            this.transferProgress[next.id] = Math.min(1, bytesWritten / total);
+            this.publishClips();
+          }
+        },
+      });
+      addReceived({
+        id: next.id,
+        sessionId: next.sessionId,
+        name: next.name,
+        startMs: next.startMs,
+        endMs: next.endMs,
+        createdAtMs: next.createdAtMs,
+        receivedAtMs: Date.now(),
+        sizeBytes: next.sizeBytes,
+        phone: this.snapshot.phone?.device ?? 'telemóvel',
+        uri: dest.uri,
+      });
+    } catch {
+      this.failedDownloads[next.id] = (this.failedDownloads[next.id] ?? 0) + 1;
+      try {
+        if (dest.exists) dest.delete();
+      } catch {
+        // ignora
+      }
+    } finally {
+      delete this.transferProgress[next.id];
+      this.downloading = null;
+      this.publishClips();
+    }
+    // Há mais? Continua logo.
+    this.downloadNext();
+  }
+
   private failedClip(req: QueuedRequest, error: string): RemoteClip {
     return {
       id: req.id,
@@ -275,6 +340,11 @@ export class RemoteClient {
     }));
     const merged = [...this.serverClips.filter((c) => !this.queue.some((q) => q.id === c.id)), ...queued];
     merged.sort((a, b) => a.createdAtMs - b.createdAtMs);
-    this.emit({ clips: merged });
+    const withLocal = merged.map((c) => ({
+      ...c,
+      localUri: findReceived(c.id)?.uri ?? null,
+      transfer: this.transferProgress[c.id] ?? null,
+    }));
+    this.emit({ clips: withLocal });
   }
 }

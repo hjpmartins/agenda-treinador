@@ -1,37 +1,19 @@
-import { Asset, requestPermissionsAsync } from 'expo-media-library';
-import * as Sharing from 'expo-sharing';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, BackHandler, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addEngineListener, ClipEngine, type Clip, type Session } from '../../modules/clip-engine';
+import { PlayerModal, run, saveToGallery, share } from '../components/media';
 import { Button, Card } from '../components/ui';
+import {
+  deleteReceived,
+  listReceived,
+  subscribeReceived,
+  type ReceivedClip,
+} from '../remote/receivedLibrary';
 import { formatBytes, formatClock, formatDateTime, formatDuration } from '../lib/format';
 import { colors, radius, space } from '../theme';
 
 type Props = { onBack: () => void };
-
-async function saveToGallery(uri: string) {
-  const perm = await requestPermissionsAsync(true);
-  if (!perm.granted) {
-    Alert.alert('Sem permissão', 'Autoriza o acesso à galeria nas definições para guardar vídeos.');
-    return;
-  }
-  await Asset.create(uri);
-  Alert.alert('Guardado', 'O vídeo foi guardado na galeria.');
-}
-
-async function share(uri: string) {
-  if (!(await Sharing.isAvailableAsync())) {
-    Alert.alert('Partilha indisponível', 'Este dispositivo não permite partilhar ficheiros.');
-    return;
-  }
-  await Sharing.shareAsync(uri, { mimeType: 'video/mp4' });
-}
-
-function run(task: () => Promise<void>) {
-  task().catch((e) => Alert.alert('Erro', e instanceof Error ? e.message : String(e)));
-}
 
 const STATUS_LABEL: Record<Clip['status'], string> = {
   pending: 'À espera',
@@ -50,6 +32,8 @@ const SESSION_STATUS: Record<Session['status'], string> = {
 export function ClipsScreen({ onBack }: Props) {
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [playing, setPlaying] = useState<{ uri: string; title: string } | null>(null);
+  const [received, setReceived] = useState<ReceivedClip[]>(() => listReceived());
+  useEffect(() => subscribeReceived(setReceived), []);
 
   const reload = useCallback(async () => {
     if (!ClipEngine) return setSessions([]);
@@ -121,11 +105,25 @@ export function ClipsScreen({ onBack }: Props) {
 
       {sessions === null ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: space(4) }} />
-      ) : sessions.length === 0 ? (
+      ) : sessions.length === 0 && received.length === 0 ? (
         <Text style={styles.empty}>Ainda não há gravações.</Text>
       ) : (
         <FlatList
           data={sessions}
+          ListHeaderComponent={
+            received.length > 0 ? (
+              <ReceivedSection
+                clips={received}
+                onPlay={(c) => setPlaying({ uri: c.uri, title: c.name })}
+                onDelete={(c) =>
+                  Alert.alert('Apagar do tablet?', c.name, [
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Apagar', style: 'destructive', onPress: () => deleteReceived(c.id) },
+                  ])
+                }
+              />
+            ) : null
+          }
           keyExtractor={(s) => s.id}
           contentContainerStyle={{ gap: space(2), paddingBottom: space(4) }}
           renderItem={({ item: s }) => (
@@ -217,21 +215,62 @@ export function ClipsScreen({ onBack }: Props) {
   );
 }
 
-function PlayerModal({ uri, title, onClose }: { uri: string; title: string; onClose: () => void }) {
-  const player = useVideoPlayer(uri, (p) => {
-    p.play();
-  });
+/** Clips copiados do telemóvel para este dispositivo (modo Comando), agrupados por jogo. */
+function ReceivedSection({
+  clips,
+  onPlay,
+  onDelete,
+}: {
+  clips: ReceivedClip[];
+  onPlay: (c: ReceivedClip) => void;
+  onDelete: (c: ReceivedClip) => void;
+}) {
+  const bySession = new Map<string, ReceivedClip[]>();
+  for (const c of [...clips].sort((a, b) => b.createdAtMs - a.createdAtMs)) {
+    bySession.set(c.sessionId, [...(bySession.get(c.sessionId) ?? []), c]);
+  }
   return (
-    <Modal visible animationType="fade" onRequestClose={onClose} supportedOrientations={['portrait', 'landscape']}>
-      <View style={styles.playerRoot}>
-        <VideoView player={player} style={styles.video} nativeControls contentFit="contain" />
-        <View style={styles.playerBar}>
-          <Text style={styles.rowTitle}>{title}</Text>
-          <Button label="Fechar" onPress={onClose} />
-        </View>
-      </View>
-    </Modal>
+    <View style={{ gap: space(2), marginBottom: space(2) }}>
+      {[...bySession.entries()].map(([sessionId, list]) => (
+        <Card key={sessionId}>
+          <Text style={styles.sessionTitle}>Recebidos · jogo de {sessionLabel(sessionId)}</Text>
+          <Text style={[styles.muted, { marginBottom: space(1) }]}>
+            Do {list[0].phone} · {list.length} clip{list.length === 1 ? '' : 's'}
+          </Text>
+          {list
+            .slice()
+            .sort((a, b) => a.startMs - b.startMs)
+            .map((c) => (
+              <View key={c.id} style={styles.item}>
+                <View style={styles.itemHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>{c.name}</Text>
+                    <Text style={styles.muted}>
+                      {formatClock(c.startMs)} – {formatClock(c.endMs)} ({formatDuration(c.endMs - c.startMs)}) ·{' '}
+                      {formatBytes(c.sizeBytes)}
+                    </Text>
+                  </View>
+                  <Pressable onPress={() => onDelete(c)} hitSlop={12} style={styles.trash}>
+                    <Text style={styles.trashText}>✕</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.actions}>
+                  <Button label="▶ Ver" onPress={() => onPlay(c)} style={styles.action} />
+                  <Button label="Galeria" onPress={() => run(() => saveToGallery(c.uri))} style={styles.action} />
+                  <Button label="Partilhar" onPress={() => run(() => share(c.uri))} style={styles.action} />
+                </View>
+              </View>
+            ))}
+        </Card>
+      ))}
+    </View>
   );
+}
+
+/** "20261014-213005" → "14/10 21:30" */
+function sessionLabel(id: string): string {
+  const m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/.exec(id);
+  return m ? `${m[3]}/${m[2]} ${m[4]}:${m[5]}` : id;
 }
 
 const styles = StyleSheet.create({
@@ -268,13 +307,4 @@ const styles = StyleSheet.create({
   trashText: { color: colors.muted, fontSize: 18 },
   warnBox: { backgroundColor: colors.accentDim, borderRadius: radius.m, padding: space(1.5), gap: space(1), marginBottom: space(1) },
   warnText: { color: colors.warn },
-  playerRoot: { flex: 1, backgroundColor: '#000' },
-  video: { flex: 1 },
-  playerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: space(2),
-    backgroundColor: colors.surface,
-  },
 });

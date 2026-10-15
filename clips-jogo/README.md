@@ -3,7 +3,7 @@
 App para gravar jogos de basquetebol com um telemóvel no tripé e tirar clips **durante** a gravação, sem a parar. Funciona **100% sem internet**.
 
 - **Gravar** (telemóvel no tripé): grava o jogo inteiro, sem interrupções.
-- **Comando** (tablet na mão): botões "clip dos últimos 10/20/30/60 s". *(Fase 2.)*
+- **Comando** (tablet na mão): botões "clip dos últimos 10/20/30/60 s". Os clips passam sozinhos para o tablet.
 - **Clips**: lista de clips e do jogo completo. Podes vê-los, guardá-los na galeria e partilhá-los.
 
 ## Estado
@@ -12,7 +12,7 @@ App para gravar jogos de basquetebol com um telemóvel no tripé e tirar clips *
 |---|---|---|
 | 1 | Gravação contínua + cortes locais (botões de teste no próprio telemóvel) | ✅ Android |
 | 2 | Emparelhamento por QR + ligação offline + modo Comando (tablet Android) | ✅ a testar |
-| 3 | Envio automático dos clips para o tablet + lista no tablet | ⏳ |
+| 3 | Envio automático dos clips para o tablet + lista no tablet | ✅ a testar |
 | 4 | Robustez (reconexão, fila, serviço em segundo plano) + iOS | ⏳ |
 
 > **iPhone/iPad:** o motor de gravação para iOS ainda não está feito. Nesta versão a app abre em iOS, mas o botão "Gravar" fica desativado. Mais abaixo está o que vai ser preciso para instalar em iPhone/iPad.
@@ -49,7 +49,8 @@ O APK é compilado automaticamente pelo GitHub sempre que há alterações nesta
    - **Clip dos últimos 10/20/30/60 s:** o momento fica fixado no toque. Aparece um rascunho com **±5 s** no início e no fim e um nome opcional, que é enviado sozinho ao fim de 5 s (qualquer ajuste pausa a contagem).
    - **Marcar início / Marcar fim:** para jogadas longas.
    - A lista à direita mostra o estado de cada clip: "Na fila", "A processar" ou "Pronto".
-5. Se a ligação cair, a gravação continua. Os pedidos ficam "Na fila" e são enviados quando o tablet voltar a ligar-se, com os tempos certos.
+5. Cada clip pronto é **copiado sozinho para o tablet** ("A transferir 40%" → "No tablet ✓"). Podes vê-lo, guardá-lo na galeria do tablet ou partilhá-lo logo no ecrã Comando. Ficam também em **Ver gravações e clips → Recebidos**, mesmo depois de desligar.
+6. Se a ligação cair, a gravação continua. Os pedidos ficam "Na fila" e são enviados quando o tablet voltar a ligar-se, com os tempos certos.
 
 > Notas:
 > - Se o "Ponto de acesso" (hotspot) normal do telemóvel estiver ligado, desliga-o: o Android não deixa ter os dois ao mesmo tempo.

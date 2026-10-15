@@ -147,6 +147,12 @@ object Link {
       return clipJson(current.id, clip)
     }
 
+    override fun clipFile(id: String): java.io.File? {
+      val s = ClipEngine.currentSession() ?: return null
+      val clip = s.clips.firstOrNull { it.id == id && it.status == ClipInfo.STATUS_READY } ?: return null
+      return clip.fileName?.let { java.io.File(s.clipsDir, it) }?.takeIf { it.exists() }
+    }
+
     override fun clips(): JSONObject {
       val s = ClipEngine.currentSession()
       return JSONObject().apply {

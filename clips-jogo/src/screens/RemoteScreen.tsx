@@ -15,6 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { PlayerModal, run, saveToGallery, share } from '../components/media';
 import { Button, Card, Chip } from '../components/ui';
 import { ADJUST_STEP_MS, fromMarks, lastSeconds, normalize, PRESET_SECONDS, type ClipRange } from '../lib/clipRange';
 import { formatClock, formatDuration } from '../lib/format';
@@ -133,6 +134,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
   const [countdown, setCountdown] = useState<number | null>(null);
   const [markStart, setMarkStart] = useState<number | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [playing, setPlaying] = useState<{ uri: string; title: string } | null>(null);
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => client.subscribe(setSnap), [client]);
@@ -331,9 +333,13 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
           keyExtractor={(c) => c.id}
           ListEmptyComponent={<Text style={styles.muted}>Os clips pedidos aparecem aqui.</Text>}
           contentContainerStyle={{ gap: space(1) }}
-          renderItem={({ item }) => <ClipRow clip={item} />}
+          renderItem={({ item }) => (
+            <ClipRow clip={item} onPlay={(uri) => setPlaying({ uri, title: item.name })} />
+          )}
         />
       </View>
+
+      {playing ? <PlayerModal uri={playing.uri} title={playing.title} onClose={() => setPlaying(null)} /> : null}
     </View>
   );
 }
@@ -394,24 +400,41 @@ const CLIP_STATUS: Record<RemoteClip['status'], { label: string; color: string }
   failed: { label: 'Falhou', color: colors.danger },
 };
 
-function ClipRow({ clip }: { clip: RemoteClip }) {
-  const st = CLIP_STATUS[clip.status];
-  const busy = clip.status === 'queued' || clip.status === 'pending' || clip.status === 'cutting';
+function ClipRow({ clip, onPlay }: { clip: RemoteClip; onPlay: (uri: string) => void }) {
+  const local = clip.localUri;
+  const transferring = clip.transfer != null;
+  const st = local
+    ? { label: 'No tablet ✓', color: colors.ok }
+    : transferring
+      ? { label: `A transferir ${Math.round((clip.transfer ?? 0) * 100)}%`, color: colors.accent }
+      : clip.status === 'ready'
+        ? { label: 'Pronto', color: colors.accent }
+        : CLIP_STATUS[clip.status];
+  const busy = !local && clip.status !== 'failed';
   return (
     <View style={styles.clipRow}>
-      <View style={styles.flex}>
-        <Text style={styles.clipName} numberOfLines={1}>
-          {clip.name}
-        </Text>
-        <Text style={styles.muted}>
-          {formatClock(clip.startMs)} – {formatClock(clip.endMs)}
-        </Text>
-        {clip.error ? <Text style={styles.warn}>{clip.error}</Text> : null}
+      <View style={styles.clipHeader}>
+        <View style={styles.flex}>
+          <Text style={styles.clipName} numberOfLines={1}>
+            {clip.name}
+          </Text>
+          <Text style={styles.muted}>
+            {formatClock(clip.startMs)} – {formatClock(clip.endMs)}
+          </Text>
+          {clip.error ? <Text style={styles.warn}>{clip.error}</Text> : null}
+        </View>
+        <View style={[styles.badge, { borderColor: st.color }]}>
+          {busy ? <ActivityIndicator size="small" color={st.color} /> : null}
+          <Text style={[styles.badgeText, { color: st.color }]}>{st.label}</Text>
+        </View>
       </View>
-      <View style={[styles.badge, { borderColor: st.color }]}>
-        {busy ? <ActivityIndicator size="small" color={st.color} /> : null}
-        <Text style={[styles.badgeText, { color: st.color }]}>{st.label}</Text>
-      </View>
+      {local ? (
+        <View style={styles.clipActions}>
+          <Button label="▶ Ver" onPress={() => onPlay(local)} style={styles.flex} />
+          <Button label="Galeria" onPress={() => run(() => saveToGallery(local))} style={styles.flex} />
+          <Button label="Partilhar" onPress={() => run(() => share(local))} style={styles.flex} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -499,9 +522,9 @@ const styles = StyleSheet.create({
   helpCard: { backgroundColor: colors.surfaceHigh, gap: space(1) },
   side: { width: 340, backgroundColor: colors.surface, padding: space(2), gap: space(1) },
   sideHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  clipHeader: { flexDirection: 'row', alignItems: 'center', gap: space(1) },
+  clipActions: { flexDirection: 'row', gap: space(1) },
   clipRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: space(1),
     paddingVertical: space(1),
     borderTopWidth: StyleSheet.hairlineWidth,

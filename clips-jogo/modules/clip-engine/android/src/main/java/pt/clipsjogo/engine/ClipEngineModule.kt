@@ -104,6 +104,18 @@ class ClipEngineModule : Module() {
 
     Function("clearLastCrash") { CrashLog.clear() }
 
+    AsyncFunction("setStandby") { on: Boolean -> ClipEngine.setStandby(on) }
+
+    /** Ecrã de repouso: brilho no mínimo (menos calor e bateria). */
+    Function("setScreenDim") { on: Boolean ->
+      val activity = appContext.currentActivity ?: return@Function
+      activity.runOnUiThread {
+        val lp = activity.window.attributes
+        lp.screenBrightness = if (on) 0.01f else android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        activity.window.attributes = lp
+      }
+    }
+
     Function("getRecordingTimeMs") { ClipEngine.nowRecUs() / 1000.0 }
 
     AsyncFunction("setQuality") { quality: String ->

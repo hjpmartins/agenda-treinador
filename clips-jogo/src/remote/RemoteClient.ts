@@ -18,6 +18,8 @@ export type PhoneStatus = {
   thermal: string;
   freeBytes?: number;
   bytesPerSecond?: number;
+  /** Telemóvel em modo espera (câmara desligada até começar a gravar). */
+  standby?: boolean;
 };
 
 export type RemoteClip = {
@@ -341,7 +343,9 @@ export class RemoteClient {
         : status.state === 'recording'
           ? 'A sincronizar com o telemóvel…'
           : status.state === 'preview'
-            ? 'Pronto a gravar — carrega em Iniciar gravação'
+            ? status.standby
+              ? 'Em espera (câmara desligada) — pronto a gravar'
+              : 'Pronto a gravar — carrega em Iniciar gravação'
             : 'Abre o ecrã Gravar no telemóvel (com o ecrã ligado)';
     return { recording: false, notRecordingReason: reason };
   }

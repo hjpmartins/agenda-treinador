@@ -132,8 +132,24 @@ object ClipEngine {
     refreshPipeline()
   }
 
+  /**
+   * Modo espera (antes do jogo, ecrã de repouso): câmara e encoder desligados para
+   * poupar bateria e calor. O tablet continua a poder iniciar a gravação.
+   */
+  @Volatile var standby = false
+    private set
+
+  @Synchronized
+  fun setStandby(on: Boolean) {
+    if (standby == on) return
+    standby = on
+    if (state == STATE_RECORDING || state == STATE_FINALIZING) return
+    if (on) dropEncoder()
+    refreshPipeline()
+  }
+
   private val encoderNeeded: Boolean
-    get() = previewSurface != null || state == STATE_RECORDING || state == STATE_FINALIZING
+    get() = (previewSurface != null && !standby) || state == STATE_RECORDING || state == STATE_FINALIZING
 
   /**
    * Liga câmara → (pré-visualização + encoder). O encoder fica ligado durante a
@@ -188,6 +204,12 @@ object ClipEngine {
     check(state != STATE_RECORDING && state != STATE_FINALIZING) { "Já está a gravar." }
     val cam = cameraOrNull() ?: throw IllegalStateException("Sem permissão para usar a câmara.")
     if (quality != previewQuality) setQuality(quality)
+    if (standby) {
+      // Sai do modo espera: liga a câmara e dá-lhe tempo para acertar foco e exposição.
+      standby = false
+      refreshPipeline()
+      Thread.sleep(1800)
+    }
 
     val rotation = cam.rotationFor(displayRotationDegrees)
     val prevState = state
@@ -467,6 +489,7 @@ object ClipEngine {
     val bytesPerSecond = VideoConfig.forQuality(q).bitrate / 8 + 16_000
     return mapOf(
       "state" to state,
+      "standby" to standby,
       "sessionId" to s?.id,
       "recordingMs" to nowRecUs() / 1000,
       "segments" to (s?.segments?.size ?: 0),

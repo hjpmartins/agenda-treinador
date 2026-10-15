@@ -158,6 +158,7 @@ object Link {
         put("device", "${Build.MANUFACTURER} ${Build.MODEL}")
         put("elapsedMs", SystemClock.elapsedRealtimeNanos() / 1_000_000.0)
         put("state", s["state"])
+        put("standby", s["standby"] == true)
         put("sessionId", s["sessionId"] ?: JSONObject.NULL)
         put("recStartElapsedMs", ClipEngine.recordingStartElapsedMs() ?: JSONObject.NULL)
         put("batteryPercent", s["batteryPercent"] ?: JSONObject.NULL)

@@ -50,7 +50,8 @@ class CameraPreviewView(context: Context, appContext: AppContext) : ExpoView(con
   }
 
   companion object {
-    const val PREVIEW_WIDTH = 1920
-    const val PREVIEW_HEIGHT = 1080
+    // A pré-visualização não precisa de 1080p (a gravação é independente): menos trabalho, menos calor.
+    const val PREVIEW_WIDTH = 1280
+    const val PREVIEW_HEIGHT = 720
   }
 }

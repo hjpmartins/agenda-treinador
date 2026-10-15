@@ -77,6 +77,15 @@ Para deixar o telemóvel no tripé (ex.: na bancada) antes do jogo e só começa
 
 Se o telemóvel não estiver no ecrã Gravar, o tablet diz "Abre o ecrã Gravar no telemóvel".
 
+### Calor e bateria
+
+- **Modo espera** (ecrã Gravar, antes de começar): apaga o ecrã e desliga a câmara até a gravação começar — o telemóvel
+  pode ficar no tripé muito tempo sem aquecer. O tablet continua a poder iniciar a gravação (demora ~2 s a mais, para a
+  câmara acertar foco e exposição).
+- **Ecrã de repouso** (a gravar): ecrã preto com o brilho no mínimo.
+- Se o telemóvel aquecer muito: tira a capa, evita sol direto, e considera **720p** (bastante menos esforço).
+  Carregar ao mesmo tempo também aquece; usa a powerbank só se a bateria não chegar.
+
 ### Distância e qualidade da ligação
 
 - No Comando, o aviso **"Wi-Fi bom/razoável/fraco · -62 dBm · 2,4 GHz · 35 ms"** mostra o sinal do tablet, a banda,

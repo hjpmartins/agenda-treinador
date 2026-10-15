@@ -112,6 +112,19 @@ export function RecordScreen({ onBack, onClips }: Props) {
     if (permission === 'granted' && !recording && !finalizing) engine.setQuality(quality).catch(() => {});
   }, [engine, permission, quality, recording, finalizing]);
 
+  // Ecrã de repouso: brilho no mínimo; antes de gravar, também desliga a câmara (modo espera).
+  useEffect(() => {
+    engine.setScreenDim(sleeping);
+    engine.setStandby(sleeping && !recording && !finalizing).catch(() => {});
+  }, [engine, sleeping, recording, finalizing]);
+  useEffect(
+    () => () => {
+      engine.setStandby(false).catch(() => {});
+      engine.setScreenDim(false);
+    },
+    [engine]
+  );
+
   // Ao sair do ecrã (sem gravar), desliga a rede local.
   const recordingRef = useRef(false);
   recordingRef.current = recording || finalizing;
@@ -338,6 +351,12 @@ export function RecordScreen({ onBack, onClips }: Props) {
                 onPress={connectTablet}
                 loading={linkBusy}
               />
+              <Button
+                label="Modo espera"
+                sublabel="Ecrã e câmara desligados até começar (menos calor)"
+                variant="ghost"
+                onPress={() => setSleeping(true)}
+              />
               <Button label="Voltar" variant="ghost" onPress={onBack} />
             </View>
           </>
@@ -384,11 +403,20 @@ export function RecordScreen({ onBack, onClips }: Props) {
 
       {sleeping ? (
         <Pressable style={styles.sleep} onPress={() => setSleeping(false)}>
-          <View style={styles.timerBox}>
-            <View style={styles.recDot} />
-            <Text style={[styles.timer, { opacity: 0.5 }]}>{formatClock(elapsedMs)}</Text>
-          </View>
-          <Text style={styles.sleepHint}>A gravar. Toca para acordar o ecrã.</Text>
+          {recording ? (
+            <>
+              <View style={styles.timerBox}>
+                <View style={styles.recDot} />
+                <Text style={[styles.timer, { opacity: 0.5 }]}>{formatClock(elapsedMs)}</Text>
+              </View>
+              <Text style={styles.sleepHint}>A gravar. Toca para acordar o ecrã.</Text>
+            </>
+          ) : (
+            <Text style={[styles.sleepHint, { textAlign: 'center' }]}>
+              Em espera: câmara desligada para poupar bateria e calor.{'\n'}
+              {status.tabletConnected ? 'O tablet pode iniciar a gravação.' : 'Tablet não ligado.'} Toca para acordar.
+            </Text>
+          )}
         </Pressable>
       ) : null}
     </View>

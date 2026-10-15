@@ -48,6 +48,8 @@ export type EngineStatus = {
   bytesPerSecond: number;
   hasMicrophone: boolean;
   linkActive: boolean;
+  /** Modo espera: câmara desligada até começar a gravar. */
+  standby: boolean;
   tabletConnected: boolean;
 };
 
@@ -77,6 +79,10 @@ declare class ClipEngineNative extends NativeModule<Events> {
   getPermissionsAsync(): Promise<PermissionResult>;
   getStatus(): EngineStatus;
   getRecordingTimeMs(): number;
+  /** Modo espera: desliga câmara/encoder até gravar (o tablet pode iniciar a gravação). */
+  setStandby(on: boolean): Promise<void>;
+  /** Brilho do ecrã no mínimo (ecrã de repouso). */
+  setScreenDim(on: boolean): void;
   /** Erro que fez a app fechar da última vez (null se não houve). */
   getLastCrash(): string | null;
   clearLastCrash(): void;

@@ -47,8 +47,6 @@ export type EngineStatus = {
   freeBytes: number;
   bytesPerSecond: number;
   hasMicrophone: boolean;
-  /** Gravar som (por defeito não). */
-  audioEnabled: boolean;
   linkActive: boolean;
   /** Modo espera: câmara desligada até começar a gravar. */
   standby: boolean;
@@ -82,9 +80,6 @@ declare class ClipEngineNative extends NativeModule<Events> {
   getPermissionsAsync(): Promise<PermissionResult>;
   getStatus(): EngineStatus;
   getRecordingTimeMs(): number;
-  /** Gravar o som do jogo nas próximas gravações (fica guardado no telemóvel). */
-  setAudioEnabled(on: boolean): void;
-  getAudioEnabled(): boolean;
   /** Modo espera: desliga câmara/encoder até gravar (o tablet pode iniciar a gravação). */
   setStandby(on: boolean): Promise<void>;
   /** Brilho do ecrã no mínimo (ecrã de repouso). */

@@ -53,6 +53,8 @@ object ClipCutter {
     endUs: Long,
     output: File,
     rotationDegrees: Int,
+    /** false = só imagem (os clips não levam som; o vídeo completo leva). */
+    withAudio: Boolean = true,
     onProgress: ((Float) -> Unit)? = null
   ): Result {
     require(segments.isNotEmpty()) { "Sem segmentos para cortar." }
@@ -90,7 +92,7 @@ object ClipCutter {
           val vFormat = video.format ?: continue
           if (!started) {
             outVideo = muxer.addTrack(vFormat)
-            audio.format?.let { outAudio = muxer.addTrack(it) }
+            if (withAudio) audio.format?.let { outAudio = muxer.addTrack(it) }
             muxer.start()
             started = true
           }

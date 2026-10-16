@@ -81,11 +81,6 @@ object ClipEngine {
   private var activeMuxer: SegmentMuxer? = null
   private var previewQuality = "1080p"
 
-  /** Gravar som (escolha guardada no telemóvel; por defeito não — os clips são para ver). */
-  var audioEnabled: Boolean
-    get() = appContext.getSharedPreferences("clips_engine", Context.MODE_PRIVATE).getBoolean("audio", false)
-    set(v) = appContext.getSharedPreferences("clips_engine", Context.MODE_PRIVATE).edit().putBoolean("audio", v).apply()
-
   /** Qualidade escolhida no ecrã Gravar (usada quando o tablet inicia a gravação). */
   val selectedQuality: String get() = previewQuality
   @Volatile private var videoEncoder: VideoEncoder? = null
@@ -232,7 +227,7 @@ object ClipEngine {
 
     clock.reset()
     recordingDone = false
-    val withAudio = audioEnabled && hasPermission(Manifest.permission.RECORD_AUDIO)
+    val withAudio = hasPermission(Manifest.permission.RECORD_AUDIO)
     val m = SegmentMuxer(s.segmentsDir, SEGMENT_US, rotation, withAudio, clock) { seg -> onSegmentClosed(s, seg) }
 
     val audio = if (withAudio) {
@@ -335,7 +330,7 @@ object ClipEngine {
           try {
             val result = ClipCutter.cut(
               s.segmentsDir, plan.pieces.map { it.segment }, plan.startUs, plan.endUs,
-              File(s.clipsDir, fileName), s.rotation
+              File(s.clipsDir, fileName), s.rotation, withAudio = false
             )
             updateClip(s, clip) {
               status = ClipInfo.STATUS_READY
@@ -531,8 +526,7 @@ object ClipEngine {
       "thermal" to thermal,
       "freeBytes" to free,
       "bytesPerSecond" to bytesPerSecond,
-      "hasMicrophone" to (audioEnabled && hasPermission(Manifest.permission.RECORD_AUDIO)),
-      "audioEnabled" to audioEnabled,
+      "hasMicrophone" to hasPermission(Manifest.permission.RECORD_AUDIO),
       "linkActive" to pt.clipsjogo.engine.link.Link.active,
       "tabletConnected" to pt.clipsjogo.engine.link.Link.tabletConnected
     )

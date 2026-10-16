@@ -36,7 +36,6 @@ export function RecordScreen({ onBack, onClips }: Props) {
   const [justFinished, setJustFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sleeping, setSleeping] = useState(false);
-  const [audioOn, setAudioOn] = useState(() => engine.getAudioEnabled());
   const [busy, setBusy] = useState(false);
   const [link, setLink] = useState<LinkInfo | null>(null);
   const [linkBusy, setLinkBusy] = useState(false);
@@ -258,7 +257,7 @@ export function RecordScreen({ onBack, onClips }: Props) {
             {status.thermal !== 'normal' ? (
               <Chip label={status.thermal === 'critico' ? 'Muito quente!' : 'Quente'} tone={status.thermal === 'critico' ? 'danger' : 'warn'} />
             ) : null}
-            {status.audioEnabled && !status.hasMicrophone ? <Chip label="Sem som (falta permissão)" tone="warn" /> : null}
+            {!status.hasMicrophone ? <Chip label="Sem som" tone="warn" /> : null}
             <Chip
               label={status.tabletConnected ? 'Tablet ligado' : status.linkActive ? 'À espera do tablet' : 'Tablet: não ligado'}
               tone={status.tabletConnected ? 'ok' : status.linkActive ? 'warn' : 'neutral'}
@@ -326,21 +325,6 @@ export function RecordScreen({ onBack, onClips }: Props) {
                     sublabel={q === '1080p' ? '~4,5 GB/h' : '~2,3 GB/h'}
                     variant={quality === q ? 'primary' : 'secondary'}
                     onPress={() => setQuality(q)}
-                    style={styles.flex}
-                  />
-                ))}
-              </View>
-              <Text style={styles.label}>Som</Text>
-              <View style={styles.row}>
-                {[false, true].map((on) => (
-                  <Button
-                    key={String(on)}
-                    label={on ? 'Sim' : 'Não'}
-                    variant={audioOn === on ? 'primary' : 'secondary'}
-                    onPress={() => {
-                      engine.setAudioEnabled(on);
-                      setAudioOn(on);
-                    }}
                     style={styles.flex}
                   />
                 ))}

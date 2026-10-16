@@ -104,10 +104,6 @@ class ClipEngineModule : Module() {
 
     Function("clearLastCrash") { CrashLog.clear() }
 
-    /** Gravar o som do jogo (guardado no telemóvel; por defeito não). */
-    Function("setAudioEnabled") { on: Boolean -> ClipEngine.audioEnabled = on }
-    Function("getAudioEnabled") { ClipEngine.audioEnabled }
-
     AsyncFunction("setStandby") { on: Boolean -> ClipEngine.setStandby(on) }
 
     /** Ecrã de repouso: brilho no mínimo (menos calor e bateria). */

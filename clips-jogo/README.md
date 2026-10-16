@@ -106,8 +106,8 @@ Se o telemóvel não estiver no ecrã Gravar, o tablet diz "Abre o ecrã Gravar 
 
 ### Som
 
-- No ecrã Gravar do telemóvel: **Som: Não / Sim** (por defeito **Não** — os clips são para ver). A escolha fica guardada.
-- Os vídeos enviados "com desenhos" nunca levam som (assim as paragens nos desenhos duram sempre o tempo certo).
+- O **vídeo completo do jogo tem som**. Os **clips não têm som** (são para ver), nem as cópias leves nem os vídeos
+  enviados "com desenhos" (assim as paragens nos desenhos duram sempre o tempo certo).
 
 ### Calor e bateria
 

@@ -35,7 +35,7 @@ object LightCopies {
     states[key] = "preparing"
     worker.execute {
       try {
-        LightTranscoder.transcode(original, light)
+        LightTranscoder.export(original, light, LightTranscoder.Options(audio = false))
         states.remove(key)
       } catch (e: Throwable) {
         light.delete()

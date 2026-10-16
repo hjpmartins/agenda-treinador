@@ -45,6 +45,8 @@ object LightTranscoder {
     val endUs: Long = Long.MAX_VALUE,
     val freezes: List<Freeze> = emptyList(),
     val freezeUs: Long = 3_000_000,
+    /** false = vídeo sem som. */
+    val audio: Boolean = true,
     val onProgress: ((Float) -> Unit)? = null,
   )
 
@@ -151,7 +153,7 @@ object LightTranscoder {
     val outH = even((inH * scale).toInt())
 
     val audioEx = MediaExtractor().apply { setDataSource(src.path) }
-    val aTrack = findTrack(audioEx, "audio/")
+    val aTrack = if (opt.audio) findTrack(audioEx, "audio/") else -1
     if (aTrack >= 0) {
       audioEx.selectTrack(aTrack)
       if (startUs > 0) audioEx.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)

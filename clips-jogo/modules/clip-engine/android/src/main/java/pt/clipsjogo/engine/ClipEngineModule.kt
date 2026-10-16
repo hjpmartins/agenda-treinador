@@ -104,6 +104,10 @@ class ClipEngineModule : Module() {
 
     Function("clearLastCrash") { CrashLog.clear() }
 
+    /** Gravar o som do jogo (guardado no telemóvel; por defeito não). */
+    Function("setAudioEnabled") { on: Boolean -> ClipEngine.audioEnabled = on }
+    Function("getAudioEnabled") { ClipEngine.audioEnabled }
+
     AsyncFunction("setStandby") { on: Boolean -> ClipEngine.setStandby(on) }
 
     /** Ecrã de repouso: brilho no mínimo (menos calor e bateria). */
@@ -272,6 +276,8 @@ class ClipEngineModule : Module() {
               endUs = if (endMs > 0) (endMs * 1000).toLong() else Long.MAX_VALUE,
               freezes = freezes,
               freezeUs = (freezeMs * 1000).toLong(),
+              // Sem som: as paragens nos desenhos ficam sempre com a duração certa.
+              audio = false,
               onProgress = { p ->
                 val pct = (p * 100).toInt()
                 if (pct != last) {

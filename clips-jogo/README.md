@@ -78,7 +78,7 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
   Os desenhos ficam guardados (marcas amarelas na barra).
 - **✂ Cortar**: "Início aqui" / "Fim aqui" — o clip passa a ver-se só nessa parte (o ficheiro original não muda).
 - **Enviar com desenhos** (↗ Enviar no leitor, ou Partilhar num clip com corte/desenhos → "Com desenhos"): cria um
-  vídeo em 720p só com a parte cortada; em cada desenho a imagem fica **parada 3 s com o desenho por cima** e depois
+  vídeo em 720p só com a parte cortada; em cada desenho a imagem fica **parada 4 s com o desenho por cima** (com silêncio) e depois
   continua. Abre a partilha do Android (WhatsApp, YouTube, Galeria…). "Original" envia o clip tal como está.
 - **Desconto** (botão no Comando): clips deste jogo agrupados por motivo; toca num motivo e os clips passam seguidos.
 - Em **Ver gravações e clips → Recebidos**, cada jogo tem "Ver seguidos" por motivo, para a análise durante a semana.

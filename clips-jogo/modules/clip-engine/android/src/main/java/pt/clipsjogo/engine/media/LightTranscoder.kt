@@ -74,6 +74,62 @@ object LightTranscoder {
 
   private const val FRAME_US = 33_333L
 
+  /** [count] tramas AAC de silêncio, com o mesmo formato do som do clip (1024 amostras cada). */
+  private fun silentAacFrames(source: MediaFormat, count: Int): List<ByteArray> {
+    if (count <= 0) return emptyList()
+    val rate = source.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+    val channels = source.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+    val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, rate, channels).apply {
+      setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+      setInteger(MediaFormat.KEY_BIT_RATE, 64_000)
+    }
+    val enc = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
+    val frames = ArrayList<ByteArray>(count)
+    try {
+      enc.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+      enc.start()
+      val info = MediaCodec.BufferInfo()
+      val bytesPerFrame = 2 * channels
+      val totalSamples = (count + 8) * 1024L
+      var fed = 0L
+      var inputDone = false
+      var guard = 0
+      while (frames.size < count && guard++ < 10_000) {
+        if (!inputDone) {
+          val idx = enc.dequeueInputBuffer(TIMEOUT_US)
+          if (idx >= 0) {
+            val b = enc.getInputBuffer(idx)!!
+            b.clear()
+            val n = minOf((b.capacity() / bytesPerFrame).toLong(), totalSamples - fed).toInt()
+            if (n <= 0) {
+              enc.queueInputBuffer(idx, 0, 0, fed * 1_000_000L / rate, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+              inputDone = true
+            } else {
+              b.put(ByteArray(n * bytesPerFrame))
+              enc.queueInputBuffer(idx, 0, n * bytesPerFrame, fed * 1_000_000L / rate, 0)
+              fed += n
+            }
+          }
+        }
+        val o = enc.dequeueOutputBuffer(info, TIMEOUT_US)
+        if (o >= 0) {
+          if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0 && info.size > 0) {
+            val out = enc.getOutputBuffer(o)!!
+            out.position(info.offset)
+            out.limit(info.offset + info.size)
+            frames.add(ByteArray(info.size).also { out.get(it) })
+          }
+          enc.releaseOutputBuffer(o, false)
+          if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
+        }
+      }
+    } finally {
+      try { enc.stop() } catch (_: Exception) {}
+      try { enc.release() } catch (_: Exception) {}
+    }
+    return frames.take(count)
+  }
+
   private fun run(src: File, out: File, opt: Options) {
     val videoEx = MediaExtractor().apply { setDataSource(src.path) }
     val vTrack = findTrack(videoEx, "video/")
@@ -226,23 +282,49 @@ object LightTranscoder {
         }
       }
 
-      // Som: copiado sem alterações, dentro do corte e desviado pelas paragens (fica em silêncio durante elas).
+      // Som: copiado sem alterações, dentro do corte. Em cada paragem entra silêncio a sério
+      // (sem ele, os leitores e o WhatsApp acertam a imagem pelo som e "comem" a paragem).
       if (audioOutTrack >= 0 && muxerStarted) {
         val buf = ByteBuffer.allocate(1 shl 20)
         val ai = MediaCodec.BufferInfo()
+        val freezeTotal = (opt.freezeUs / FRAME_US) * FRAME_US
+        val aFormat = audioEx.getTrackFormat(aTrack)
+        val rate = if (aFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) aFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 48_000
+        val frameDurUs = 1024L * 1_000_000L / rate
+        val silence = if (freezes.isEmpty()) emptyList() else try {
+          silentAacFrames(aFormat, (freezeTotal / frameDurUs).toInt())
+        } catch (e: Exception) {
+          emptyList()
+        }
+        var inserted = 0
+        fun insertSilence() {
+          var ts = freezes[inserted].atUs - startUs + inserted * freezeTotal
+          for (frame in silence) {
+            ai.set(0, frame.size, ts, MediaCodec.BUFFER_FLAG_KEY_FRAME)
+            muxer.writeSampleData(audioOutTrack, ByteBuffer.wrap(frame), ai)
+            ts += frameDurUs
+          }
+          inserted++
+        }
+        var lastTs = -1L
         while (true) {
           val size = audioEx.readSampleData(buf, 0)
           if (size < 0) break
           val t = audioEx.sampleTime
           if (t > endUs) break
           if (t >= startUs) {
-            val shift = freezes.count { it.atUs <= t } * ((opt.freezeUs / FRAME_US) * FRAME_US)
-            val flags = if (audioEx.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
-            ai.set(0, size, t - startUs + shift, flags)
-            muxer.writeSampleData(audioOutTrack, buf, ai)
+            while (inserted < freezes.size && freezes[inserted].atUs <= t) insertSilence()
+            val ts = t - startUs + inserted * freezeTotal
+            if (ts > lastTs) {
+              val flags = if (audioEx.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
+              ai.set(0, size, ts, flags)
+              muxer.writeSampleData(audioOutTrack, buf, ai)
+              lastTs = ts
+            }
           }
           audioEx.advance()
         }
+        while (inserted < freezes.size) insertSilence()
       }
       if (!muxerStarted) throw IOException("O codificador não produziu vídeo.")
       opt.onProgress?.invoke(1f)

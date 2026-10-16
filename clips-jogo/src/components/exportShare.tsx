@@ -7,7 +7,7 @@ import { share } from './media';
 import { Card, ProgressBar } from './ui';
 
 /** Tempo que a imagem fica parada em cada desenho, no vídeo enviado. */
-export const FREEZE_MS = 3000;
+export const FREEZE_MS = 4000;
 
 // Progresso da criação do vídeo (um de cada vez), mostrado por <ExportOverlay/>.
 let progress: number | null = null;

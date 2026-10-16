@@ -38,7 +38,8 @@ import { colors, radius, space } from '../theme';
 
 type Props = { onBack: () => void };
 
-const AUTO_SEND_SECONDS = 5;
+/** Envio automático do clip pedido (igual à barra flutuante); cada toque em motivo/jogadora volta a contar. */
+const AUTO_SEND_SECONDS = 8;
 
 /** Ecrã dividido / janela baixa: botões numa linha, tudo mais pequeno. */
 function useLayout() {
@@ -444,8 +445,14 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
               setCountdown(null);
               setDraft((d) => (d ? { ...d, name } : d));
             }}
-            onMotive={(motive) => setDraft((d) => (d ? { ...d, motive } : d))}
-            onPlayers={(players) => setDraft((d) => (d ? { ...d, players } : d))}
+            onMotive={(motive) => {
+              setDraft((d) => (d ? { ...d, motive } : d));
+              setCountdown((c) => (c == null ? null : AUTO_SEND_SECONDS));
+            }}
+            onPlayers={(players) => {
+              setDraft((d) => (d ? { ...d, players } : d));
+              setCountdown((c) => (c == null ? null : AUTO_SEND_SECONDS));
+            }}
             onCancel={() => {
               setDraft(null);
               setCountdown(null);

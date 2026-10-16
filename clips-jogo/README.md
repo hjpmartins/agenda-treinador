@@ -71,12 +71,15 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
 - **Motivo de cada clip** (um por clip): ao pedir o clip no Comando (fila de motivos no painel do clip), na **barra
   flutuante** (os motivos aparecem ~6 s depois de pedir — tocar é opcional), ou depois, tocando em "+ motivo" na lista.
   A lista de motivos edita-se em "Motivo… → Editar lista".
-- **▶ Ver** abre o leitor de análise: câmara lenta (0,25x / 0,5x / 1x), imagem a imagem (◀ 1 / 1 ▶), −3 s e barra para
+- **▶ Ver** abre o leitor de análise: velocidade (0,25x / 0,5x / 1x / 2x), imagem a imagem (◀ 1 / 1 ▶), −3 s e barra para
   arrastar.
 - **✏ Desenhar**: com a imagem parada, seta, círculo ou traço livre, em amarelo, vermelho ou branco; desfazer/apagar.
   Podes desenhar em vários momentos do mesmo clip; ao reproduzir, a imagem **para em cada desenho** (▶ para continuar).
   Os desenhos ficam guardados (marcas amarelas na barra).
 - **✂ Cortar**: "Início aqui" / "Fim aqui" — o clip passa a ver-se só nessa parte (o ficheiro original não muda).
+- **Enviar com desenhos** (↗ Enviar no leitor, ou Partilhar num clip com corte/desenhos → "Com desenhos"): cria um
+  vídeo em 720p só com a parte cortada; em cada desenho a imagem fica **parada 3 s com o desenho por cima** e depois
+  continua. Abre a partilha do Android (WhatsApp, YouTube, Galeria…). "Original" envia o clip tal como está.
 - **Desconto** (botão no Comando): clips deste jogo agrupados por motivo; toca num motivo e os clips passam seguidos.
 - Em **Ver gravações e clips → Recebidos**, cada jogo tem "Ver seguidos" por motivo, para a análise durante a semana.
 

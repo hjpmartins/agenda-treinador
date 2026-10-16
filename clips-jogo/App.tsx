@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ExportOverlay } from './src/components/exportShare';
 import { ClipsScreen } from './src/screens/ClipsScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { RecordScreen } from './src/screens/RecordScreen';
@@ -28,6 +29,7 @@ export default function App() {
       ) : (
         <ClipsScreen onBack={home} />
       )}
+      <ExportOverlay />
     </SafeAreaProvider>
   );
 }

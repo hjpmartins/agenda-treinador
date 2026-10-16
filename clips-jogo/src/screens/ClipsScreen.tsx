@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, BackHandler, FlatList, Pressable, StyleSheet,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addEngineListener, ClipEngine, type Clip, type Session } from '../../modules/clip-engine';
 import { AnalysisPlayer, type AnalysisItem } from '../components/AnalysisPlayer';
+import { shareClip } from '../components/exportShare';
 import { PlayerModal, run, saveToGallery, share } from '../components/media';
 import { MotivePicker } from '../components/MotivePicker';
 import { groupByMotive } from '../lib/annotations';
@@ -324,7 +325,7 @@ function ReceivedSection({
                 <View style={styles.actions}>
                   <Button label="▶ Ver" onPress={() => onPlay([toItem(c)], 0)} style={styles.action} />
                   <Button label="Galeria" onPress={() => run(() => saveToGallery(c.uri))} style={styles.action} />
-                  <Button label="Partilhar" onPress={() => run(() => share(c.uri))} style={styles.action} />
+                  <Button label="Partilhar" onPress={() => shareClip(c.id, c.uri, c.name)} style={styles.action} />
                 </View>
               </View>
             ))}

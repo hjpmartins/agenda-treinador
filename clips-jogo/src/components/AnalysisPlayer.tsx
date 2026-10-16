@@ -19,12 +19,13 @@ import {
 import { formatClock } from '../lib/format';
 import { getNotes, setNotes, useNotesVersion } from '../remote/notesStore';
 import { colors, radius, space } from '../theme';
+import { shareClip } from './exportShare';
 import { MotivePicker } from './MotivePicker';
 
 export type AnalysisItem = { id: string; uri: string; title: string };
 
 const PEN_COLORS = ['#FFD60A', '#FF3B30', '#FFFFFF'];
-const RATES = [0.25, 0.5, 1];
+const RATES = [0.25, 0.5, 1, 2];
 const FRAME_MS = 1000 / 30;
 
 /**
@@ -324,6 +325,13 @@ function ClipAnalysis({
           onPress={() => {
             player.pause();
             setMode(mode === 'draw' ? 'view' : 'draw');
+          }}
+        />
+        <Btn
+          label="↗ Enviar"
+          onPress={() => {
+            player.pause();
+            shareClip(item.id, item.uri, item.title);
           }}
         />
         <Btn

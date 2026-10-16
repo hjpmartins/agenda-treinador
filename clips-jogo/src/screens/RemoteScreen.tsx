@@ -20,7 +20,8 @@ import {
 } from 'react-native';
 import { ClipEngine } from '../../modules/clip-engine';
 import { AnalysisPlayer, type AnalysisItem } from '../components/AnalysisPlayer';
-import { run, saveToGallery, share } from '../components/media';
+import { shareClip } from '../components/exportShare';
+import { run, saveToGallery } from '../components/media';
 import { MotiveChips, MotivePicker } from '../components/MotivePicker';
 import { groupByMotive } from '../lib/annotations';
 import { allNotes, getMotives, getNotes, setNotes, useNotesVersion } from '../remote/notesStore';
@@ -769,7 +770,7 @@ function ClipRow({
         <View style={styles.clipActions}>
           <Button label="▶ Ver" onPress={() => onPlay(local)} style={[styles.flex, compact && styles.smallButton]} />
           <Button label="Galeria" onPress={() => run(() => saveToGallery(local))} style={[styles.flex, compact && styles.smallButton]} />
-          <Button label="Partilhar" onPress={() => run(() => share(local))} style={[styles.flex, compact && styles.smallButton]} />
+          <Button label="Partilhar" onPress={() => shareClip(clip.id, local, clip.name)} style={[styles.flex, compact && styles.smallButton]} />
         </View>
       ) : null}
     </View>

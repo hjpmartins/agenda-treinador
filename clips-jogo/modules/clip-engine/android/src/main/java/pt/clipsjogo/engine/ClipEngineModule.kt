@@ -55,7 +55,7 @@ class ClipEngineModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ClipEngine")
 
-    Events("onStateChange", "onClipUpdate", "onFinalizeProgress", "onError", "onUpdateProgress")
+    Events("onStateChange", "onClipUpdate", "onFinalizeProgress", "onError", "onUpdateProgress", "onExportProgress")
 
     OnCreate {
       ClipEngine.init(appContext.reactContext!!)
@@ -230,6 +230,64 @@ class ClipEngineModule : Module() {
     }
 
     Function("clearUpdates") { Updater.clear(appContext.reactContext!!) }
+
+    // ---------------------------------------------------------- exportar com desenhos (tablet)
+
+    /**
+     * Cria um vídeo para enviar (ex.: WhatsApp): só a parte cortada, em 720p, e em cada
+     * desenho a imagem fica parada [freezeMs] com o desenho por cima.
+     * momentsJson: [{ atMs, strokes: [{ tool, color, points: [[x,y],…] }] }] (tempos do ficheiro).
+     */
+    AsyncFunction("exportAnnotated") { srcUri: String, startMs: Double, endMs: Double, momentsJson: String, freezeMs: Double, promise: Promise ->
+      val context = appContext.reactContext!!
+      Thread({
+        try {
+          val src = java.io.File(Uri.parse(srcUri).path ?: srcUri)
+          val dir = java.io.File(context.cacheDir, "exportados").apply { mkdirs() }
+          dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 24 * 3600_000L }?.forEach { it.delete() }
+          val dst = java.io.File(dir, src.nameWithoutExtension + "-desenhos.mp4")
+          // Tamanho de saída (para desenhar os traços à mesma escala).
+          val probe = android.media.MediaMetadataRetriever().apply { setDataSource(src.path) }
+          val w = probe.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 1920
+          val h = probe.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 1080
+          probe.release()
+          val scale = minOf(1.0, 720.0 / minOf(w, h))
+          val outW = ((w * scale).toInt() / 2) * 2
+          val outH = ((h * scale).toInt() / 2) * 2
+          val moments = org.json.JSONArray(momentsJson)
+          val freezes = (0 until moments.length()).map { i ->
+            val m = moments.getJSONObject(i)
+            pt.clipsjogo.engine.media.LightTranscoder.Freeze(
+              (m.getDouble("atMs") * 1000).toLong(),
+              pt.clipsjogo.engine.media.StrokeBitmap.render(m.getJSONArray("strokes"), outW, outH)
+            )
+          }
+          var last = -1
+          pt.clipsjogo.engine.media.LightTranscoder.export(
+            src, dst,
+            pt.clipsjogo.engine.media.LightTranscoder.Options(
+              maxHeight = 720,
+              bitrate = 3_000_000,
+              startUs = (startMs * 1000).toLong(),
+              endUs = if (endMs > 0) (endMs * 1000).toLong() else Long.MAX_VALUE,
+              freezes = freezes,
+              freezeUs = (freezeMs * 1000).toLong(),
+              onProgress = { p ->
+                val pct = (p * 100).toInt()
+                if (pct != last) {
+                  last = pct
+                  sendEvent("onExportProgress", mapOf("progress" to p.toDouble()))
+                }
+              }
+            )
+          )
+          freezes.forEach { it.overlay?.recycle() }
+          promise.resolve(Uri.fromFile(dst).toString())
+        } catch (e: Throwable) {
+          promise.reject("E_EXPORT", "Não foi possível criar o vídeo: ${e.message ?: e.javaClass.simpleName}", e)
+        }
+      }, "exportar-desenhos").start()
+    }
 
     // ---------------------------------------------------------- barra flutuante (tablet)
 

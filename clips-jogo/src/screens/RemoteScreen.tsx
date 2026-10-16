@@ -375,31 +375,32 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
           {connected && recording ? (
             <Button label="■ Parar" variant="ghost" loading={recBusy} onPress={stopRec} style={compact && styles.smallButton} />
           ) : null}
-          <View style={styles.chips}>
-            <Chip label={connectionChip.label} tone={connectionChip.tone} />
-            {connected && !recording ? (
-              <Chip label={snap.notRecordingReason ?? 'A sincronizar com o telemóvel…'} tone="warn" />
-            ) : null}
-            {snap.phone?.batteryPercent != null ? (
-              <Chip
-                label={`Telemóvel ${snap.phone.batteryPercent}%${snap.phone.charging ? ' ⚡' : ''}`}
-                tone={snap.phone.charging || snap.phone.batteryPercent >= 30 ? 'neutral' : 'warn'}
-              />
-            ) : null}
-            {snap.phone?.freeBytes != null && snap.phone.bytesPerSecond ? (
-              (() => {
-                const left = recordingTimeLeftMs(snap.phone.freeBytes, snap.phone.bytesPerSecond);
-                return left < 60 * 60_000 ? (
-                  <Chip label={`Espaço no telemóvel: ${formatHoursMinutes(left)}`} tone={left < 20 * 60_000 ? 'danger' : 'warn'} />
-                ) : null;
-              })()
-            ) : null}
-            {snap.phone?.thermal && snap.phone.thermal !== 'normal' ? (
-              <Chip label={snap.phone.thermal === 'critico' ? 'Telemóvel muito quente!' : 'Telemóvel quente'} tone={snap.phone.thermal === 'critico' ? 'danger' : 'warn'} />
-            ) : null}
-            {queued > 0 ? <Chip label={`${queued} na fila`} tone="warn" /> : null}
-            {connected || snap.link.total > 0 ? <SignalChip wifi={wifi} link={snap.link} /> : null}
-          </View>
+        </View>
+        {/* Avisos numa linha própria, por baixo do cronómetro. */}
+        <View style={styles.chips}>
+          <Chip label={connectionChip.label} tone={connectionChip.tone} />
+          {connected && !recording ? (
+            <Chip label={snap.notRecordingReason ?? 'A sincronizar com o telemóvel…'} tone="warn" />
+          ) : null}
+          {snap.phone?.batteryPercent != null ? (
+            <Chip
+              label={`Telemóvel ${snap.phone.batteryPercent}%${snap.phone.charging ? ' ⚡' : ''}`}
+              tone={snap.phone.charging || snap.phone.batteryPercent >= 30 ? 'neutral' : 'warn'}
+            />
+          ) : null}
+          {snap.phone?.freeBytes != null && snap.phone.bytesPerSecond ? (
+            (() => {
+              const left = recordingTimeLeftMs(snap.phone.freeBytes, snap.phone.bytesPerSecond);
+              return left < 60 * 60_000 ? (
+                <Chip label={`Espaço no telemóvel: ${formatHoursMinutes(left)}`} tone={left < 20 * 60_000 ? 'danger' : 'warn'} />
+              ) : null;
+            })()
+          ) : null}
+          {snap.phone?.thermal && snap.phone.thermal !== 'normal' ? (
+            <Chip label={snap.phone.thermal === 'critico' ? 'Telemóvel muito quente!' : 'Telemóvel quente'} tone={snap.phone.thermal === 'critico' ? 'danger' : 'warn'} />
+          ) : null}
+          {queued > 0 ? <Chip label={`${queued} na fila`} tone="warn" /> : null}
+          {connected || snap.link.total > 0 ? <SignalChip wifi={wifi} link={snap.link} /> : null}
         </View>
 
         {draft ? (
@@ -821,7 +822,7 @@ const styles = StyleSheet.create({
   recDotCompact: { width: 10, height: 10, borderRadius: 5, marginRight: space(1) },
   timer: { color: colors.text, fontSize: 40, fontWeight: '800', fontVariant: ['tabular-nums'] },
   timerCompact: { fontSize: 24 },
-  chips: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: space(1) },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1) },
 
   presets: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2) },
   // Uma linha de 4, ocupa a altura que sobrar (mín. 64, máx. 140).

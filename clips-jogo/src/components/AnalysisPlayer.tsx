@@ -2,6 +2,7 @@ import { useEvent, useEventListener } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Ellipse, Line, Polygon, Polyline } from 'react-native-svg';
 import {
   addStroke,
@@ -73,6 +74,8 @@ function ClipAnalysis({
   onClose: () => void;
 }) {
   useNotesVersion();
+  // O ecrã inteiro passa por baixo das barras do Android: os botões ficam dentro da zona segura.
+  const insets = useSafeAreaInsets();
   const notes = getNotes(item.id);
   const moments = notes.moments ?? [];
 
@@ -230,7 +233,12 @@ function ClipAnalysis({
   if (draft) strokesToShow.push(draft);
 
   return (
-    <View style={styles.root}>
+    <View
+      style={[
+        styles.root,
+        { paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right },
+      ]}
+    >
       <View style={styles.videoArea} onLayout={onVideoLayout}>
         <View style={[styles.videoBox, { left: box.x, top: box.y, width: box.w, height: box.h }]}>
           <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} />

@@ -1,7 +1,15 @@
-import { Upload, Plus, ArrowRightLeft, Printer, Pencil, Trash2 } from "lucide-react";
+import { Upload, Plus, ArrowRightLeft, Printer, Pencil, Trash2, Video } from "lucide-react";
 import { countTreinosRealizados, calcPresenca, shortName } from "../../utils";
 import { printPlayer } from "../../print";
 import { EmptyState } from "../common/Modal";
+
+// Abre a app "Clips de Jogo" (no tablet Android) com o plantel: número e nome de cada jogadora.
+function clipsJogoLink(players) {
+  const data = players
+    .filter((p) => p.nome || p.numero)
+    .map((p) => ({ n: String(p.numero || "").trim(), nome: (p.nome || "").trim() }));
+  return `clipsjogo://plantel?d=${encodeURIComponent(JSON.stringify(data))}`;
+}
 
 function PlayersView({ players, sessions, clubLogo, onAdd, onImportClick, onEdit, onDelete, onMoveTeam }) {
   const totalTreinos = countTreinosRealizados(sessions);
@@ -17,7 +25,16 @@ function PlayersView({ players, sessions, clubLogo, onAdd, onImportClick, onEdit
             {totalTreinos > 0 && ` · ${totalTreinos} treino${totalTreinos === 1 ? "" : "s"} realizado${totalTreinos === 1 ? "" : "s"} com presenças registadas`}
           </div>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 shrink-0 flex-wrap">
+          {players.length > 0 && (
+            <a
+              href={clipsJogoLink(players)}
+              title="No tablet com a app Clips de Jogo: envia o número e o nome das jogadoras para marcar os clips"
+              className="flex items-center gap-1.5 border border-[#2E3644] hover:border-[#5A6272] text-[#F2EDE3] text-sm font-medium rounded-md px-3.5 py-2 transition-colors"
+            >
+              <Video size={16} /> Enviar para Clips de Jogo
+            </a>
+          )}
           <button onClick={onImportClick} className="flex items-center gap-1.5 border border-[#2E3644] hover:border-[#5A6272] text-[#F2EDE3] text-sm font-medium rounded-md px-3.5 py-2 transition-colors">
             <Upload size={16} /> Importar lista
           </button>

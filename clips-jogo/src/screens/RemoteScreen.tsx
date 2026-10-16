@@ -281,6 +281,11 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
       try {
         const picked = ClipEngine?.takeBarMotives() ?? {};
         for (const [id, motive] of Object.entries(picked)) setNotes(id, { motive });
+        // Qualidade mudada na barra (HD/Leve): a app passa a usar a mesma.
+        const light = ClipEngine?.getBarLight();
+        if (light != null && (light ? 'leve' : 'original') !== client.state.quality) {
+          client.setQuality(light ? 'leve' : 'original');
+        }
       } catch {
         // ignora
       }
@@ -288,7 +293,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
     take();
     const sub = AppState.addEventListener('change', (s) => s === 'active' && take());
     return () => sub.remove();
-  }, []);
+  }, [client]);
   const openFloating = () => {
     if (!ClipEngine) return;
     if (floatingOn) {
@@ -328,6 +333,17 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (e) {
       Alert.alert('Não foi possível iniciar', e instanceof Error ? e.message : String(e));
+    } finally {
+      setRecBusy(false);
+    }
+  };
+  const phonePaused = phoneState === 'recording' && snap.phone?.paused === true;
+  const togglePause = async (pause: boolean) => {
+    setRecBusy(true);
+    try {
+      await client.setPaused(pause);
+    } catch (e) {
+      Alert.alert(pause ? 'Não foi possível pausar' : 'Não foi possível retomar', e instanceof Error ? e.message : String(e));
     } finally {
       setRecBusy(false);
     }
@@ -373,7 +389,16 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
               onPress={startRec}
             />
           ) : null}
-          {connected && recording ? (
+          {connected && (recording || phonePaused) ? (
+            <Button
+              label={phonePaused ? '▶ Retomar' : '❚❚ Pausa'}
+              variant={phonePaused ? 'primary' : 'ghost'}
+              loading={recBusy}
+              onPress={() => togglePause(!phonePaused)}
+              style={compact && styles.smallButton}
+            />
+          ) : null}
+          {connected && (recording || phonePaused) ? (
             <Button label="■ Parar" variant="ghost" loading={recBusy} onPress={stopRec} style={compact && styles.smallButton} />
           ) : null}
         </View>

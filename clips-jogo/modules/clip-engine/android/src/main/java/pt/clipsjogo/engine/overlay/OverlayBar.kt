@@ -52,6 +52,7 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
   private val group = LinearLayout(context)
   private val presetViews = ArrayList<TextView>()
   private val markView = TextView(context)
+  private val qualityView = TextView(context)
   private var collapsed = prefs.getBoolean("collapsed", false)
   private var flashText: String? = null
   private var flashColor = OK
@@ -159,6 +160,22 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
     }
     group.addView(markView)
 
+    // Qualidade da cópia para o tablet: HD (original) ou Leve (720p, chega mais depressa).
+    group.addView(qualityView.apply {
+      setTextColor(TEXT)
+      setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+      typeface = Typeface.DEFAULT_BOLD
+      gravity = Gravity.CENTER
+      background = rounded(SURFACE_HIGH, 12)
+      isClickable = true
+      layoutParams = LinearLayout.LayoutParams(dp(56), dp(46)).apply { marginStart = dp(5) }
+      setOnClickListener { v ->
+        actions.toggleLight()
+        v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        flash(if (actions.isLight()) "Cópia leve" else "Cópia HD", OK)
+        refresh()
+      }
+    })
     group.addView(button("↗", SURFACE_HIGH, 42) { actions.openApp(context) })
     row.addView(group)
 
@@ -269,6 +286,7 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
     markView.text = if (marking) "Fim" else "Início"
     markView.background = if (marking) rounded(ACCENT, 12, TEXT) else rounded(SURFACE_HIGH, 12)
     markView.alpha = if (canClip) 1f else 0.35f
+    qualityView.text = if (actions.isLight()) "Leve" else "HD"
   }
 
   private fun format(ms: Long): String {

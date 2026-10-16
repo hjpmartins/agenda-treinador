@@ -92,7 +92,13 @@ class RecordingClock {
   @Volatile var t0BootUs: Long = -1L
     private set
 
+  /** Tempo total em pausa (intervalo), que não conta para o tempo de gravação. */
+  @Volatile var pausedTotalUs: Long = 0L
+    private set
+  @Volatile private var pausedAtBootUs: Long = -1L
+
   val started: Boolean get() = t0BootUs >= 0
+  val paused: Boolean get() = pausedAtBootUs >= 0
 
   fun start(bootUs: Long) {
     t0BootUs = bootUs
@@ -100,9 +106,26 @@ class RecordingClock {
 
   fun reset() {
     t0BootUs = -1L
+    pausedTotalUs = 0L
+    pausedAtBootUs = -1L
   }
 
-  fun toRecUs(bootUs: Long): Long = if (started) bootUs - t0BootUs else 0L
+  /** O tempo de gravação para aqui até [resume]. */
+  fun pause(bootUs: Long) {
+    if (!paused) pausedAtBootUs = bootUs
+  }
+
+  fun resume(bootUs: Long) {
+    if (!paused) return
+    pausedTotalUs += (bootUs - pausedAtBootUs).coerceAtLeast(0)
+    pausedAtBootUs = -1L
+  }
+
+  fun toRecUs(bootUs: Long): Long {
+    if (!started) return 0L
+    val effective = if (paused) minOf(bootUs, pausedAtBootUs) else bootUs
+    return effective - t0BootUs - pausedTotalUs
+  }
 }
 
 /**

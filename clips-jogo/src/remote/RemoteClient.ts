@@ -20,6 +20,8 @@ export type PhoneStatus = {
   bytesPerSecond?: number;
   /** Telemóvel em modo espera (câmara desligada até começar a gravar). */
   standby?: boolean;
+  /** Gravação em pausa (intervalo). */
+  paused?: boolean;
 };
 
 export type RemoteClip = {
@@ -235,6 +237,18 @@ export class RemoteClient {
     this.pollStatus();
   }
 
+  /** Intervalo: pausa ou retoma a gravação no telemóvel. */
+  async setPaused(paused: boolean): Promise<void> {
+    if (!this.baseUrl) throw new Error('Sem ligação ao telemóvel.');
+    await fetchJson(
+      `${this.baseUrl}/api/recording/${paused ? 'pause' : 'resume'}`,
+      this.pairing.token,
+      { method: 'POST', body: '{}' },
+      12000
+    );
+    this.pollStatus();
+  }
+
   /** Para a gravação no telemóvel (o vídeo completo é criado lá). */
   async stopRecording(): Promise<void> {
     if (!this.baseUrl) throw new Error('Sem ligação ao telemóvel.');
@@ -326,6 +340,11 @@ export class RemoteClient {
   }
 
   private updateRecording(status: PhoneStatus): Pick<RemoteSnapshot, 'recording' | 'notRecordingReason'> {
+    if (status.state === 'recording' && status.paused) {
+      // Intervalo: não se pedem clips; ao retomar, o tempo continua de onde parou.
+      this.notRecordingStreak = 0;
+      return { recording: false, notRecordingReason: 'Gravação em pausa (intervalo)' };
+    }
     if (status.state === 'recording' && status.recStartElapsedMs != null) {
       this.lastRecording = { sessionId: status.sessionId, recStartElapsedMs: status.recStartElapsedMs };
       this.notRecordingStreak = 0;

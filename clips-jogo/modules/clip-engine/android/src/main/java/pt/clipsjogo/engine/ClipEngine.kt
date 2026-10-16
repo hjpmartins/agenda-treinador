@@ -171,6 +171,11 @@ object ClipEngine {
         emitError(e.message ?: "Não foi possível iniciar o encoder de vídeo.")
       }
     }
+    if (paused && state == STATE_RECORDING) {
+      // Pausa (intervalo): câmara desligada, o encoder fica à espera (mesmo formato ao retomar).
+      cam.setSurfaces(emptyList())
+      return
+    }
     if (!encoderNeeded) {
       cam.setSurfaces(emptyList())
       dropEncoder()
@@ -264,6 +269,7 @@ object ClipEngine {
   fun stopRecording() {
     if (state != STATE_RECORDING) return
     val s = session ?: return
+    paused = false
     setState(STATE_FINALIZING)
     s.status = SessionInfo.STATUS_FINALIZING
     // Parar o áudio primeiro: o que ele já entregou fica na fila da thread do encoder, antes do fecho.
@@ -288,7 +294,37 @@ object ClipEngine {
 
   /** Instante (elapsedRealtime, ms) do primeiro frame da gravação em curso; null se não está a gravar. */
   fun recordingStartElapsedMs(): Double? =
-    if (session != null && !recordingDone && clock.started) clock.t0BootUs / 1000.0 else null
+    if (session != null && !recordingDone && clock.started) (clock.t0BootUs + clock.pausedTotalUs) / 1000.0 else null
+
+  /** Intervalo: deixa de gravar (sem ocupar espaço) e desliga a câmara; o tempo do jogo fica parado. */
+  @Volatile var paused = false
+    private set
+
+  @Synchronized
+  fun pauseRecording() {
+    if (state != STATE_RECORDING || paused) return
+    paused = true
+    clock.pause(SystemClock.elapsedRealtimeNanos() / 1000)
+    encoderHandler.post { activeMuxer?.pause() }
+    refreshPipeline()
+    listener?.onStateChanged(state)
+  }
+
+  /** Volta a gravar no mesmo jogo (a câmara liga-se e acerta foco/exposição antes). */
+  @Synchronized
+  fun resumeRecording() {
+    if (state != STATE_RECORDING || !paused) return
+    paused = false
+    refreshPipeline()
+    Thread.sleep(1800)
+    val enc = videoEncoder
+    encoderHandler.post {
+      clock.resume(SystemClock.elapsedRealtimeNanos() / 1000)
+      activeMuxer?.resume()
+      enc?.requestKeyFrame()
+    }
+    listener?.onStateChanged(state)
+  }
 
   fun nowRecUs(): Long =
     if (state == STATE_RECORDING && clock.started) clock.toRecUs(SystemClock.elapsedRealtimeNanos() / 1000) else 0L
@@ -515,6 +551,7 @@ object ClipEngine {
     return mapOf(
       "state" to state,
       "standby" to standby,
+      "paused" to paused,
       "sessionId" to s?.id,
       "recordingMs" to nowRecUs() / 1000,
       "segments" to (s?.segments?.size ?: 0),

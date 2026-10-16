@@ -74,6 +74,8 @@ class SegmentMuxer(
   private var nextIndex = 0
   private var lastVideoRecUs = -1L
   private var finished = false
+  /** Em pausa (intervalo): nada é escrito; ao retomar começa um segmento novo num keyframe. */
+  private var paused = false
 
   private val bufferInfo = MediaCodec.BufferInfo()
   private var audioBuffer: ByteBuffer = ByteBuffer.allocateDirect(64 * 1024)
@@ -94,8 +96,25 @@ class SegmentMuxer(
   private val ready: Boolean
     get() = videoFormat != null && (!audioActive || audioFormat != null)
 
+  /** Fecha o segmento atual; até [resume] os frames são ignorados. */
+  fun pause() {
+    if (finished || paused) return
+    paused = true
+    closing?.close()
+    closing = null
+    current?.let {
+      it.endUs = lastVideoRecUs + FRAME_US
+      it.close()
+    }
+    current = null
+  }
+
+  fun resume() {
+    paused = false
+  }
+
   fun writeVideo(buffer: ByteBuffer, info: MediaCodec.BufferInfo, bootUs: Long) {
-    if (finished) return
+    if (finished || paused) return
     if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) return
     if (info.size <= 0) return
     if (!ready) {
@@ -117,6 +136,11 @@ class SegmentMuxer(
     if (recUs <= lastVideoRecUs) {
       Log.w(TAG, "Frame de vídeo fora de ordem ignorado ($recUs <= $lastVideoRecUs)")
       return
+    }
+    if (current == null) {
+      // Depois de uma pausa: o segmento novo começa num keyframe, logo a seguir ao anterior.
+      if (!isKey) return
+      current = OpenSegment(nextIndex++, recUs)
     }
 
     var seg = current!!
@@ -149,7 +173,7 @@ class SegmentMuxer(
   }
 
   fun writeAudio(data: ByteArray, bootUs: Long) {
-    if (finished || !audioActive) return
+    if (finished || paused || !audioActive) return
     if (!clock.started) return
     val recUs = clock.toRecUs(bootUs)
     if (recUs < 0) return

@@ -2,7 +2,8 @@ import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, BackHandler, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 import {
   addEngineListener,
@@ -46,6 +47,21 @@ export function RecordScreen({ onBack, onClips }: Props) {
 
   const recording = status.state === 'recording';
   const finalizing = status.state === 'finalizing';
+  const paused = recording && status.paused;
+  const insets = useSafeAreaInsets();
+  const [pauseBusy, setPauseBusy] = useState(false);
+  const togglePause = async () => {
+    setPauseBusy(true);
+    try {
+      if (paused) await engine.resumeRecording();
+      else await engine.pauseRecording();
+      setStatus(engine.getStatus());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPauseBusy(false);
+    }
+  };
 
   // Ecrã sempre na horizontal enquanto se grava.
   useEffect(() => {
@@ -258,6 +274,7 @@ export function RecordScreen({ onBack, onClips }: Props) {
               <Chip label={status.thermal === 'critico' ? 'Muito quente!' : 'Quente'} tone={status.thermal === 'critico' ? 'danger' : 'warn'} />
             ) : null}
             {!status.hasMicrophone ? <Chip label="Sem som" tone="warn" /> : null}
+            {paused ? <Chip label="Em pausa (intervalo)" tone="warn" /> : null}
             <Chip
               label={status.tabletConnected ? 'Tablet ligado' : status.linkActive ? 'À espera do tablet' : 'Tablet: não ligado'}
               tone={status.tabletConnected ? 'ok' : status.linkActive ? 'warn' : 'neutral'}
@@ -280,7 +297,10 @@ export function RecordScreen({ onBack, onClips }: Props) {
       </View>
 
       {/* ---------------------------------------------------- painel lateral */}
-      <View style={styles.panel}>
+      <ScrollView
+        style={[styles.panel, { paddingRight: insets.right }]}
+        contentContainerStyle={[styles.panelContent, { paddingBottom: Math.max(space(2), insets.bottom) }]}
+      >
         {finalizing ? (
           <View style={styles.panelSection}>
             <Text style={styles.h2}>A criar o vídeo completo…</Text>
@@ -291,9 +311,9 @@ export function RecordScreen({ onBack, onClips }: Props) {
           <>
             <View style={styles.panelSection}>
               <Text style={styles.label}>Clip de teste (últimos…)</Text>
-              <View style={styles.grid}>
+              <View style={styles.row}>
                 {PRESET_SECONDS.map((s) => (
-                  <Button key={s} label={`${s}s`} size="l" onPress={() => testClip(s)} style={styles.gridButton} />
+                  <Button key={s} label={`${s}s`} disabled={paused} onPress={() => testClip(s)} style={styles.flex} />
                 ))}
               </View>
               <Text style={styles.muted}>
@@ -310,7 +330,16 @@ export function RecordScreen({ onBack, onClips }: Props) {
                 loading={linkBusy}
               />
               <Button label="Ecrã de repouso" variant="ghost" onPress={() => setSleeping(true)} />
-              <Button label="Parar gravação" variant="danger" size="l" onPress={stop} />
+              <View style={styles.row}>
+                <Button
+                  label={paused ? '▶ Retomar' : '❚❚ Pausa'}
+                  variant={paused ? 'primary' : 'secondary'}
+                  loading={pauseBusy}
+                  onPress={togglePause}
+                  style={styles.flex}
+                />
+                <Button label="Parar" variant="danger" onPress={stop} style={styles.flex} />
+              </View>
             </View>
           </>
         ) : (
@@ -361,7 +390,7 @@ export function RecordScreen({ onBack, onClips }: Props) {
             </View>
           </>
         )}
-      </View>
+      </ScrollView>
 
       {/* ---------------------------------------------------- ecrã de repouso */}
       {/* ---------------------------------------------------- QR para o tablet */}
@@ -409,7 +438,9 @@ export function RecordScreen({ onBack, onClips }: Props) {
                 <View style={styles.recDot} />
                 <Text style={[styles.timer, { opacity: 0.5 }]}>{formatClock(elapsedMs)}</Text>
               </View>
-              <Text style={styles.sleepHint}>A gravar. Toca para acordar o ecrã.</Text>
+              <Text style={styles.sleepHint}>
+                {paused ? 'Em pausa (intervalo): câmara desligada.' : 'A gravar.'} Toca para acordar o ecrã.
+              </Text>
             </>
           ) : (
             <Text style={[styles.sleepHint, { textAlign: 'center' }]}>
@@ -471,10 +502,11 @@ const styles = StyleSheet.create({
   errorHint: { color: '#fff', opacity: 0.8, marginTop: 4, fontSize: 12 },
   panel: {
     width: 280,
+    flexGrow: 0,
     backgroundColor: colors.surface,
-    padding: space(2),
-    justifyContent: 'space-between',
   },
+  // Rola se não couber (ecrãs baixos): os botões de baixo nunca ficam escondidos.
+  panelContent: { flexGrow: 1, padding: space(2), justifyContent: 'space-between', gap: space(2) },
   panelSection: { gap: space(1.5) },
   label: { color: colors.muted, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1) },

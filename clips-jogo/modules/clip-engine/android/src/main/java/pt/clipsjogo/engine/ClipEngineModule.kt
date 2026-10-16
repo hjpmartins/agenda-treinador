@@ -126,6 +126,10 @@ class ClipEngineModule : Module() {
       ClipEngine.startRecording(quality, displayRotationDegrees())
     }
 
+    AsyncFunction("pauseRecording") { ClipEngine.pauseRecording() }
+
+    AsyncFunction("resumeRecording") { ClipEngine.resumeRecording() }
+
     AsyncFunction("stopRecording") {
       ClipEngine.stopRecording()
     }
@@ -310,6 +314,9 @@ class ClipEngineModule : Module() {
     Function("takeBarMotives") { FloatingRemote.takeMotives(appContext.reactContext!!) }
 
     Function("disarmFloatingBar") { FloatingRemote.disarm() }
+
+    /** Qualidade escolhida na barra (true = leve), ou null se a barra não está ativa. */
+    Function("getBarLight") { FloatingRemote.currentLight() }
 
     /** Põe a app em segundo plano (volta à app anterior, ex.: estatísticas). */
     Function("moveToBackground") {

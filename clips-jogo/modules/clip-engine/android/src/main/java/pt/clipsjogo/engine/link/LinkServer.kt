@@ -32,6 +32,8 @@ class LinkServer(
     fun clipLight(id: String): JSONObject
     fun startRecording(): JSONObject
     fun stopRecording(): JSONObject
+    fun pauseRecording(): JSONObject
+    fun resumeRecording(): JSONObject
   }
 
   @Volatile var lastSeenElapsedMs = 0L
@@ -67,6 +69,8 @@ class LinkServer(
         }
         session.method == Method.POST && session.uri == "/api/recording/start" -> json(Response.Status.OK, api.startRecording())
         session.method == Method.POST && session.uri == "/api/recording/stop" -> json(Response.Status.OK, api.stopRecording())
+        session.method == Method.POST && session.uri == "/api/recording/pause" -> json(Response.Status.OK, api.pauseRecording())
+        session.method == Method.POST && session.uri == "/api/recording/resume" -> json(Response.Status.OK, api.resumeRecording())
         session.method == Method.GET && LIGHT_ROUTE.matches(session.uri) -> {
           val id = LIGHT_ROUTE.find(session.uri)!!.groupValues[1]
           json(Response.Status.OK, api.clipLight(id))

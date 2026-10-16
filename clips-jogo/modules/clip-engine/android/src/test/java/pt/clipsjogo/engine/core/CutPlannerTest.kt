@@ -75,6 +75,18 @@ class CutPlannerTest {
   }
 
   @Test
+  fun recordingClock_pauseFreezesTimeAndResumeContinues() {
+    val clock = RecordingClock()
+    clock.start(0)
+    clock.pause(10 * s) // intervalo aos 10 s de jogo
+    assertEquals(10 * s, clock.toRecUs(15 * s)) // em pausa, o tempo não anda
+    clock.resume(610 * s) // 10 min depois
+    assertEquals(10 * s, clock.toRecUs(610 * s))
+    assertEquals(12 * s, clock.toRecUs(612 * s))
+    assertEquals(600 * s, clock.pausedTotalUs)
+  }
+
+  @Test
   fun timebase_framesInMonotonicClock_areShiftedToBoottime() {
     // Telemóvel ligado há 5 dias, 112 h a dormir: MONOTONIC está 112 h atrás de BOOTTIME.
     val mono = 8 * 3600 * s

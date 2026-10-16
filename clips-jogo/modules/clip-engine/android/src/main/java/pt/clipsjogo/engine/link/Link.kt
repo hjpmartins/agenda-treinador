@@ -159,6 +159,7 @@ object Link {
         put("elapsedMs", SystemClock.elapsedRealtimeNanos() / 1_000_000.0)
         put("state", s["state"])
         put("standby", s["standby"] == true)
+        put("paused", s["paused"] == true)
         put("sessionId", s["sessionId"] ?: JSONObject.NULL)
         put("recStartElapsedMs", ClipEngine.recordingStartElapsedMs() ?: JSONObject.NULL)
         put("batteryPercent", s["batteryPercent"] ?: JSONObject.NULL)
@@ -208,6 +209,16 @@ object Link {
       }
       val id = ClipEngine.startRecording(ClipEngine.selectedQuality, displayRotation())
       return JSONObject().put("ok", true).put("sessionId", id)
+    }
+
+    override fun pauseRecording(): JSONObject {
+      ClipEngine.pauseRecording()
+      return JSONObject().put("ok", true)
+    }
+
+    override fun resumeRecording(): JSONObject {
+      ClipEngine.resumeRecording()
+      return JSONObject().put("ok", true)
     }
 
     override fun stopRecording(): JSONObject {

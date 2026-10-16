@@ -118,6 +118,14 @@ Se o telemóvel não estiver no ecrã Gravar, o tablet diz "Abre o ecrã Gravar 
 - Se o telemóvel aquecer muito: tira a capa, evita sol direto, e considera **720p** (bastante menos esforço).
   Carregar ao mesmo tempo também aquece; usa a powerbank só se a bateria não chegar.
 
+### Pausa (intervalo)
+
+- **❚❚ Pausa** (no telemóvel, ao lado de Parar, ou no Comando do tablet): deixa de gravar e **desliga a câmara** — não
+  ocupa espaço nem aquece. O tempo do jogo fica parado.
+- **▶ Retomar**: a câmara liga-se (~2 s para acertar foco e exposição) e a gravação continua **no mesmo jogo**, com o
+  tempo a continuar de onde parou. O vídeo completo fica sem o intervalo.
+- Durante a pausa não se pedem clips (o tablet mostra "Gravação em pausa (intervalo)").
+
 ### Distância e qualidade da ligação
 
 - No Comando, o aviso **"Wi-Fi bom/razoável/fraco · -62 dBm · 2,4 GHz · 35 ms"** mostra o sinal do tablet, a banda,
@@ -141,6 +149,7 @@ Para usar outra app em ecrã inteiro (ex.: estatísticas) e pedir clips ao mesmo
    - **10s/20s/30s/60s**: pede logo o clip dos últimos segundos (o cronómetro mostra "✓ 20s").
    - **Início** → **Fim**: marca o início e depois o fim do clip. Toque longo cancela a marca.
    - **Arrastar o cronómetro** muda a barra de sítio; **um toque no cronómetro** encolhe-a (fica só o cronómetro) ou expande-a.
+   - **HD / Leve**: qualidade da cópia dos clips para o tablet (toca para trocar; a app passa a usar a mesma).
    - **↗** volta à app de clips (a barra esconde-se enquanto estás nela e reaparece quando sais).
    - "·1" ao lado do cronómetro = pedidos à espera de serem enviados ao telemóvel.
 4. Para desligar, abre a app e carrega em **Barra flutuante: ligada**.

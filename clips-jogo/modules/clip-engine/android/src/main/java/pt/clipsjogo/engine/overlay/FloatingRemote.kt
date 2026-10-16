@@ -71,6 +71,16 @@ object FloatingRemote {
     Client.start(appContext!!, cfg)
   }
 
+  /** Qualidade da cópia para o tablet escolhida na barra (null se a barra não está ativa). */
+  fun currentLight(): Boolean? = if (armed) config?.light else null
+
+  fun setLight(on: Boolean) {
+    val ctx = appContext ?: return
+    val cfg = config?.copy(light = on) ?: return
+    config = cfg
+    Client.start(ctx, cfg) // só atualiza a configuração (o ciclo já está a correr)
+  }
+
   fun disarm() {
     armed = false
     main.post { hide() }
@@ -109,6 +119,10 @@ object FloatingRemote {
       private set
 
     fun motives(): List<String> = config?.motives ?: emptyList()
+
+    fun isLight(): Boolean = config?.light == true
+
+    fun toggleLight() = setLight(!isLight())
 
     fun setMotive(context: Context, clipId: String, motive: String) {
       context.getSharedPreferences(MOTIVES_PREFS, Context.MODE_PRIVATE).edit().putString(clipId, motive).apply()

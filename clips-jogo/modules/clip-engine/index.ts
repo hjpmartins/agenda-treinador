@@ -47,6 +47,8 @@ export type EngineStatus = {
   freeBytes: number;
   bytesPerSecond: number;
   hasMicrophone: boolean;
+  /** Gravação em pausa (intervalo). */
+  paused: boolean;
   linkActive: boolean;
   /** Modo espera: câmara desligada até começar a gravar. */
   standby: boolean;
@@ -91,6 +93,9 @@ declare class ClipEngineNative extends NativeModule<Events> {
   setQuality(quality: Quality): Promise<void>;
   startRecording(quality: Quality): Promise<string>;
   stopRecording(): Promise<void>;
+  /** Intervalo: deixa de gravar e desliga a câmara; o tempo do jogo fica parado. */
+  pauseRecording(): Promise<void>;
+  resumeRecording(): Promise<void>;
   requestClip(id: string | null, startMs: number, endMs: number, name: string | null): Promise<Clip>;
   renameClip(sessionId: string, clipId: string, name: string): Promise<void>;
   deleteClip(sessionId: string, clipId: string): Promise<void>;
@@ -126,6 +131,8 @@ declare class ClipEngineNative extends NativeModule<Events> {
   /** Motivos escolhidos na barra flutuante desde a última chamada (id do clip → motivo). */
   takeBarMotives(): Record<string, string>;
   disarmFloatingBar(): void;
+  /** Qualidade escolhida na barra flutuante (true = leve), ou null se a barra não está ativa. */
+  getBarLight(): boolean | null;
   moveToBackground(): boolean;
 
   /**

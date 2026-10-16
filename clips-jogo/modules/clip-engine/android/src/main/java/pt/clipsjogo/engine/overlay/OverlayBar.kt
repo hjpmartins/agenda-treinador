@@ -14,7 +14,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
-import android.widget.HorizontalScrollView
+import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import kotlin.math.abs
@@ -45,8 +45,12 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
 
   private val root = LinearLayout(context)
   private val row = LinearLayout(context)
-  private val motiveScroll = HorizontalScrollView(context)
-  private val motiveRow = LinearLayout(context)
+  // Painel por baixo da barra: motivos (à esquerda) e jogadoras (à direita), tudo à vista.
+  private val tagPanel = LinearLayout(context)
+  private val motiveColumn = LinearLayout(context)
+  private val playerColumn = LinearLayout(context)
+  private val motiveGrid = GridLayout(context)
+  private val playerGrid = GridLayout(context)
   private var motiveClipId: String? = null
   private val hideMotives = Runnable { showMotives(null) }
   private val timer = TextView(context)
@@ -180,16 +184,33 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
     group.addView(button("↗", SURFACE_HIGH, 42) { actions.openApp(context) })
     row.addView(group)
 
-    // Motivos: aparecem uns segundos depois de pedir um clip (tocar é opcional).
-    motiveRow.orientation = LinearLayout.HORIZONTAL
-    motiveScroll.isHorizontalScrollBarEnabled = false
-    motiveScroll.addView(motiveRow)
-    // Mesma largura que a barra (desliza para ver mais motivos).
-    motiveScroll.layoutParams = LinearLayout.LayoutParams(
-      LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-    ).apply { topMargin = dp(6) }
-    motiveScroll.visibility = View.GONE
-    root.addView(motiveScroll)
+    // Motivos e jogadoras: aparecem depois de pedir um clip (tocar é opcional).
+    fun column(col: LinearLayout, title: String, grid: GridLayout, columns: Int) {
+      col.orientation = LinearLayout.VERTICAL
+      col.addView(TextView(context).apply {
+        text = title
+        setTextColor(MUTED)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        typeface = Typeface.DEFAULT_BOLD
+        setPadding(dp(2), 0, 0, dp(4))
+      })
+      grid.columnCount = columns
+      col.addView(grid)
+    }
+    column(motiveColumn, "MOTIVO", motiveGrid, 2)
+    column(playerColumn, "JOGADORAS", playerGrid, 3)
+    tagPanel.orientation = LinearLayout.HORIZONTAL
+    tagPanel.addView(motiveColumn)
+    tagPanel.addView(View(context).apply { layoutParams = LinearLayout.LayoutParams(dp(14), 1) })
+    tagPanel.addView(playerColumn)
+    tagPanel.addView(button("✓", SURFACE_HIGH, 46) { showMotives(null) }.apply {
+      (layoutParams as LinearLayout.LayoutParams).gravity = Gravity.TOP
+    })
+    tagPanel.layoutParams = LinearLayout.LayoutParams(
+      LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+    ).apply { topMargin = dp(8) }
+    tagPanel.visibility = View.GONE
+    root.addView(tagPanel)
   }
 
   fun attach() {
@@ -212,23 +233,29 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
     chosenMotive = null
     chosenPlayers.clear()
     if (clipId == null || (actions.motives().isEmpty() && actions.players().isEmpty()) || collapsed) {
-      motiveScroll.visibility = View.GONE
+      tagPanel.visibility = View.GONE
       return
     }
     renderChips()
-    motiveScroll.visibility = View.VISIBLE
-    ui.postDelayed(hideMotives, 6000)
+    tagPanel.visibility = View.VISIBLE
+    ui.postDelayed(hideMotives, 8000)
   }
 
-  private fun chip(label: String, selected: Boolean, selColor: Int, onTap: () -> Unit) = TextView(context).apply {
+  private fun chip(label: String, selected: Boolean, selColor: Int, widthDp: Int, onTap: () -> Unit) = TextView(context).apply {
     text = label
     setTextColor(TEXT)
-    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
     typeface = Typeface.DEFAULT_BOLD
     gravity = Gravity.CENTER
-    setPadding(dp(12), 0, dp(12), 0)
-    background = if (selected) rounded(selColor, 18) else rounded(SURFACE_HIGH, 18, BORDER)
-    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)).apply { marginEnd = dp(5) }
+    maxLines = 1
+    ellipsize = android.text.TextUtils.TruncateAt.END
+    setPadding(dp(6), 0, dp(6), 0)
+    background = if (selected) rounded(selColor, 12) else rounded(SURFACE_HIGH, 12, BORDER)
+    layoutParams = GridLayout.LayoutParams().apply {
+      width = dp(widthDp)
+      height = dp(40)
+      setMargins(0, 0, dp(5), dp(5))
+    }
     isClickable = true
     setOnClickListener { v ->
       v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
@@ -236,24 +263,27 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
       renderChips()
       // Mais tempo para escolher o resto (ex.: jogadoras depois do motivo).
       ui.removeCallbacks(hideMotives)
-      ui.postDelayed(hideMotives, 5000)
+      ui.postDelayed(hideMotives, 8000)
     }
   }
 
   private fun renderChips() {
     val id = motiveClipId ?: return
-    motiveRow.removeAllViews()
-    for (m in actions.motives()) {
-      motiveRow.addView(chip(m, chosenMotive == m, ACCENT) {
+    motiveGrid.removeAllViews()
+    playerGrid.removeAllViews()
+    val motives = actions.motives()
+    val players = actions.players()
+    motiveColumn.visibility = if (motives.isEmpty()) View.GONE else View.VISIBLE
+    playerColumn.visibility = if (players.isEmpty()) View.GONE else View.VISIBLE
+    for (m in motives) {
+      motiveGrid.addView(chip(m, chosenMotive == m, ACCENT, 148) {
         chosenMotive = m
         actions.setMotive(context, id, m)
         flash("✓ $m", OK)
       })
     }
-    val players = actions.players()
-    if (players.isNotEmpty()) motiveRow.addView(View(context).apply { layoutParams = LinearLayout.LayoutParams(dp(10), 1) })
     for ((num, label) in players) {
-      motiveRow.addView(chip(label, num in chosenPlayers, PLAYER_BLUE) {
+      playerGrid.addView(chip(label, num in chosenPlayers, PLAYER_BLUE, 104) {
         if (!chosenPlayers.add(num)) chosenPlayers.remove(num)
         actions.setPlayers(context, id, chosenPlayers.toList())
       })
@@ -278,7 +308,7 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
 
   private fun applyCollapsed() {
     group.visibility = if (collapsed) View.GONE else View.VISIBLE
-    if (collapsed) motiveScroll.visibility = View.GONE
+    if (collapsed) tagPanel.visibility = View.GONE
   }
 
   private fun refresh() {

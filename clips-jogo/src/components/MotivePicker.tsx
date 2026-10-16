@@ -79,13 +79,16 @@ export function MotivePicker({
 export function MotiveChips({ value, onChange }: { value: string | null; onChange: (m: string | null) => void }) {
   useNotesVersion();
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-      {getMotives().map((m) => (
-        <Pressable key={m} onPress={() => onChange(value === m ? null : m)} style={[styles.chip, value === m && styles.chipOn]}>
-          <Text style={[styles.chipText, value === m && { color: '#fff' }]}>{m}</Text>
-        </Pressable>
-      ))}
-    </ScrollView>
+    <View style={styles.block}>
+      <Text style={styles.blockTitle}>MOTIVO</Text>
+      <View style={styles.wrap}>
+        {getMotives().map((m) => (
+          <Pressable key={m} onPress={() => onChange(value === m ? null : m)} style={[styles.chip, value === m && styles.chipOn]}>
+            <Text style={[styles.chipText, value === m && { color: '#fff' }]}>{m}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -96,7 +99,9 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { color: colors.text, fontSize: 20, fontWeight: '800' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1) },
-  row: { flexDirection: 'row', gap: space(1), paddingVertical: 2 },
+  block: { gap: 4 },
+  blockTitle: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

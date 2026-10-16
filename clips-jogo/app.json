@@ -3,7 +3,7 @@
     "name": "Clips de Jogo",
     "slug": "clips-jogo",
     "scheme": "clipsjogo",
-    "version": "0.9.0",
+    "version": "0.9.1",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",

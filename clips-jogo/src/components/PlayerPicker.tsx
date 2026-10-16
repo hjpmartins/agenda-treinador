@@ -112,16 +112,19 @@ export function PlayerChips({ value, onChange }: { value: string[]; onChange: (p
   const roster = getRoster();
   if (roster.length === 0) return null;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-      {roster.map((p) => {
-        const on = value.includes(p.n);
-        return (
-          <Pressable key={p.n + p.nome} onPress={() => onChange(togglePlayer(value, p.n))} style={[styles.chip, on && styles.chipOn]}>
-            <Text style={[styles.chipText, on && { color: '#fff' }]}>{playerLabel(p)}</Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+    <View style={styles.block}>
+      <Text style={styles.blockTitle}>JOGADORAS</Text>
+      <View style={styles.wrap}>
+        {roster.map((p) => {
+          const on = value.includes(p.n);
+          return (
+            <Pressable key={p.n + p.nome} onPress={() => onChange(togglePlayer(value, p.n))} style={[styles.chip, on && styles.chipOn]}>
+              <Text style={[styles.chipText, on && { color: '#fff' }]}>{playerLabel(p)}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -139,7 +142,9 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 20, fontWeight: '800' },
   muted: { color: colors.muted, fontSize: 14 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1) },
-  row: { flexDirection: 'row', gap: space(1), paddingVertical: 2 },
+  block: { gap: 4 },
+  blockTitle: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

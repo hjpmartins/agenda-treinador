@@ -87,8 +87,9 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
 
 - **Plantel**: na Agenda do Treinador (no tablet), ecrã **Plantel → "Enviar para Clips de Jogo"** — abre esta app e
   importa número e nome das jogadoras. Também se edita à mão: ecrã inicial → **Plantel**.
-- **Marcar jogadoras num clip** (várias): no painel do clip acabado de pedir (fila azul), na **barra flutuante** (a
-  seguir aos motivos, a azul), ou depois em "+ jogadora" na lista / no leitor.
+- **Marcar jogadoras num clip** (várias): no painel do clip acabado de pedir (motivos e jogadoras em blocos separados),
+  na **barra flutuante** (painel por baixo da barra: motivos à esquerda, jogadoras à direita; fecha com ✓ ou 8 s depois
+  do último toque), ou depois em "+ jogadora" na lista / no leitor.
 - **Ver gravações e clips → Por jogadora**: clips de cada jogadora (dos jogos guardados) → **▶ Ver seguidos** ou
   **Enviar todos** (WhatsApp…): os que têm corte ou desenhos vão na versão com desenhos.
 

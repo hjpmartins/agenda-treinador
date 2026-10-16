@@ -684,8 +684,15 @@ function DraftPanel({
           onSubmitEditing={onSend}
         />
       </View>
-      <MotiveChips value={draft.motive} onChange={onMotive} />
-      <PlayerChips value={draft.players} onChange={onPlayers} />
+      {/* Motivos e jogadoras lado a lado (um por baixo do outro se não couber). */}
+      <View style={styles.tagCols}>
+        <View style={styles.tagCol}>
+          <MotiveChips value={draft.motive} onChange={onMotive} />
+        </View>
+        <View style={styles.tagCol}>
+          <PlayerChips value={draft.players} onChange={onPlayers} />
+        </View>
+      </View>
       <View style={[styles.draftRow, styles.wrap]}>
         <Text style={styles.label}>Início</Text>
         <Button label="−5s" onPress={() => onAdjust('start', -ADJUST_STEP_MS)} />
@@ -936,6 +943,8 @@ const styles = StyleSheet.create({
   motive: { color: colors.accent, fontWeight: '700', marginTop: 2 },
   players: { color: '#5AA2FF', fontWeight: '700', marginTop: 2 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space(1.5) },
+  tagCols: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2) },
+  tagCol: { flexGrow: 1, flexBasis: 260 },
   motiveEmpty: { color: colors.muted, marginTop: 2 },
   descBackdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: space(2) },
   descCard: {

@@ -52,3 +52,23 @@ test('agrupar por motivo', () => {
   const g = groupByMotive(clips, { a: { motive: 'Y' }, b: { motive: 'X' }, c: { motive: 'Y' } }, ['X', 'Y', 'Z']);
   assert.deepEqual(g.map((x) => [x.motive, x.clips.length]), [['X', 1], ['Y', 2]]);
 });
+
+import { groupByPlayer, parseRosterLink, playerLabel, togglePlayer } from '../src/lib/annotations.ts';
+
+test('plantel enviado pela Agenda', () => {
+  const data = [{ n: '8', nome: 'Carlota Raquel' }, { n: '00', nome: 'Matilde Vaz' }, { n: '', nome: '' }, { n: '13', nome: 'Petra' }];
+  const r = parseRosterLink(`clipsjogo://plantel?d=${encodeURIComponent(JSON.stringify(data))}`);
+  assert.deepEqual(r?.map((p) => p.n), ['00', '8', '13']);
+  assert.equal(parseRosterLink('clipsjogo://outra'), null);
+  assert.equal(parseRosterLink('clipsjogo://plantel?d=lixo'), null);
+  assert.equal(playerLabel({ n: '8', nome: 'Carlota Raquel' }), '#8 Carlota');
+  assert.equal(playerLabel({ n: '', nome: 'Ana' }), 'Ana');
+});
+
+test('jogadoras nos clips', () => {
+  assert.deepEqual(togglePlayer(undefined, '8'), ['8']);
+  assert.deepEqual(togglePlayer(['8', '5'], '8'), ['5']);
+  const roster = [{ n: '5', nome: 'A' }, { n: '8', nome: 'B' }, { n: '9', nome: 'C' }];
+  const g = groupByPlayer([{ id: 'x' }, { id: 'y' }], { x: { players: ['8', '5'] }, y: { players: ['8'] } }, roster);
+  assert.deepEqual(g.map((x) => [x.player.n, x.clips.length]), [['5', 1], ['8', 2]]);
+});

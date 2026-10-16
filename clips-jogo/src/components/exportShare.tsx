@@ -11,9 +11,11 @@ export const FREEZE_MS = 4000;
 
 // Progresso da criação do vídeo (um de cada vez), mostrado por <ExportOverlay/>.
 let progress: number | null = null;
+let label = 'A preparar o vídeo com os desenhos…';
 const listeners = new Set<() => void>();
-function setProgress(p: number | null) {
+function setProgress(p: number | null, text?: string) {
   progress = p;
+  if (text) label = text;
   listeners.forEach((l) => l());
 }
 
@@ -23,22 +25,48 @@ export function hasEdits(id: string): boolean {
 }
 
 /** Cria o vídeo com o corte e os desenhos e abre a partilha (WhatsApp, YouTube, …). */
+function exportOne(id: string, uri: string): Promise<string> {
+  const n = getNotes(id);
+  return ClipEngine!.exportAnnotated(uri, n.trim?.startMs ?? 0, n.trim?.endMs ?? 0, JSON.stringify(n.moments ?? []), FREEZE_MS);
+}
+
 export async function shareWithDrawings(id: string, uri: string) {
   if (!ClipEngine) throw new Error('Indisponível neste dispositivo.');
   if (progress != null) return;
-  const n = getNotes(id);
-  setProgress(0);
+  setProgress(0, 'A preparar o vídeo com os desenhos…');
   const sub = addEngineListener('onExportProgress', ({ progress: p }) => setProgress(p));
   try {
-    const out = await ClipEngine.exportAnnotated(
-      uri,
-      n.trim?.startMs ?? 0,
-      n.trim?.endMs ?? 0,
-      JSON.stringify(n.moments ?? []),
-      FREEZE_MS
-    );
+    const out = await exportOne(id, uri);
     setProgress(null);
     await share(out);
+  } finally {
+    sub?.remove();
+    setProgress(null);
+  }
+}
+
+/**
+ * Envia vários clips de uma vez (ex.: todos os de uma jogadora): os que têm corte
+ * ou desenhos vão na versão com desenhos, os outros como estão.
+ */
+export async function shareMany(items: { id: string; uri: string }[], title: string) {
+  if (!ClipEngine) throw new Error('Indisponível neste dispositivo.');
+  if (progress != null || items.length === 0) return;
+  const total = items.length;
+  let index = 0;
+  setProgress(0, `A preparar 1/${total}…`);
+  const sub = addEngineListener('onExportProgress', ({ progress: p }) =>
+    setProgress((index + p) / total, `A preparar ${index + 1}/${total}…`)
+  );
+  try {
+    const out: string[] = [];
+    for (; index < total; index++) {
+      const it = items[index];
+      setProgress(index / total, `A preparar ${index + 1}/${total}…`);
+      out.push(hasEdits(it.id) ? await exportOne(it.id, it.uri) : it.uri);
+    }
+    setProgress(null);
+    ClipEngine.shareFiles(out, title);
   } finally {
     sub?.remove();
     setProgress(null);
@@ -68,11 +96,12 @@ export function ExportOverlay() {
     () => progress
   );
   if (p == null) return null;
+  const text = label;
   return (
     <Modal visible transparent animationType="fade" supportedOrientations={['landscape', 'portrait']}>
       <View style={styles.backdrop}>
         <Card style={styles.card}>
-          <Text style={styles.title}>A preparar o vídeo com os desenhos…</Text>
+          <Text style={styles.title}>{text}</Text>
           <ProgressBar value={p} />
           <Text style={styles.muted}>{Math.round(p * 100)}%</Text>
         </Card>

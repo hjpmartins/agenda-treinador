@@ -83,6 +83,15 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
 - **Desconto** (botão no Comando): clips deste jogo agrupados por motivo; toca num motivo e os clips passam seguidos.
 - Em **Ver gravações e clips → Recebidos**, cada jogo tem "Ver seguidos" por motivo, para a análise durante a semana.
 
+### Jogadoras (plantel)
+
+- **Plantel**: na Agenda do Treinador (no tablet), ecrã **Plantel → "Enviar para Clips de Jogo"** — abre esta app e
+  importa número e nome das jogadoras. Também se edita à mão: ecrã inicial → **Plantel**.
+- **Marcar jogadoras num clip** (várias): no painel do clip acabado de pedir (fila azul), na **barra flutuante** (a
+  seguir aos motivos, a azul), ou depois em "+ jogadora" na lista / no leitor.
+- **Ver gravações e clips → Por jogadora**: clips de cada jogadora (dos jogos guardados) → **▶ Ver seguidos** ou
+  **Enviar todos** (WhatsApp…): os que têm corte ou desenhos vão na versão com desenhos.
+
 ### Iniciar e parar a gravação a partir do tablet
 
 Para deixar o telemóvel no tripé (ex.: na bancada) antes do jogo e só começar a gravar no início:

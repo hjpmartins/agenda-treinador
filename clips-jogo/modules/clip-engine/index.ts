@@ -126,8 +126,12 @@ declare class ClipEngineNative extends NativeModule<Events> {
     skipIds: string[],
     autoDownload: boolean,
     light: boolean,
-    motives: string[]
+    motives: string[],
+    playerNums: string[],
+    playerLabels: string[]
   ): void;
+  /** Jogadoras escolhidas na barra flutuante desde a última chamada (id do clip → números). */
+  takeBarPlayers(): Record<string, string[]>;
   /** Motivos escolhidos na barra flutuante desde a última chamada (id do clip → motivo). */
   takeBarMotives(): Record<string, string>;
   disarmFloatingBar(): void;
@@ -140,6 +144,9 @@ declare class ClipEngineNative extends NativeModule<Events> {
    * parada freezeMs em cada desenho. momentsJson = JSON de [{ atMs, strokes }]. Devolve o uri.
    */
   exportAnnotated(srcUri: string, startMs: number, endMs: number, momentsJson: string, freezeMs: number): Promise<string>;
+
+  /** Partilhar vários vídeos de uma vez (uris file://, dentro de recebidos/ ou exportados/). */
+  shareFiles(uris: string[], title: string): void;
 
   // Atualizações da app
   /** Caminho do APK desta versão se já foi descarregado, senão null. */

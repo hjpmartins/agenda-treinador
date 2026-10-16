@@ -35,6 +35,7 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
     const val WARN = 0xFFFFB020.toInt()
     const val OK = 0xFF2ECC71.toInt()
     const val REC = 0xFFFF3B30.toInt()
+    const val PLAYER_BLUE = 0xFF2D7FF9.toInt()
     val PRESETS = intArrayOf(10, 20, 30, 60)
   }
 
@@ -198,38 +199,65 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
     ui.post(tick)
   }
 
-  /** Mostra os motivos para o clip acabado de pedir (null esconde). */
+  /**
+   * Depois de pedir um clip: motivos (laranja, um) e jogadoras (azul, várias) para
+   * tocar. Tudo opcional; a fila esconde-se uns segundos depois do último toque.
+   */
+  private var chosenMotive: String? = null
+  private val chosenPlayers = LinkedHashSet<String>()
+
   private fun showMotives(clipId: String?) {
     ui.removeCallbacks(hideMotives)
-    val motives = actions.motives()
     motiveClipId = clipId
-    if (clipId == null || motives.isEmpty() || collapsed) {
+    chosenMotive = null
+    chosenPlayers.clear()
+    if (clipId == null || (actions.motives().isEmpty() && actions.players().isEmpty()) || collapsed) {
       motiveScroll.visibility = View.GONE
       return
     }
-    motiveRow.removeAllViews()
-    for (m in motives) {
-      motiveRow.addView(TextView(context).apply {
-        text = m
-        setTextColor(TEXT)
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-        typeface = Typeface.DEFAULT_BOLD
-        gravity = Gravity.CENTER
-        setPadding(dp(12), 0, dp(12), 0)
-        background = rounded(SURFACE_HIGH, 18, BORDER)
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)).apply { marginEnd = dp(5) }
-        isClickable = true
-        setOnClickListener { v ->
-          val id = motiveClipId ?: return@setOnClickListener
-          actions.setMotive(context, id, m)
-          v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-          flash("✓ $m", OK)
-          showMotives(null)
-        }
-      })
-    }
+    renderChips()
     motiveScroll.visibility = View.VISIBLE
     ui.postDelayed(hideMotives, 6000)
+  }
+
+  private fun chip(label: String, selected: Boolean, selColor: Int, onTap: () -> Unit) = TextView(context).apply {
+    text = label
+    setTextColor(TEXT)
+    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+    typeface = Typeface.DEFAULT_BOLD
+    gravity = Gravity.CENTER
+    setPadding(dp(12), 0, dp(12), 0)
+    background = if (selected) rounded(selColor, 18) else rounded(SURFACE_HIGH, 18, BORDER)
+    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)).apply { marginEnd = dp(5) }
+    isClickable = true
+    setOnClickListener { v ->
+      v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+      onTap()
+      renderChips()
+      // Mais tempo para escolher o resto (ex.: jogadoras depois do motivo).
+      ui.removeCallbacks(hideMotives)
+      ui.postDelayed(hideMotives, 5000)
+    }
+  }
+
+  private fun renderChips() {
+    val id = motiveClipId ?: return
+    motiveRow.removeAllViews()
+    for (m in actions.motives()) {
+      motiveRow.addView(chip(m, chosenMotive == m, ACCENT) {
+        chosenMotive = m
+        actions.setMotive(context, id, m)
+        flash("✓ $m", OK)
+      })
+    }
+    val players = actions.players()
+    if (players.isNotEmpty()) motiveRow.addView(View(context).apply { layoutParams = LinearLayout.LayoutParams(dp(10), 1) })
+    for ((num, label) in players) {
+      motiveRow.addView(chip(label, num in chosenPlayers, PLAYER_BLUE) {
+        if (!chosenPlayers.add(num)) chosenPlayers.remove(num)
+        actions.setPlayers(context, id, chosenPlayers.toList())
+      })
+    }
   }
 
   fun detach() {

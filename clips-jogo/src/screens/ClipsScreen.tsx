@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, BackHandler, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addEngineListener, ClipEngine, type Clip, type Session } from '../../modules/clip-engine';
 import { AnalysisPlayer, type AnalysisItem } from '../components/AnalysisPlayer';
-import { shareClip } from '../components/exportShare';
+import { shareClip, shareMany } from '../components/exportShare';
+import { PlayerPicker, playersShort } from '../components/PlayerPicker';
 import { PlayerModal, run, saveToGallery, share } from '../components/media';
 import { MotivePicker } from '../components/MotivePicker';
-import { groupByMotive } from '../lib/annotations';
+import { groupByMotive, groupByPlayer, playerLabel, type Player } from '../lib/annotations';
 import { KEEP_GAMES, nextToPrune } from '../lib/retention';
-import { allNotes, getMotives, getNotes, setNotes, useNotesVersion } from '../remote/notesStore';
+import { allNotes, getMotives, getNotes, getRoster, setNotes, useNotesVersion } from '../remote/notesStore';
 import { Button, Card } from '../components/ui';
 import {
   deleteReceived,
@@ -41,6 +42,7 @@ export function ClipsScreen({ onBack }: Props) {
   const [received, setReceived] = useState<ReceivedClip[]>(() => listReceived());
   const [analysis, setAnalysis] = useState<{ items: AnalysisItem[]; index: number } | null>(null);
   const [motiveFor, setMotiveFor] = useState<string | null>(null);
+  const [playersFor, setPlayersFor] = useState<string | null>(null);
   const phoneNextToPrune = nextToPrune(
     (sessions ?? [])
       .filter((x) => x.status !== 'recording' && x.status !== 'finalizing')
@@ -51,6 +53,7 @@ export function ClipsScreen({ onBack }: Props) {
   useEffect(() => {
     try {
       for (const [id, motive] of Object.entries(ClipEngine?.takeBarMotives() ?? {})) setNotes(id, { motive });
+      for (const [id, players] of Object.entries(ClipEngine?.takeBarPlayers() ?? {})) setNotes(id, { players });
     } catch {
       // ignora
     }
@@ -137,6 +140,7 @@ export function ClipsScreen({ onBack }: Props) {
                 clips={received}
                 onPlay={(items, index) => setAnalysis({ items, index })}
                 onMotive={(c) => setMotiveFor(c.id)}
+                onPlayers={(c) => setPlayersFor(c.id)}
                 onDelete={(c) =>
                   Alert.alert('Apagar do tablet?', c.name, [
                     { text: 'Cancelar', style: 'cancel' },
@@ -241,6 +245,12 @@ export function ClipsScreen({ onBack }: Props) {
 
       {playing ? <PlayerModal uri={playing.uri} title={playing.title} onClose={() => setPlaying(null)} /> : null}
       {analysis ? <AnalysisPlayer items={analysis.items} startIndex={analysis.index} onClose={() => setAnalysis(null)} /> : null}
+      <PlayerPicker
+        visible={playersFor != null}
+        selected={playersFor ? getNotes(playersFor).players ?? [] : []}
+        onChange={(players) => playersFor && setNotes(playersFor, { players })}
+        onClose={() => setPlayersFor(null)}
+      />
       <MotivePicker
         visible={motiveFor != null}
         current={motiveFor ? getNotes(motiveFor).motive ?? null : null}
@@ -259,23 +269,56 @@ function ReceivedSection({
   clips,
   onPlay,
   onMotive,
+  onPlayers,
   onDelete,
 }: {
   clips: ReceivedClip[];
   onPlay: (items: AnalysisItem[], index: number) => void;
   onMotive: (c: ReceivedClip) => void;
+  onPlayers: (c: ReceivedClip) => void;
   onDelete: (c: ReceivedClip) => void;
 }) {
   useNotesVersion();
   const notes = allNotes();
   const toItem = (c: ReceivedClip): AnalysisItem => ({ id: c.id, uri: c.uri, title: c.name });
   const willPrune = nextToPrune(clips);
+  const [forPlayer, setForPlayer] = useState<Player | null>(null);
+  const byPlayer = groupByPlayer(
+    [...clips].sort((a, b) => a.createdAtMs - b.createdAtMs),
+    notes,
+    getRoster()
+  );
   const bySession = new Map<string, ReceivedClip[]>();
   for (const c of [...clips].sort((a, b) => b.createdAtMs - a.createdAtMs)) {
     bySession.set(c.sessionId, [...(bySession.get(c.sessionId) ?? []), c]);
   }
   return (
     <View style={{ gap: space(2), marginBottom: space(2) }}>
+      {byPlayer.length > 0 ? (
+        <Card style={{ gap: space(1) }}>
+          <Text style={styles.sessionTitle}>Por jogadora</Text>
+          <View style={styles.motiveRow}>
+            {byPlayer.map((g) => (
+              <Pressable key={g.player.n + g.player.nome} onPress={() => setForPlayer(g.player)} style={styles.playerChip}>
+                <Text style={styles.motiveChipText}>
+                  {playerLabel(g.player)} ({g.clips.length})
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Card>
+      ) : null}
+      {forPlayer ? (
+        <PlayerClipsModal
+          player={forPlayer}
+          clips={byPlayer.find((g) => g.player.n === forPlayer.n && g.player.nome === forPlayer.nome)?.clips ?? []}
+          onPlay={(items) => {
+            setForPlayer(null);
+            onPlay(items, 0);
+          }}
+          onClose={() => setForPlayer(null)}
+        />
+      ) : null}
       {[...bySession.entries()].map(([sessionId, list]) => (
         <Card key={sessionId}>
           <Text style={styles.sessionTitle}>Recebidos · jogo de {sessionLabel(sessionId)}</Text>
@@ -312,11 +355,18 @@ function ReceivedSection({
                       {formatBytes(c.sizeBytes)}
                       {c.leve ? ' · cópia leve' : ''}
                     </Text>
-                    <Pressable onPress={() => onMotive(c)} hitSlop={6}>
-                      <Text style={notes[c.id]?.motive ? styles.motiveText : styles.muted}>
-                        {notes[c.id]?.motive ?? '+ motivo'}
-                      </Text>
-                    </Pressable>
+                    <View style={styles.tagRow}>
+                      <Pressable onPress={() => onMotive(c)} hitSlop={6}>
+                        <Text style={notes[c.id]?.motive ? styles.motiveText : styles.muted}>
+                          {notes[c.id]?.motive ?? '+ motivo'}
+                        </Text>
+                      </Pressable>
+                      <Pressable onPress={() => onPlayers(c)} hitSlop={6}>
+                        <Text style={notes[c.id]?.players?.length ? styles.playersText : styles.muted}>
+                          {playersShort(notes[c.id]?.players) ?? '+ jogadora'}
+                        </Text>
+                      </Pressable>
+                    </View>
                   </View>
                   <Pressable onPress={() => onDelete(c)} hitSlop={12} style={styles.trash}>
                     <Text style={styles.trashText}>✕</Text>
@@ -332,6 +382,53 @@ function ReceivedSection({
         </Card>
       ))}
     </View>
+  );
+}
+
+/** Clips de uma jogadora (todos os jogos guardados): ver seguidos ou enviar todos. */
+function PlayerClipsModal({
+  player,
+  clips,
+  onPlay,
+  onClose,
+}: {
+  player: Player;
+  clips: ReceivedClip[];
+  onPlay: (items: AnalysisItem[]) => void;
+  onClose: () => void;
+}) {
+  const items = clips.map((c) => ({ id: c.id, uri: c.uri, title: c.name }));
+  const notes = allNotes();
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose} supportedOrientations={['landscape', 'portrait']}>
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        <Pressable onPress={() => {}} style={styles.modalCard}>
+          <Text style={styles.sessionTitle}>
+            {playerLabel(player)} · {clips.length} clip{clips.length === 1 ? '' : 's'}
+          </Text>
+          <ScrollView style={{ maxHeight: 280 }} contentContainerStyle={{ gap: 6 }}>
+            {clips.map((c) => (
+              <Text key={c.id} style={styles.muted}>
+                • {sessionLabel(c.sessionId)} · {formatClock(c.startMs)} · {notes[c.id]?.motive ?? 'sem motivo'}
+                {(notes[c.id]?.moments?.length ?? 0) > 0 ? ' · com desenhos' : ''}
+              </Text>
+            ))}
+          </ScrollView>
+          <Button label="▶ Ver seguidos" variant="primary" size="l" onPress={() => onPlay(items)} />
+          <Button
+            label="Enviar todos (WhatsApp…)"
+            sublabel="Os que têm corte ou desenhos vão com os desenhos"
+            onPress={() => {
+              onClose();
+              shareMany(items, `Clips · ${playerLabel(player)}`).catch((e) =>
+                Alert.alert('Erro', e instanceof Error ? e.message : String(e))
+              );
+            }}
+          />
+          <Button label="Fechar" variant="ghost" onPress={onClose} />
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -361,6 +458,19 @@ const styles = StyleSheet.create({
   },
   motiveChipText: { color: '#fff', fontWeight: '700' },
   motiveText: { color: colors.accent, fontWeight: '700', marginTop: 2 },
+  playersText: { color: '#5AA2FF', fontWeight: '700', marginTop: 2 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space(1.5) },
+  playerChip: { borderRadius: radius.pill, backgroundColor: '#2D7FF9', paddingHorizontal: space(1.5), paddingVertical: 6 },
+  modalBackdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: space(2) },
+  modalCard: {
+    width: '100%',
+    maxWidth: 560,
+    maxHeight: '90%',
+    gap: space(1.5),
+    backgroundColor: colors.surface,
+    borderRadius: radius.l,
+    padding: space(2),
+  },
   root: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: space(2) },
   header: { flexDirection: 'row', alignItems: 'center', gap: space(2), paddingVertical: space(2) },
   title: { color: colors.text, fontSize: 24, fontWeight: '800' },

@@ -35,7 +35,21 @@ object FloatingRemote {
     val light: Boolean = false,
     /** Motivos para escolher logo a seguir a pedir um clip. */
     val motives: List<String> = emptyList(),
+    /** Plantel: (número, "#8 Carlota"). */
+    val players: List<Pair<String, String>> = emptyList(),
   )
+
+  private const val PLAYERS_PREFS = "clips_barra_jogadoras"
+
+  /** Jogadoras escolhidas na barra (id do clip → números), para a app registar ao voltar. */
+  fun takePlayers(context: Context): Map<String, List<String>> {
+    val prefs = context.getSharedPreferences(PLAYERS_PREFS, Context.MODE_PRIVATE)
+    val all = prefs.all.mapNotNull { (k, v) ->
+      (v as? String)?.let { k to it.split(',').filter { n -> n.isNotEmpty() } }
+    }.toMap()
+    prefs.edit().clear().apply()
+    return all
+  }
 
   private const val MOTIVES_PREFS = "clips_barra_motivos"
 
@@ -119,6 +133,13 @@ object FloatingRemote {
       private set
 
     fun motives(): List<String> = config?.motives ?: emptyList()
+
+    fun players(): List<Pair<String, String>> = config?.players ?: emptyList()
+
+    fun setPlayers(context: Context, clipId: String, nums: List<String>) {
+      context.getSharedPreferences(PLAYERS_PREFS, Context.MODE_PRIVATE).edit()
+        .putString(clipId, nums.joinToString(",")).apply()
+    }
 
     fun isLight(): Boolean = config?.light == true
 

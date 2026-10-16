@@ -295,6 +295,29 @@ class ClipEngineModule : Module() {
       }, "exportar-desenhos").start()
     }
 
+    /** Partilhar vários vídeos de uma vez (ex.: todos os clips de uma jogadora pelo WhatsApp). */
+    Function("shareFiles") { uris: List<String>, title: String ->
+      val context = appContext.reactContext!!
+      val authority = "${context.packageName}.clipengine.updates"
+      val contentUris = ArrayList(uris.map { u ->
+        androidx.core.content.FileProvider.getUriForFile(context, authority, java.io.File(Uri.parse(u).path ?: u))
+      })
+      if (contentUris.isEmpty()) return@Function
+      val send = android.content.Intent(
+        if (contentUris.size == 1) android.content.Intent.ACTION_SEND else android.content.Intent.ACTION_SEND_MULTIPLE
+      ).apply {
+        type = "video/mp4"
+        if (contentUris.size == 1) putExtra(android.content.Intent.EXTRA_STREAM, contentUris[0])
+        else putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, contentUris)
+        clipData = android.content.ClipData.newUri(context.contentResolver, title, contentUris[0]).also { cd ->
+          contentUris.drop(1).forEach { cd.addItem(android.content.ClipData.Item(it)) }
+        }
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      }
+      val chooser = android.content.Intent.createChooser(send, title).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+      (appContext.currentActivity ?: context).startActivity(chooser)
+    }
+
     // ---------------------------------------------------------- barra flutuante (tablet)
 
     OnActivityEntersBackground { FloatingRemote.onAppBackground() }
@@ -306,9 +329,15 @@ class ClipEngineModule : Module() {
       FloatingRemote.openPermissionSettings(appContext.reactContext!!)
     }
 
-    Function("armFloatingBar") { urls: List<String>, token: String, skipIds: List<String>, autoDownload: Boolean, light: Boolean, motives: List<String> ->
-      FloatingRemote.arm(appContext.reactContext!!, FloatingRemote.Config(urls, token, skipIds.toSet(), autoDownload, light, motives))
+    Function("armFloatingBar") { urls: List<String>, token: String, skipIds: List<String>, autoDownload: Boolean, light: Boolean, motives: List<String>, playerNums: List<String>, playerLabels: List<String> ->
+      FloatingRemote.arm(
+        appContext.reactContext!!,
+        FloatingRemote.Config(urls, token, skipIds.toSet(), autoDownload, light, motives, playerNums.zip(playerLabels))
+      )
     }
+
+    /** Jogadoras escolhidas na barra flutuante desde a última chamada (id do clip → números). */
+    Function("takeBarPlayers") { FloatingRemote.takePlayers(appContext.reactContext!!) }
 
     /** Motivos escolhidos na barra flutuante desde a última vez (id do clip → motivo). */
     Function("takeBarMotives") { FloatingRemote.takeMotives(appContext.reactContext!!) }

@@ -1,12 +1,12 @@
 import { File, Paths } from 'expo-file-system';
 import { useSyncExternalStore } from 'react';
-import { DEFAULT_MOTIVES, type ClipNotes } from '../lib/annotations';
+import { DEFAULT_MOTIVES, type ClipNotes, type Player } from '../lib/annotations';
 
 /**
  * Anotações dos clips no tablet (motivo, corte, desenhos) e lista de motivos.
  * Guardadas por id de clip, por isso servem antes e depois de o clip ser copiado.
  */
-type Data = { notes: Record<string, ClipNotes>; motives: string[] };
+type Data = { notes: Record<string, ClipNotes>; motives: string[]; roster: Player[] };
 
 const file = () => new File(Paths.document, 'anotacoes.json');
 let data: Data | null = null;
@@ -18,9 +18,13 @@ function load(): Data {
   try {
     const f = file();
     const parsed = f.exists ? (JSON.parse(f.textSync()) as Partial<Data>) : {};
-    data = { notes: parsed.notes ?? {}, motives: parsed.motives?.length ? parsed.motives : DEFAULT_MOTIVES };
+    data = {
+      notes: parsed.notes ?? {},
+      motives: parsed.motives?.length ? parsed.motives : DEFAULT_MOTIVES,
+      roster: parsed.roster ?? [],
+    };
   } catch {
-    data = { notes: {}, motives: DEFAULT_MOTIVES };
+    data = { notes: {}, motives: DEFAULT_MOTIVES, roster: [] };
   }
   return data;
 }
@@ -51,6 +55,15 @@ export function getMotives(): string[] {
 
 export function setMotives(motives: string[]) {
   commit({ ...load(), motives });
+}
+
+/** Plantel (número + nome) para marcar as jogadoras nos clips. */
+export function getRoster(): Player[] {
+  return load().roster;
+}
+
+export function setRoster(roster: Player[]) {
+  commit({ ...load(), roster });
 }
 
 function subscribe(l: () => void) {

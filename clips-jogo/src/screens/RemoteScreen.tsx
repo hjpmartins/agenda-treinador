@@ -23,8 +23,9 @@ import { AnalysisPlayer, type AnalysisItem } from '../components/AnalysisPlayer'
 import { shareClip } from '../components/exportShare';
 import { run, saveToGallery } from '../components/media';
 import { MotiveChips, MotivePicker } from '../components/MotivePicker';
-import { groupByMotive } from '../lib/annotations';
-import { allNotes, getMotives, getNotes, setNotes, useNotesVersion } from '../remote/notesStore';
+import { PlayerChips, PlayerPicker, playersShort } from '../components/PlayerPicker';
+import { groupByMotive, playerLabel } from '../lib/annotations';
+import { allNotes, getMotives, getNotes, getRoster, setNotes, useNotesVersion } from '../remote/notesStore';
 import { Button, Card, Chip } from '../components/ui';
 import { ADJUST_STEP_MS, fromMarks, lastSeconds, normalize, PRESET_SECONDS, type ClipRange } from '../lib/clipRange';
 import { classifySignal, formatBand, overallQuality } from '../lib/linkQuality';
@@ -152,7 +153,7 @@ function ScanView({ onPaired, onBack }: { onPaired: (p: Pairing) => void; onBack
 
 // ======================================================================== comando
 
-type Draft = ClipRange & { name: string; createdAt: number; motive: string | null };
+type Draft = ClipRange & { name: string; createdAt: number; motive: string | null; players: string[] };
 
 function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconnect: () => void }) {
   const [snap, setSnap] = useState<RemoteSnapshot>(() => client.state);
@@ -176,6 +177,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
   const [flash, setFlash] = useState<string | null>(null);
   const [playing, setPlaying] = useState<{ items: AnalysisItem[]; index: number } | null>(null);
   const [motiveFor, setMotiveFor] = useState<string | null>(null);
+  const [playersFor, setPlayersFor] = useState<string | null>(null);
   const [showDesconto, setShowDesconto] = useState(false);
   useNotesVersion();
   const pulse = useRef(new Animated.Value(0)).current;
@@ -203,7 +205,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
   const send = useCallback(
     (d: Draft) => {
       const id = client.requestClip(d.startMs, d.endMs, d.name);
-      if (d.motive) setNotes(id, { motive: d.motive });
+      if (d.motive || d.players.length) setNotes(id, { motive: d.motive, players: d.players });
       setDraft(null);
       setCountdown(null);
       feedback(`Clip pedido · ${formatDuration(d.endMs - d.startMs)}`);
@@ -227,10 +229,10 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
       // Se já havia um rascunho por enviar, envia-o antes de criar o novo.
       if (draft) {
         const id = client.requestClip(draft.startMs, draft.endMs, draft.name);
-        if (draft.motive) setNotes(id, { motive: draft.motive });
+        if (draft.motive || draft.players.length) setNotes(id, { motive: draft.motive, players: draft.players });
       }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      setDraft({ ...range, name: '', createdAt: Date.now(), motive: null });
+      setDraft({ ...range, name: '', createdAt: Date.now(), motive: null, players: [] });
       setCountdown(AUTO_SEND_SECONDS);
     },
     [client, draft]
@@ -281,6 +283,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
       try {
         const picked = ClipEngine?.takeBarMotives() ?? {};
         for (const [id, motive] of Object.entries(picked)) setNotes(id, { motive });
+        for (const [id, players] of Object.entries(ClipEngine?.takeBarPlayers() ?? {})) setNotes(id, { players });
         // Qualidade mudada na barra (HD/Leve): a app passa a usar a mesma.
         const light = ClipEngine?.getBarLight();
         if (light != null && (light ? 'leve' : 'original') !== client.state.quality) {
@@ -318,7 +321,9 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
       knownReceivedIds(),
       snap.autoDownload,
       snap.quality === 'leve',
-      getMotives()
+      getMotives(),
+      getRoster().map((p) => p.n),
+      getRoster().map(playerLabel)
     );
     setFloatingOn(true);
     ClipEngine.moveToBackground();
@@ -440,6 +445,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
               setDraft((d) => (d ? { ...d, name } : d));
             }}
             onMotive={(motive) => setDraft((d) => (d ? { ...d, motive } : d))}
+            onPlayers={(players) => setDraft((d) => (d ? { ...d, players } : d))}
             onCancel={() => {
               setDraft(null);
               setCountdown(null);
@@ -561,6 +567,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
               compact={compact}
               onPlay={(uri) => setPlaying({ items: [{ id: item.id, uri, title: item.name }], index: 0 })}
               onMotive={() => setMotiveFor(item.id)}
+              onPlayers={() => setPlayersFor(item.id)}
             />
           )}
         />
@@ -575,6 +582,12 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
           setMotiveFor(null);
         }}
         onClose={() => setMotiveFor(null)}
+      />
+      <PlayerPicker
+        visible={playersFor != null}
+        selected={playersFor ? getNotes(playersFor).players ?? [] : []}
+        onChange={(players) => playersFor && setNotes(playersFor, { players })}
+        onClose={() => setPlayersFor(null)}
       />
       {showDesconto ? (
         <DescontoModal
@@ -640,6 +653,7 @@ function DraftPanel({
   onAdjust,
   onName,
   onMotive,
+  onPlayers,
   onCancel,
   onSend,
 }: {
@@ -649,6 +663,7 @@ function DraftPanel({
   onAdjust: (which: 'start' | 'end', delta: number) => void;
   onName: (name: string) => void;
   onMotive: (motive: string | null) => void;
+  onPlayers: (players: string[]) => void;
   onCancel: () => void;
   onSend: () => void;
 }) {
@@ -670,6 +685,7 @@ function DraftPanel({
         />
       </View>
       <MotiveChips value={draft.motive} onChange={onMotive} />
+      <PlayerChips value={draft.players} onChange={onPlayers} />
       <View style={[styles.draftRow, styles.wrap]}>
         <Text style={styles.label}>Início</Text>
         <Button label="−5s" onPress={() => onAdjust('start', -ADJUST_STEP_MS)} />
@@ -752,13 +768,16 @@ function ClipRow({
   compact,
   onPlay,
   onMotive,
+  onPlayers,
 }: {
   clip: RemoteClip;
   compact: boolean;
   onPlay: (uri: string) => void;
   onMotive: () => void;
+  onPlayers: () => void;
 }) {
   const motive = getNotes(clip.id).motive;
+  const players = playersShort(getNotes(clip.id).players);
   const local = clip.localUri;
   const transferring = clip.transfer != null;
   const st = local
@@ -782,9 +801,14 @@ function ClipRow({
             {formatClock(clip.startMs)} – {formatClock(clip.endMs)}
           </Text>
           {clip.error ? <Text style={styles.warn}>{clip.error}</Text> : null}
-          <Pressable onPress={onMotive} hitSlop={6}>
-            <Text style={motive ? styles.motive : styles.motiveEmpty}>{motive ?? '+ motivo'}</Text>
-          </Pressable>
+          <View style={styles.tagRow}>
+            <Pressable onPress={onMotive} hitSlop={6}>
+              <Text style={motive ? styles.motive : styles.motiveEmpty}>{motive ?? '+ motivo'}</Text>
+            </Pressable>
+            <Pressable onPress={onPlayers} hitSlop={6}>
+              <Text style={players ? styles.players : styles.motiveEmpty}>{players ?? '+ jogadora'}</Text>
+            </Pressable>
+          </View>
         </View>
         <View style={[styles.badge, { borderColor: st.color }]}>
           {busy ? <ActivityIndicator size="small" color={st.color} /> : null}
@@ -910,6 +934,8 @@ const styles = StyleSheet.create({
   sideStacked: { flex: 1 },
   sideHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space(1) },
   motive: { color: colors.accent, fontWeight: '700', marginTop: 2 },
+  players: { color: '#5AA2FF', fontWeight: '700', marginTop: 2 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space(1.5) },
   motiveEmpty: { color: colors.muted, marginTop: 2 },
   descBackdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: space(2) },
   descCard: {

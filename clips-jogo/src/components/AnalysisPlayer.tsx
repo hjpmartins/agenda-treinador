@@ -21,6 +21,7 @@ import { getNotes, setNotes, useNotesVersion } from '../remote/notesStore';
 import { colors, radius, space } from '../theme';
 import { shareClip } from './exportShare';
 import { MotivePicker } from './MotivePicker';
+import { PlayerPicker, playersShort } from './PlayerPicker';
 
 export type AnalysisItem = { id: string; uri: string; title: string };
 
@@ -94,6 +95,7 @@ function ClipAnalysis({
   const [draft, setDraft] = useState<Stroke | null>(null);
   const [box, setBox] = useState({ x: 0, y: 0, w: 0, h: 0 });
   const [pickMotive, setPickMotive] = useState(false);
+  const [pickPlayers, setPickPlayers] = useState(false);
 
   const trim = normalizeTrim(notes.trim, durationMs);
   const startMs = trim?.startMs ?? 0;
@@ -255,6 +257,9 @@ function ClipAnalysis({
             {position ? `${position} · ` : ''}
             {item.title}
           </Text>
+          <Pressable onPress={() => setPickPlayers(true)} style={[styles.motiveChip, { borderColor: '#2D7FF9' }]}>
+            <Text style={styles.motiveText}>{playersShort(notes.players) ?? 'Jogadoras…'}</Text>
+          </Pressable>
           <Pressable onPress={() => setPickMotive(true)} style={styles.motiveChip}>
             <Text style={styles.motiveText}>{notes.motive ?? 'Motivo…'}</Text>
           </Pressable>
@@ -344,6 +349,12 @@ function ClipAnalysis({
         />
       </View>
 
+      <PlayerPicker
+        visible={pickPlayers}
+        selected={notes.players ?? []}
+        onChange={(players) => setNotes(item.id, { players })}
+        onClose={() => setPickPlayers(false)}
+      />
       <MotivePicker
         visible={pickMotive}
         current={notes.motive ?? null}

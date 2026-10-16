@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ClipEngine, isEngineAvailable } from '../../modules/clip-engine';
 import { Button, Card } from '../components/ui';
 import { UpdatePanel } from '../components/UpdatePanel';
+import { RosterEditor } from '../components/PlayerPicker';
+import { getRoster, useNotesVersion } from '../remote/notesStore';
 import { colors, space } from '../theme';
 import appConfig from '../../app.json';
 
@@ -14,6 +16,8 @@ type Props = {
 };
 
 export function HomeScreen({ onRecord, onRemote, onClips }: Props) {
+  useNotesVersion();
+  const [showRoster, setShowRoster] = useState(false);
   const [crash, setCrash] = useState<string | null>(() => {
     try {
       return ClipEngine?.getLastCrash() ?? null;
@@ -78,6 +82,7 @@ export function HomeScreen({ onRecord, onRemote, onClips }: Props) {
 
         <View style={styles.bottom}>
           <Button label="Ver gravações e clips" variant="ghost" onPress={onClips} />
+        <Button label={`Plantel (${getRoster().length})`} variant="ghost" onPress={() => setShowRoster(true)} />
           {isEngineAvailable ? (
             <UpdatePanel currentVersion={appConfig.expo.version} />
           ) : (
@@ -85,11 +90,23 @@ export function HomeScreen({ onRecord, onRemote, onClips }: Props) {
           )}
         </View>
       </ScrollView>
+      <Modal visible={showRoster} transparent animationType="fade" onRequestClose={() => setShowRoster(false)}>
+        <View style={styles.modalBackdrop}>
+          <Card style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Plantel</Text>
+            <RosterEditor />
+            <Button label="Fechar" variant="primary" onPress={() => setShowRoster(false)} />
+          </Card>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  modalBackdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: space(2) },
+  modalCard: { width: '100%', maxWidth: 600, gap: space(1.5) },
+  modalTitle: { color: colors.text, fontSize: 20, fontWeight: '800' },
   safe: { flex: 1, backgroundColor: colors.bg },
   root: {
     flexGrow: 1,

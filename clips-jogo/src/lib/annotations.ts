@@ -21,7 +21,40 @@ export type Stroke = { tool: Tool; color: string; points: Point[] };
 /** Um momento desenhado: a imagem para aqui e mostra os traços. */
 export type Moment = { atMs: number; strokes: Stroke[] };
 export type Trim = { startMs: number; endMs: number };
-export type ClipNotes = { motive?: string | null; trim?: Trim | null; moments?: Moment[] };
+/** Jogadora do plantel (vem da Agenda do Treinador ou é escrita à mão). */
+export type Player = { n: string; nome: string };
+/** players: números das jogadoras marcadas no clip. */
+export type ClipNotes = { motive?: string | null; trim?: Trim | null; moments?: Moment[]; players?: string[] };
+
+/** "#8 Carlota" (primeiro nome), ou só o número/nome se faltar o outro. */
+export function playerLabel(p: Player): string {
+  const first = p.nome.trim().split(/\s+/)[0] ?? '';
+  return p.n ? `#${p.n}${first ? ` ${first}` : ''}` : first || '?';
+}
+
+const shirt = (n: string) => (n === '' || Number.isNaN(Number(n)) ? 999 : Number(n));
+
+/** Lê o plantel enviado pela Agenda: clipsjogo://plantel?d=[{"n":"8","nome":"…"}] */
+export function parseRosterLink(url: string): Player[] | null {
+  const m = /^clipsjogo:\/\/plantel\?d=(.*)$/.exec(url.trim());
+  if (!m) return null;
+  try {
+    const data = JSON.parse(decodeURIComponent(m[1]));
+    if (!Array.isArray(data)) return null;
+    return data
+      .map((p) => ({ n: String(p?.n ?? '').trim(), nome: String(p?.nome ?? '').trim() }))
+      .filter((p) => p.n || p.nome)
+      .sort((a, b) => shirt(a.n) - shirt(b.n));
+  } catch {
+    return null;
+  }
+}
+
+/** Liga/desliga uma jogadora (pelo número) na lista do clip. */
+export function togglePlayer(list: string[] | undefined, n: string): string[] {
+  const cur = list ?? [];
+  return cur.includes(n) ? cur.filter((x) => x !== n) : [...cur, n];
+}
 
 /** Dois tempos a menos disto são o mesmo momento (≈ 1 imagem a 30 fps). */
 export const MOMENT_TOLERANCE_MS = 40;
@@ -71,6 +104,17 @@ export function normalizeTrim(trim: Partial<Trim> | null | undefined, durationMs
   }
   if (start <= 0 && end >= durationMs) return null;
   return { startMs: Math.round(start), endMs: Math.round(end) };
+}
+
+/** Clips agrupados por jogadora, pela ordem do plantel. */
+export function groupByPlayer<T extends { id: string }>(
+  clips: T[],
+  notes: Record<string, ClipNotes>,
+  roster: Player[]
+): { player: Player; clips: T[] }[] {
+  return roster
+    .map((player) => ({ player, clips: clips.filter((c) => notes[c.id]?.players?.includes(player.n)) }))
+    .filter((g) => g.clips.length > 0);
 }
 
 /** Clips agrupados por motivo, pela ordem da lista de motivos. */

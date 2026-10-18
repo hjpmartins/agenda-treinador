@@ -17,7 +17,12 @@ import kotlin.math.sin
  * com as mesmas formas do ecrã (seta, círculo, traço livre).
  */
 object StrokeBitmap {
-  fun render(strokes: JSONArray, width: Int, height: Int): Bitmap {
+  /** [crop] = zoom do vídeo (x, y, largura, altura em 0..1): os traços acompanham a parte mostrada. */
+  fun render(strokes: JSONArray, width: Int, height: Int, crop: FloatArray? = null): Bitmap {
+    val cx = crop?.get(0) ?: 0f
+    val cy = crop?.get(1) ?: 0f
+    val cw = crop?.get(2) ?: 1f
+    val ch = crop?.get(3) ?: 1f
     val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bmp)
     val strokeWidth = max(3f, width * 0.006f)
@@ -27,7 +32,7 @@ object StrokeBitmap {
       val pts = s.getJSONArray("points").let { arr ->
         (0 until arr.length()).map { j ->
           val p = arr.getJSONArray(j)
-          floatArrayOf(p.getDouble(0).toFloat() * width, p.getDouble(1).toFloat() * height)
+          floatArrayOf((p.getDouble(0).toFloat() - cx) / cw * width, (p.getDouble(1).toFloat() - cy) / ch * height)
         }
       }
       if (pts.isEmpty()) continue

@@ -17,7 +17,7 @@ import {
   type Tool,
 } from '../lib/annotations';
 import { formatClock } from '../lib/format';
-import { doubleTapZoom, NO_ZOOM, pinchZoom, type XY, type Zoom } from '../lib/zoom';
+import { cropToZoom, doubleTapZoom, NO_ZOOM, pinchZoom, zoomToCrop, type XY, type Zoom } from '../lib/zoom';
 import { clipTitle, getNotes, setNotes, useNotesVersion } from '../remote/notesStore';
 import { colors, radius, space } from '../theme';
 import { shareClip } from './exportShare';
@@ -195,8 +195,8 @@ function ClipAnalysis({
   // ------------------------------------------------------------ desenho
   const shownMoment: Moment | undefined = !isPlaying ? findMoment(moments, currentMs) : undefined;
 
-  const toolRef = useRef({ tool, color, box, currentMs });
-  toolRef.current = { tool, color, box, currentMs };
+  const toolRef = useRef({ tool, color, box, currentMs, zoom });
+  toolRef.current = { tool, color, box, currentMs, zoom };
   const draftRef = useRef<Stroke | null>(null);
 
   const pan = useMemo(
@@ -206,14 +206,14 @@ function ClipAnalysis({
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: (e) => {
           const { tool: t, color: c } = toolRef.current;
-          const p = toPoint(e.nativeEvent.locationX, e.nativeEvent.locationY, toolRef.current.box);
+          const p = toPoint(e.nativeEvent.locationX, e.nativeEvent.locationY, toolRef.current.box, toolRef.current.zoom);
           draftRef.current = { tool: t, color: c, points: [p, p] };
           setDraft(draftRef.current);
         },
         onPanResponderMove: (e) => {
           const d = draftRef.current;
           if (!d) return;
-          const p = toPoint(e.nativeEvent.locationX, e.nativeEvent.locationY, toolRef.current.box);
+          const p = toPoint(e.nativeEvent.locationX, e.nativeEvent.locationY, toolRef.current.box, toolRef.current.zoom);
           draftRef.current = d.tool === 'free' ? { ...d, points: [...d.points, p] } : { ...d, points: [d.points[0], p] };
           setDraft(draftRef.current);
         },
@@ -320,6 +320,23 @@ function ClipAnalysis({
   };
   const zoomed = zoom.s > 1.01;
 
+  // O zoom fica guardado no clip (e vai no vídeo enviado): ao abrir, volta o mesmo zoom.
+  const zoomRestored = useRef(false);
+  useEffect(() => {
+    if (zoomRestored.current || box.w <= 0) return;
+    zoomRestored.current = true;
+    setZoom(cropToZoom(getNotes(item.id).crop, box.w, box.h));
+  }, [box.w, box.h, item.id]);
+  useEffect(() => {
+    if (!zoomRestored.current || box.w <= 0) return;
+    const t = setTimeout(() => {
+      const crop = zoomToCrop(zoom, box.w, box.h);
+      const old = getNotes(item.id).crop ?? null;
+      if (JSON.stringify(old) !== JSON.stringify(crop)) setNotes(item.id, { crop });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [zoom, box.w, box.h, item.id]);
+
   // ------------------------------------------------------------ corte (pegas na barra)
   const fullTrim = () => trim ?? { startMs: 0, endMs: durationMs };
   const dragTrim = (which: 'start' | 'end', ms: number) => {
@@ -401,7 +418,7 @@ function ClipAnalysis({
         {shownMoment && mode === 'view' ? <Text style={styles.momentHint}>Desenho · ▶ para continuar</Text> : null}
         {zoomed ? (
           <Pressable onPress={() => setZoom(NO_ZOOM)} style={styles.zoomChip}>
-            <Text style={styles.zoomText}>🔍 {zoom.s.toFixed(1).replace('.', ',')}x · Repor</Text>
+            <Text style={styles.zoomText}>🔍 {zoom.s.toFixed(1).replace('.', ',')}x · vai no vídeo enviado · Repor</Text>
           </Pressable>
         ) : null}
       </View>
@@ -490,8 +507,6 @@ function ClipAnalysis({
           on={mode === 'draw'}
           onPress={() => {
             player.pause();
-            // Desenha-se sobre a imagem inteira (sem zoom), para os traços ficarem no sítio certo.
-            setZoom(NO_ZOOM);
             setMode(mode === 'draw' ? 'view' : 'draw');
           }}
         />
@@ -532,9 +547,14 @@ function ClipAnalysis({
   );
 }
 
-function toPoint(x: number, y: number, box: { w: number; h: number }): Point {
+/** Toque no ecrã → ponto da imagem (0..1), tendo em conta o zoom. */
+function toPoint(x: number, y: number, box: { w: number; h: number }, zoom: Zoom): Point {
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
-  return [clamp(x / (box.w || 1)), clamp(y / (box.h || 1))];
+  const w = box.w || 1;
+  const h = box.h || 1;
+  const ix = (x - w / 2 - zoom.x) / zoom.s + w / 2;
+  const iy = (y - h / 2 - zoom.y) / zoom.s + h / 2;
+  return [clamp(ix / w), clamp(iy / h)];
 }
 
 function tooSmall(s: Stroke): boolean {

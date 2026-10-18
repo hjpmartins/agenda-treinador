@@ -152,7 +152,9 @@ declare class ClipEngineNative extends NativeModule<Events> {
     momentsJson: string,
     freezeMs: number,
     /** 720 (leve, WhatsApp) ou 1080 (qualidade máxima, YouTube). */
-    maxHeight: number
+    maxHeight: number,
+    /** Zoom: JSON de [x, y, largura, altura] em 0..1, ou '' para a imagem inteira. */
+    cropJson: string
   ): Promise<string>;
 
   /**

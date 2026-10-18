@@ -47,6 +47,11 @@ object LightTranscoder {
     val freezeUs: Long = 3_000_000,
     /** false = vídeo sem som. */
     val audio: Boolean = true,
+    /**
+     * Zoom: parte da imagem a mostrar (x, y, largura, altura em 0..1, a partir do canto
+     * de cima à esquerda, como se vê no ecrã). null = imagem inteira.
+     */
+    val crop: FloatArray? = null,
     val onProgress: ((Float) -> Unit)? = null,
   )
 
@@ -145,6 +150,10 @@ object LightTranscoder {
     val startUs = opt.startUs.coerceAtLeast(0)
     val endUs = minOf(opt.endUs, durationUs + 1_000_000)
     val freezes = opt.freezes.filter { it.atUs in startUs..endUs }.sortedBy { it.atUs }
+    // O zoom vem como se vê no ecrã; as imagens descodificadas estão antes da rotação.
+    val crop = opt.crop?.let { c ->
+      if (rotation == 180) floatArrayOf(1f - c[0] - c[2], 1f - c[1] - c[3], c[2], c[3]) else c
+    }
     if (startUs > 0) videoEx.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
 
     // Mantém a proporção; o lado menor fica no máximo em maxHeight.
@@ -225,7 +234,7 @@ object LightTranscoder {
       }
 
       fun emitFrame(outPts: Long, overlay: Bitmap?) {
-        outS.drawImage()
+        outS.drawImage(crop)
         if (overlay != null) outS.drawOverlay(overlay)
         inS.setPresentationTime(outPts * 1000)
         inS.swapBuffers()
@@ -455,7 +464,7 @@ object LightTranscoder {
       return true
     }
 
-    fun drawImage() {
+    fun drawImage(crop: FloatArray? = null) {
       surfaceTexture.getTransformMatrix(stMatrix)
       GLES20.glClearColor(0f, 0f, 0f, 1f)
       GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
@@ -471,6 +480,9 @@ object LightTranscoder {
       GLES20.glVertexAttribPointer(aTex, 2, GLES20.GL_FLOAT, false, 16, vertices)
       GLES20.glEnableVertexAttribArray(aTex)
       GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "uSTMatrix"), 1, false, stMatrix, 0)
+      // Recorte (zoom): em coordenadas de textura o y conta de baixo para cima.
+      val c = crop ?: floatArrayOf(0f, 0f, 1f, 1f)
+      GLES20.glUniform4f(GLES20.glGetUniformLocation(program, "uCrop"), c[0], 1f - c[1] - c[3], c[2], c[3])
       GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
     }
 
@@ -532,10 +544,12 @@ object LightTranscoder {
         attribute vec4 aPosition;
         attribute vec4 aTexCoord;
         uniform mat4 uSTMatrix;
+        uniform vec4 uCrop;
         varying vec2 vTexCoord;
         void main() {
           gl_Position = aPosition;
-          vTexCoord = (uSTMatrix * aTexCoord).xy;
+          vec2 t = uCrop.xy + aTexCoord.xy * uCrop.zw;
+          vTexCoord = (uSTMatrix * vec4(t, 0.0, 1.0)).xy;
         }
       """.trimIndent()
       val fs = """

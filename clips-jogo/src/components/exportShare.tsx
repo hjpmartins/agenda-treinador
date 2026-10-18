@@ -20,7 +20,7 @@ function setProgress(p: number | null, text?: string) {
 
 export function hasEdits(id: string): boolean {
   const n = getNotes(id);
-  return !!n.trim || (n.moments?.length ?? 0) > 0;
+  return !!n.trim || !!n.crop || (n.moments?.length ?? 0) > 0;
 }
 
 /** 720 = leve (WhatsApp); 1080 = qualidade máxima (YouTube). */
@@ -29,7 +29,15 @@ export type ExportQuality = 720 | 1080;
 /** Cria o vídeo com o corte e os desenhos. */
 function exportOne(id: string, uri: string, quality: ExportQuality): Promise<string> {
   const n = getNotes(id);
-  return ClipEngine!.exportAnnotated(uri, n.trim?.startMs ?? 0, n.trim?.endMs ?? 0, JSON.stringify(n.moments ?? []), FREEZE_MS, quality);
+  return ClipEngine!.exportAnnotated(
+    uri,
+    n.trim?.startMs ?? 0,
+    n.trim?.endMs ?? 0,
+    JSON.stringify(n.moments ?? []),
+    FREEZE_MS,
+    quality,
+    n.crop ? JSON.stringify(n.crop) : ''
+  );
 }
 
 /** Abre a partilha do Android (WhatsApp, YouTube, …) com os títulos como texto e nome dos ficheiros. */
@@ -104,6 +112,15 @@ export function shareClip(id: string, uri: string, fallbackTitle: string) {
   setAsking({ id, uri, title });
 }
 
+/** "corte, desenhos e zoom" — o que o vídeo editado leva. */
+function editsLabel(id: string): string {
+  const n = getNotes(id);
+  const parts = [n.trim ? 'corte' : null, (n.moments?.length ?? 0) > 0 ? 'desenhos' : null, n.crop ? 'zoom' : null].filter(
+    (x): x is string => !!x
+  );
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}` : parts[0] ?? '—';
+}
+
 const fail = (e: unknown) => Alert.alert('Erro', e instanceof Error ? e.message : String(e));
 
 function ShareChoice() {
@@ -127,20 +144,21 @@ function ShareChoice() {
           <Text style={styles.muted} numberOfLines={2}>
             {a.title}
           </Text>
+          <Text style={styles.muted}>Vai com: {editsLabel(a.id)}</Text>
           <Button
-            label="Com desenhos · WhatsApp"
+            label="Editado · WhatsApp"
             sublabel="720p, mais leve e rápido de enviar"
             variant="primary"
             onPress={() => pick(() => shareWithDrawings(a.id, a.uri, a.title, 720))}
           />
           <Button
-            label="Com desenhos · Qualidade máxima"
+            label="Editado · Qualidade máxima"
             sublabel="1080p (se o clip for HD), para o YouTube ou guardar"
             onPress={() => pick(() => shareWithDrawings(a.id, a.uri, a.title, 1080))}
           />
           <Button
-            label="Original, sem desenhos"
-            sublabel="O clip inteiro, tal como foi gravado"
+            label="Original"
+            sublabel="O clip inteiro, tal como foi gravado (sem corte, desenhos nem zoom)"
             onPress={() => pick(() => sendFiles([{ uri: a.uri, title: a.title }], a.title))}
           />
           <Button label="Cancelar" variant="ghost" onPress={() => setAsking(null)} />

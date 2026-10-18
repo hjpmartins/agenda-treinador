@@ -242,7 +242,7 @@ class ClipEngineModule : Module() {
      * desenho a imagem fica parada [freezeMs] com o desenho por cima.
      * momentsJson: [{ atMs, strokes: [{ tool, color, points: [[x,y],…] }] }] (tempos do ficheiro).
      */
-    AsyncFunction("exportAnnotated") { srcUri: String, startMs: Double, endMs: Double, momentsJson: String, freezeMs: Double, maxHeight: Double, promise: Promise ->
+    AsyncFunction("exportAnnotated") { srcUri: String, startMs: Double, endMs: Double, momentsJson: String, freezeMs: Double, maxHeight: Double, cropJson: String, promise: Promise ->
       val context = appContext.reactContext!!
       Thread({
         try {
@@ -260,12 +260,17 @@ class ClipEngineModule : Module() {
           val scale = minOf(1.0, maxH.toDouble() / minOf(w, h))
           val outW = ((w * scale).toInt() / 2) * 2
           val outH = ((h * scale).toInt() / 2) * 2
+          // Zoom: [x, y, largura, altura] em 0..1 (vazio = imagem inteira).
+          val crop = cropJson.takeIf { it.isNotBlank() }?.let { j ->
+            val a = org.json.JSONArray(j)
+            floatArrayOf(a.getDouble(0).toFloat(), a.getDouble(1).toFloat(), a.getDouble(2).toFloat(), a.getDouble(3).toFloat())
+          }?.takeIf { it[2] in 0.05f..0.999f && it[3] in 0.05f..0.999f }
           val moments = org.json.JSONArray(momentsJson)
           val freezes = (0 until moments.length()).map { i ->
             val m = moments.getJSONObject(i)
             pt.clipsjogo.engine.media.LightTranscoder.Freeze(
               (m.getDouble("atMs") * 1000).toLong(),
-              pt.clipsjogo.engine.media.StrokeBitmap.render(m.getJSONArray("strokes"), outW, outH)
+              pt.clipsjogo.engine.media.StrokeBitmap.render(m.getJSONArray("strokes"), outW, outH, crop)
             )
           }
           var last = -1
@@ -278,6 +283,7 @@ class ClipEngineModule : Module() {
               endUs = if (endMs > 0) (endMs * 1000).toLong() else Long.MAX_VALUE,
               freezes = freezes,
               freezeUs = (freezeMs * 1000).toLong(),
+              crop = crop,
               // Sem som: as paragens nos desenhos ficam sempre com a duração certa.
               audio = false,
               onProgress = { p ->

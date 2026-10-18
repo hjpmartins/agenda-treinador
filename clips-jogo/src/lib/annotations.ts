@@ -35,6 +35,8 @@ export type ClipNotes = {
   tone?: Tone | null;
   /** Título escrito no tablet (substitui o nome do clip; vai como texto e nome do ficheiro ao enviar). */
   title?: string | null;
+  /** Zoom guardado no leitor (vai no vídeo enviado): [x, y, largura, altura] em 0..1. */
+  crop?: [number, number, number, number] | null;
 };
 
 /** Valor guardado pela barra flutuante ("pos" | "neg" | "") → tipo. */

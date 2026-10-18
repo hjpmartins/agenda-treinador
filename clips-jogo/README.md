@@ -77,8 +77,8 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
   Podes desenhar em vários momentos do mesmo clip; ao reproduzir, a imagem **para em cada desenho** (▶ para continuar).
   Os desenhos ficam guardados (marcas amarelas na barra).
 - **Zoom**: dois dedos para aproximar e afastar; com zoom, um dedo arrasta a imagem. Dois toques rápidos aproximam
-  nesse ponto (ou voltam ao normal). Também há os botões **🔍+ / 🔍−**; "🔍 … · Repor" volta ao normal. Só para ver: o
-  vídeo enviado não leva zoom.
+  nesse ponto (ou voltam ao normal). Também há os botões **🔍+ / 🔍−**; "🔍 … · Repor" volta ao normal. O zoom fica
+  guardado no clip e **vai no vídeo enviado** (versão "Editado"); dá para desenhar com zoom.
 - **✂ Cortar**: aparecem duas **pegas laranja** na barra — a da esquerda é o início, a da direita o fim. Arrasta-as e a
   imagem acompanha a pega; "▶ Ver o corte" mostra o resultado. O clip passa a ver-se só nessa parte (o ficheiro
   original não muda); "Repor" volta ao clip inteiro.
@@ -86,9 +86,9 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
   no Comando também há o campo "Título". Ao enviar, o título vai como texto da mensagem e como nome do ficheiro.
 - **Enviar** (↗ Enviar no leitor, ou Partilhar): sem corte nem desenhos vai o clip original. Com corte ou desenhos
   escolhe-se:
-  - **Com desenhos · WhatsApp** — 720p, leve;
-  - **Com desenhos · Qualidade máxima** — 1080p (se o clip for HD), para o YouTube ou para guardar;
-  - **Original, sem desenhos**.
+  - **Editado · WhatsApp** — com corte, desenhos e zoom, em 720p (leve);
+  - **Editado · Qualidade máxima** — o mesmo em 1080p (se o clip for HD), para o YouTube ou para guardar;
+  - **Original** — o clip tal como foi gravado.
 
   Na versão com desenhos, em cada desenho a imagem fica **parada 4 s com o desenho por cima** (sem som).
 - **YouTube**: logo depois de enviado o YouTube mostra só 360p; o HD aparece quando acabar de processar (num jogo

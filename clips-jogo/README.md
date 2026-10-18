@@ -76,10 +76,22 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
 - **✏ Desenhar**: com a imagem parada, seta, círculo ou traço livre, em amarelo, vermelho ou branco; desfazer/apagar.
   Podes desenhar em vários momentos do mesmo clip; ao reproduzir, a imagem **para em cada desenho** (▶ para continuar).
   Os desenhos ficam guardados (marcas amarelas na barra).
-- **✂ Cortar**: "Início aqui" / "Fim aqui" — o clip passa a ver-se só nessa parte (o ficheiro original não muda).
-- **Enviar com desenhos** (↗ Enviar no leitor, ou Partilhar num clip com corte/desenhos → "Com desenhos"): cria um
-  vídeo em 720p só com a parte cortada; em cada desenho a imagem fica **parada 4 s com o desenho por cima** (o vídeo enviado não leva som) e depois
-  continua. Abre a partilha do Android (WhatsApp, YouTube, Galeria…). "Original" envia o clip tal como está.
+- **Zoom**: dois dedos para aproximar e afastar; com zoom, um dedo arrasta a imagem. Dois toques rápidos aproximam
+  nesse ponto (ou voltam ao normal); "🔍 … · Repor" também volta ao normal. Só para ver: o vídeo enviado não leva zoom.
+- **✂ Cortar**: aparecem duas **pegas laranja** na barra — a da esquerda é o início, a da direita o fim. Arrasta-as e a
+  imagem acompanha a pega; "▶ Ver o corte" mostra o resultado. O clip passa a ver-se só nessa parte (o ficheiro
+  original não muda); "Repor" volta ao clip inteiro.
+- **Título**: toca no nome do clip (na lista, no Comando ou no topo do leitor) para escrever um título. Ao pedir o clip
+  no Comando também há o campo "Título". Ao enviar, o título vai como texto da mensagem e como nome do ficheiro.
+- **Enviar** (↗ Enviar no leitor, ou Partilhar): sem corte nem desenhos vai o clip original. Com corte ou desenhos
+  escolhe-se:
+  - **Com desenhos · WhatsApp** — 720p, leve;
+  - **Com desenhos · Qualidade máxima** — 1080p (se o clip for HD), para o YouTube ou para guardar;
+  - **Original, sem desenhos**.
+
+  Na versão com desenhos, em cada desenho a imagem fica **parada 4 s com o desenho por cima** (sem som).
+- **YouTube**: logo depois de enviado o YouTube mostra só 360p; o HD aparece quando acabar de processar (num jogo
+  inteiro pode demorar horas).
 - **Tipo + / −** (positivo a azul, negativo a vermelho): no painel do clip acabado de pedir (bloco "TIPO"), na barra
   flutuante, ou depois nos botões **+** e **−** de cada clip na lista. O clip fica com o fundo dessa cor.
 - **Desconto** (botão no Comando): clips deste jogo agrupados por motivo; toca num motivo e os clips passam seguidos.

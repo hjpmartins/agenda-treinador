@@ -8,6 +8,7 @@ import { PlayerPicker, playersShort } from '../components/PlayerPicker';
 import { PlayerModal, run, saveToGallery, share } from '../components/media';
 import { MotivePicker } from '../components/MotivePicker';
 import { toneBackground, ToneToggle } from '../components/Tone';
+import { ClipTitle, TitleEditor } from '../components/TitleEditor';
 import { groupByMotive, groupByPlayer, playerLabel, type Player } from '../lib/annotations';
 import { KEEP_GAMES, nextToPrune } from '../lib/retention';
 import { absorbBarTags, allNotes, getMotives, getNotes, getRoster, setNotes, useNotesVersion } from '../remote/notesStore';
@@ -44,6 +45,7 @@ export function ClipsScreen({ onBack }: Props) {
   const [analysis, setAnalysis] = useState<{ items: AnalysisItem[]; index: number } | null>(null);
   const [motiveFor, setMotiveFor] = useState<string | null>(null);
   const [playersFor, setPlayersFor] = useState<string | null>(null);
+  const [titleFor, setTitleFor] = useState<{ id: string; name: string } | null>(null);
   // A janela das jogadoras mostra o que está gravado: tem de se atualizar a cada toque.
   useNotesVersion();
   /** Modo "Selecionar": clips marcados para enviar todos de uma vez (null = fora do modo). */
@@ -158,6 +160,7 @@ export function ClipsScreen({ onBack }: Props) {
                 onPlay={(items, index) => setAnalysis({ items, index })}
                 onMotive={(c) => setMotiveFor(c.id)}
                 onPlayers={(c) => setPlayersFor(c.id)}
+                onTitle={(c) => setTitleFor({ id: c.id, name: c.name })}
                 onDelete={(c) =>
                   Alert.alert('Apagar do tablet?', c.name, [
                     { text: 'Cancelar', style: 'cancel' },
@@ -279,6 +282,7 @@ export function ClipsScreen({ onBack }: Props) {
 
       {playing ? <PlayerModal uri={playing.uri} title={playing.title} onClose={() => setPlaying(null)} /> : null}
       {analysis ? <AnalysisPlayer items={analysis.items} startIndex={analysis.index} onClose={() => setAnalysis(null)} /> : null}
+      <TitleEditor clip={titleFor} onClose={() => setTitleFor(null)} />
       <PlayerPicker
         visible={playersFor != null}
         selected={playersFor ? getNotes(playersFor).players ?? [] : []}
@@ -307,6 +311,7 @@ function ReceivedSection({
   onPlay,
   onMotive,
   onPlayers,
+  onTitle,
   onDelete,
 }: {
   clips: ReceivedClip[];
@@ -317,6 +322,7 @@ function ReceivedSection({
   onPlay: (items: AnalysisItem[], index: number) => void;
   onMotive: (c: ReceivedClip) => void;
   onPlayers: (c: ReceivedClip) => void;
+  onTitle: (c: ReceivedClip) => void;
   onDelete: (c: ReceivedClip) => void;
 }) {
   useNotesVersion();
@@ -419,7 +425,7 @@ function ReceivedSection({
                   <View style={styles.itemHeader}>
                     {selected ? <Text style={[styles.check, isOn && styles.checkOn]}>{isOn ? '☑' : '☐'}</Text> : null}
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.rowTitle}>{c.name}</Text>
+                      <ClipTitle id={c.id} name={c.name} onEdit={() => onTitle(c)} style={styles.rowTitle} />
                       <Text style={styles.muted}>
                         {formatClock(c.startMs)} – {formatClock(c.endMs)} ({formatDuration(c.endMs - c.startMs)}) ·{' '}
                         {formatBytes(c.sizeBytes)}
@@ -485,7 +491,7 @@ function PlayerClipsModal({
           <ScrollView style={{ maxHeight: 280 }} contentContainerStyle={{ gap: 6 }}>
             {clips.map((c) => (
               <Text key={c.id} style={styles.muted}>
-                • {sessionLabel(c.sessionId)} · {formatClock(c.startMs)} · {notes[c.id]?.motive ?? 'sem motivo'}
+                • {sessionLabel(c.sessionId)} · {formatClock(c.startMs)} · {notes[c.id]?.title || (notes[c.id]?.motive ?? 'sem motivo')}
                 {(notes[c.id]?.moments?.length ?? 0) > 0 ? ' · com desenhos' : ''}
               </Text>
             ))}

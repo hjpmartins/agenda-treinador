@@ -17,17 +17,21 @@ import {
   type Tool,
 } from '../lib/annotations';
 import { formatClock } from '../lib/format';
-import { getNotes, setNotes, useNotesVersion } from '../remote/notesStore';
+import { doubleTapZoom, NO_ZOOM, pinchZoom, type XY, type Zoom } from '../lib/zoom';
+import { clipTitle, getNotes, setNotes, useNotesVersion } from '../remote/notesStore';
 import { colors, radius, space } from '../theme';
 import { shareClip } from './exportShare';
 import { MotivePicker } from './MotivePicker';
 import { PlayerPicker, playersShort } from './PlayerPicker';
+import { TitleEditor } from './TitleEditor';
 
 export type AnalysisItem = { id: string; uri: string; title: string };
 
 const PEN_COLORS = ['#FFD60A', '#FF3B30', '#FFFFFF'];
 const RATES = [0.25, 0.5, 1, 2];
 const FRAME_MS = 1000 / 30;
+/** Duração mínima de um corte. */
+const MIN_TRIM_MS = 1000;
 
 /**
  * Leitor para analisar clips no tablet: câmara lenta, imagem a imagem, cortar,
@@ -96,8 +100,12 @@ function ClipAnalysis({
   const [box, setBox] = useState({ x: 0, y: 0, w: 0, h: 0 });
   const [pickMotive, setPickMotive] = useState(false);
   const [pickPlayers, setPickPlayers] = useState(false);
+  const [editTitle, setEditTitle] = useState(false);
+  const [zoom, setZoom] = useState<Zoom>(NO_ZOOM);
+  /** Corte enquanto se arrastam as pegas (só se grava ao largar). */
+  const [trimDrag, setTrimDrag] = useState<{ startMs: number; endMs: number } | null>(null);
 
-  const trim = normalizeTrim(notes.trim, durationMs);
+  const trim = trimDrag ?? normalizeTrim(notes.trim, durationMs);
   const startMs = trim?.startMs ?? 0;
   const endMs = trim?.endMs ?? durationMs;
 
@@ -232,6 +240,87 @@ function ClipAnalysis({
     setBox({ x: (width - w) / 2, y: (height - h) / 2, w, h });
   };
 
+  // ------------------------------------------------------------ zoom (dois dedos / dois toques)
+  const zoomRef = useRef({ zoom, box });
+  zoomRef.current = { zoom, box };
+  const zoomPan = useMemo(() => {
+    let origin = { x: 0, y: 0 };
+    let base: { zoom: Zoom; mid: XY; dist: number; touches: number } | null = null;
+    let tap: { at: number; p: XY; moved: boolean } | null = null;
+    let lastTap: { at: number; p: XY } | null = null;
+    const read = (e: any): { mid: XY; dist: number; n: number } => {
+      const t: { pageX: number; pageY: number }[] = e.nativeEvent.touches?.length ? e.nativeEvent.touches : [e.nativeEvent];
+      const pts = t.slice(0, 2).map((p) => ({ x: p.pageX - origin.x, y: p.pageY - origin.y }));
+      const mid = pts.length === 2 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : pts[0];
+      const dist = pts.length === 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
+      return { mid, dist, n: pts.length };
+    };
+    const rebase = (e: any) => {
+      const r = read(e);
+      base = { zoom: zoomRef.current.zoom, mid: r.mid, dist: r.dist, touches: r.n };
+    };
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        // Canto da caixa no ecrã (a camada não tem filhos: locationX é relativo a ela).
+        origin = { x: e.nativeEvent.pageX - e.nativeEvent.locationX, y: e.nativeEvent.pageY - e.nativeEvent.locationY };
+        rebase(e);
+        tap = { at: Date.now(), p: read(e).mid, moved: false };
+      },
+      onPanResponderMove: (e) => {
+        const r = read(e);
+        if (!base || base.touches !== r.n) return rebase(e);
+        const { w, h } = zoomRef.current.box;
+        if (tap && Math.hypot(r.mid.x - tap.p.x, r.mid.y - tap.p.y) > 10) tap.moved = true;
+        if (r.n === 2) {
+          if (tap) tap.moved = true;
+          setZoom(pinchZoom(base.zoom, base.mid, base.dist, r.mid, r.dist, w, h));
+        } else if (base.zoom.s > 1) {
+          // Um dedo com zoom: arrastar a imagem.
+          setZoom(pinchZoom(base.zoom, base.mid, 1, r.mid, 1, w, h));
+        }
+      },
+      onPanResponderRelease: () => {
+        base = null;
+        const t = tap;
+        tap = null;
+        if (!t || t.moved || Date.now() - t.at > 300) return;
+        if (lastTap && t.at - lastTap.at < 350) {
+          const { w, h } = zoomRef.current.box;
+          setZoom(doubleTapZoom(zoomRef.current.zoom, t.p, w, h));
+          lastTap = null;
+        } else {
+          lastTap = { at: t.at, p: t.p };
+        }
+      },
+      onPanResponderTerminate: () => {
+        base = null;
+        tap = null;
+      },
+    });
+  }, []);
+  const zoomed = zoom.s > 1.01;
+
+  // ------------------------------------------------------------ corte (pegas na barra)
+  const fullTrim = () => trim ?? { startMs: 0, endMs: durationMs };
+  const dragTrim = (which: 'start' | 'end', ms: number) => {
+    const t = trimDrag ?? fullTrim();
+    const next =
+      which === 'start'
+        ? { startMs: Math.max(0, Math.min(ms, t.endMs - MIN_TRIM_MS)), endMs: t.endMs }
+        : { startMs: t.startMs, endMs: Math.min(durationMs, Math.max(ms, t.startMs + MIN_TRIM_MS)) };
+    setTrimDrag(next);
+    // Mostra a imagem onde está a pega.
+    player.pause();
+    seek(which === 'start' ? next.startMs : next.endMs);
+  };
+  const commitTrim = () => {
+    if (!trimDrag) return;
+    setNotes(item.id, { trim: normalizeTrim(trimDrag, durationMs) });
+    setTrimDrag(null);
+  };
+
   const strokesToShow = [...(mode === 'draw' ? findMoment(moments, currentMs)?.strokes ?? [] : shownMoment?.strokes ?? [])];
   if (draft) strokesToShow.push(draft);
 
@@ -244,19 +333,43 @@ function ClipAnalysis({
     >
       <View style={styles.videoArea} onLayout={onVideoLayout}>
         <View style={[styles.videoBox, { left: box.x, top: box.y, width: box.w, height: box.h }]}>
-          <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} />
-          <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-            {strokesToShow.map((s, i) => (
-              <StrokeShape key={i} stroke={s} w={box.w} h={box.h} />
-            ))}
-          </Svg>
-          {mode === 'draw' ? <View style={StyleSheet.absoluteFill} {...pan.panHandlers} /> : null}
+          {/* textureView: necessário para o zoom (a surfaceView não acompanha a escala). */}
+          <View
+            style={[StyleSheet.absoluteFill, { transform: [{ translateX: zoom.x }, { translateY: zoom.y }, { scale: zoom.s }] }]}
+          >
+            <VideoView
+              player={player}
+              style={StyleSheet.absoluteFill}
+              contentFit="contain"
+              nativeControls={false}
+              surfaceType="textureView"
+            />
+            <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+              {strokesToShow.map((s, i) => (
+                <StrokeShape key={i} stroke={s} w={box.w} h={box.h} />
+              ))}
+            </Svg>
+          </View>
+          {mode === 'draw' ? (
+            <View style={StyleSheet.absoluteFill} {...pan.panHandlers} />
+          ) : (
+            <View style={StyleSheet.absoluteFill} {...zoomPan.panHandlers} />
+          )}
         </View>
         <View style={styles.topBar}>
-          <Text style={styles.title} numberOfLines={1}>
-            {position ? `${position} · ` : ''}
-            {item.title}
-          </Text>
+          <Pressable
+            style={styles.flex}
+            onPress={() => {
+              player.pause();
+              setEditTitle(true);
+            }}
+          >
+            <Text style={styles.title} numberOfLines={1}>
+              {position ? `${position} · ` : ''}
+              {clipTitle(item.id, item.title)}
+              <Text style={styles.pen}>{'  ✎'}</Text>
+            </Text>
+          </Pressable>
           <Pressable onPress={() => setPickPlayers(true)} style={[styles.motiveChip, { borderColor: '#2D7FF9' }]}>
             <Text style={styles.motiveText}>{playersShort(notes.players) ?? 'Jogadoras…'}</Text>
           </Pressable>
@@ -268,18 +381,37 @@ function ClipAnalysis({
           </Pressable>
         </View>
         {shownMoment && mode === 'view' ? <Text style={styles.momentHint}>Desenho · ▶ para continuar</Text> : null}
+        {zoomed ? (
+          <Pressable onPress={() => setZoom(NO_ZOOM)} style={styles.zoomChip}>
+            <Text style={styles.zoomText}>🔍 {zoom.s.toFixed(1).replace('.', ',')}x · Repor</Text>
+          </Pressable>
+        ) : null}
       </View>
 
-      <ScrubBar
-        currentMs={currentMs}
-        durationMs={durationMs}
-        trim={trim}
-        moments={moments}
-        onSeek={(ms) => {
-          player.pause();
-          seek(ms);
-        }}
-      />
+      {mode === 'trim' && durationMs > 0 ? (
+        <TrimBar
+          currentMs={currentMs}
+          durationMs={durationMs}
+          trim={fullTrim()}
+          onDrag={dragTrim}
+          onRelease={commitTrim}
+          onSeek={(ms) => {
+            player.pause();
+            seek(ms);
+          }}
+        />
+      ) : (
+        <ScrubBar
+          currentMs={currentMs}
+          durationMs={durationMs}
+          trim={trim}
+          moments={moments}
+          onSeek={(ms) => {
+            player.pause();
+            seek(ms);
+          }}
+        />
+      )}
 
       {mode === 'draw' ? (
         <View style={styles.toolbar}>
@@ -298,13 +430,21 @@ function ClipAnalysis({
         </View>
       ) : mode === 'trim' ? (
         <View style={styles.toolbar}>
-          <Text style={styles.info}>
-            Corte: {formatClock(startMs)} – {formatClock(endMs)}
+          <Text style={[styles.info, styles.flex]}>
+            Arrasta as pegas laranja: a da esquerda é o início, a da direita o fim.{'\n'}
+            <Text style={styles.infoMuted}>
+              {formatClock(startMs)} → {formatClock(endMs)} · fica com {formatClock(endMs - startMs)}
+            </Text>
           </Text>
-          <Btn label="[ Início aqui" onPress={() => setNotes(item.id, { trim: normalizeTrim({ startMs: currentMs, endMs: trim?.endMs }, durationMs) })} />
-          <Btn label="Fim aqui ]" onPress={() => setNotes(item.id, { trim: normalizeTrim({ startMs: trim?.startMs, endMs: currentMs }, durationMs) })} />
+          <Btn
+            label="▶ Ver o corte"
+            onPress={() => {
+              seek(startMs);
+              ended.current = false;
+              player.play();
+            }}
+          />
           <Btn label="Repor" onPress={() => setNotes(item.id, { trim: null })} />
-          <View style={styles.flex} />
           <Btn label="Concluído" primary onPress={() => setMode('view')} />
         </View>
       ) : null}
@@ -329,6 +469,8 @@ function ClipAnalysis({
           on={mode === 'draw'}
           onPress={() => {
             player.pause();
+            // Desenha-se sobre a imagem inteira (sem zoom), para os traços ficarem no sítio certo.
+            setZoom(NO_ZOOM);
             setMode(mode === 'draw' ? 'view' : 'draw');
           }}
         />
@@ -349,6 +491,7 @@ function ClipAnalysis({
         />
       </View>
 
+      {editTitle ? <TitleEditor clip={{ id: item.id, name: item.title }} onClose={() => setEditTitle(false)} /> : null}
       <PlayerPicker
         visible={pickPlayers}
         selected={notes.players ?? []}
@@ -465,6 +608,87 @@ function ScrubBar({
   );
 }
 
+/** Barra do corte: duas pegas para arrastar (início e fim) e a imagem acompanha a pega. */
+function TrimBar({
+  currentMs,
+  durationMs,
+  trim,
+  onDrag,
+  onRelease,
+  onSeek,
+}: {
+  currentMs: number;
+  durationMs: number;
+  trim: { startMs: number; endMs: number };
+  onDrag: (which: 'start' | 'end', ms: number) => void;
+  onRelease: () => void;
+  onSeek: (ms: number) => void;
+}) {
+  const [width, setWidth] = useState(1);
+  const ref = useRef({ width, durationMs, trim, onDrag, onRelease, onSeek });
+  ref.current = { width, durationMs, trim, onDrag, onRelease, onSeek };
+  const pan = useMemo(() => {
+    let which: 'start' | 'end' | null = null;
+    const msAt = (x: number) => {
+      const r = ref.current;
+      return (Math.max(0, Math.min(x - HANDLE_W, r.width - 2 * HANDLE_W)) / Math.max(1, r.width - 2 * HANDLE_W)) * r.durationMs;
+    };
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: (e) => {
+        const r = ref.current;
+        const ms = msAt(e.nativeEvent.locationX);
+        // Toca na pega mais próxima; no meio, longe das duas, só muda a imagem.
+        const toPx = (t: number) => (t / Math.max(1, r.durationMs)) * (r.width - 2 * HANDLE_W) + HANDLE_W;
+        const dStart = Math.abs(e.nativeEvent.locationX - toPx(r.trim.startMs));
+        const dEnd = Math.abs(e.nativeEvent.locationX - toPx(r.trim.endMs));
+        which = Math.min(dStart, dEnd) > 48 ? null : dStart <= dEnd ? 'start' : 'end';
+        if (which) r.onDrag(which, ms);
+        else r.onSeek(ms);
+      },
+      onPanResponderMove: (e) => {
+        const ms = msAt(e.nativeEvent.locationX);
+        if (which) ref.current.onDrag(which, ms);
+        else ref.current.onSeek(ms);
+      },
+      onPanResponderRelease: () => {
+        if (which) ref.current.onRelease();
+        which = null;
+      },
+      onPanResponderTerminate: () => {
+        if (which) ref.current.onRelease();
+        which = null;
+      },
+    });
+  }, []);
+  const inner = Math.max(1, width - 2 * HANDLE_W);
+  const x = (ms: number) => HANDLE_W + (ms / Math.max(1, durationMs)) * inner;
+  const sx = x(trim.startMs);
+  const ex = x(trim.endMs);
+  return (
+    <View style={styles.trimBar} onLayout={(e) => setWidth(e.nativeEvent.layout.width)} {...pan.panHandlers}>
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <View style={[styles.trimTrack, { left: HANDLE_W, right: HANDLE_W }]} />
+        {/* Fora do corte: escurecido. */}
+        <View style={[styles.trimOut, { left: HANDLE_W, width: Math.max(0, sx - HANDLE_W) }]} />
+        <View style={[styles.trimOut, { left: ex, width: Math.max(0, width - HANDLE_W - ex) }]} />
+        <View style={[styles.trimIn, { left: sx, width: Math.max(0, ex - sx) }]} />
+        <View style={[styles.trimHandle, { left: sx - HANDLE_W }]}>
+          <Text style={styles.trimGrip}>[</Text>
+        </View>
+        <View style={[styles.trimHandle, { left: ex }]}>
+          <Text style={styles.trimGrip}>]</Text>
+        </View>
+        <View style={[styles.trimHead, { left: x(currentMs) - 1 }]} />
+      </View>
+    </View>
+  );
+}
+
+const HANDLE_W = 22;
+
 function Btn({
   label,
   onPress,
@@ -566,5 +790,41 @@ const styles = StyleSheet.create({
   swatch: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: 'transparent' },
   swatchOn: { borderColor: colors.accent, transform: [{ scale: 1.15 }] },
   info: { color: colors.text, fontWeight: '700' },
+  infoMuted: { color: colors.muted, fontWeight: '600' },
+  pen: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
+  zoomChip: {
+    position: 'absolute',
+    bottom: space(1),
+    left: space(1),
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderRadius: radius.pill,
+    paddingHorizontal: space(1.5),
+    paddingVertical: 8,
+  },
+  zoomText: { color: '#fff', fontWeight: '700' },
+  trimBar: { height: 56, backgroundColor: colors.surface },
+  trimTrack: { position: 'absolute', top: 10, bottom: 10, backgroundColor: colors.surfaceHigh, borderRadius: 4 },
+  trimOut: { position: 'absolute', top: 10, bottom: 10, backgroundColor: 'rgba(0,0,0,0.55)' },
+  trimIn: {
+    position: 'absolute',
+    top: 6,
+    bottom: 6,
+    borderTopWidth: 3,
+    borderBottomWidth: 3,
+    borderColor: colors.accent,
+    backgroundColor: 'rgba(255,122,26,0.18)',
+  },
+  trimHandle: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    width: HANDLE_W,
+    backgroundColor: colors.accent,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trimGrip: { color: '#fff', fontWeight: '900', fontSize: 18 },
+  trimHead: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: '#fff' },
   time: { color: colors.muted, fontVariant: ['tabular-nums'], marginRight: space(1) },
 });

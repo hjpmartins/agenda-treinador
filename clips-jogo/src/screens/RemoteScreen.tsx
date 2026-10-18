@@ -26,6 +26,7 @@ import { MotiveChips, MotivePicker } from '../components/MotivePicker';
 import { PlayerChips, PlayerPicker, playersShort } from '../components/PlayerPicker';
 import { groupByMotive, playerLabel, type Tone } from '../lib/annotations';
 import { toneBackground, ToneChips, ToneToggle } from '../components/Tone';
+import { ClipTitle, TitleEditor } from '../components/TitleEditor';
 import { absorbBarTags, allNotes, getMotives, getNotes, getRoster, setNotes, useNotesVersion } from '../remote/notesStore';
 import { Button, Card, Chip } from '../components/ui';
 import { ADJUST_STEP_MS, fromMarks, lastSeconds, normalize, PRESET_SECONDS, type ClipRange } from '../lib/clipRange';
@@ -180,6 +181,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
   const [playing, setPlaying] = useState<{ items: AnalysisItem[]; index: number } | null>(null);
   const [motiveFor, setMotiveFor] = useState<string | null>(null);
   const [playersFor, setPlayersFor] = useState<string | null>(null);
+  const [titleFor, setTitleFor] = useState<{ id: string; name: string } | null>(null);
   const [showDesconto, setShowDesconto] = useState(false);
   useNotesVersion();
   const pulse = useRef(new Animated.Value(0)).current;
@@ -588,6 +590,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
               onPlay={(uri) => setPlaying({ items: [{ id: item.id, uri, title: item.name }], index: 0 })}
               onMotive={() => setMotiveFor(item.id)}
               onPlayers={() => setPlayersFor(item.id)}
+              onTitle={() => setTitleFor({ id: item.id, name: item.name })}
             />
           )}
         />
@@ -603,6 +606,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
         }}
         onClose={() => setMotiveFor(null)}
       />
+      <TitleEditor clip={titleFor} onClose={() => setTitleFor(null)} />
       <PlayerPicker
         visible={playersFor != null}
         selected={playersFor ? getNotes(playersFor).players ?? [] : []}
@@ -699,7 +703,7 @@ function DraftPanel({
         <TextInput
           value={draft.name}
           onChangeText={onName}
-          placeholder="Nome (opcional) ex.: Triplo #7"
+          placeholder="Título (opcional) ex.: Triplo #7"
           placeholderTextColor={colors.muted}
           style={[styles.nameInput, compact && styles.nameInputCompact]}
           returnKeyType="send"
@@ -799,12 +803,14 @@ function ClipRow({
   onPlay,
   onMotive,
   onPlayers,
+  onTitle,
 }: {
   clip: RemoteClip;
   compact: boolean;
   onPlay: (uri: string) => void;
   onMotive: () => void;
   onPlayers: () => void;
+  onTitle: () => void;
 }) {
   const motive = getNotes(clip.id).motive;
   const players = playersShort(getNotes(clip.id).players);
@@ -825,9 +831,7 @@ function ClipRow({
     <View style={[styles.clipRow, toneBackground(tone)]}>
       <View style={styles.clipHeader}>
         <View style={styles.flex}>
-          <Text style={styles.clipName} numberOfLines={1}>
-            {clip.name}
-          </Text>
+          <ClipTitle id={clip.id} name={clip.name} onEdit={onTitle} style={styles.clipName} />
           <Text style={styles.muted}>
             {formatClock(clip.startMs)} – {formatClock(clip.endMs)}
           </Text>

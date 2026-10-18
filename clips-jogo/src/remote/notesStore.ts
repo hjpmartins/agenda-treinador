@@ -45,6 +45,11 @@ export function getNotes(id: string): ClipNotes {
   return load().notes[id] ?? {};
 }
 
+/** Título do clip: o escrito no tablet, senão o nome que veio do telemóvel. */
+export function clipTitle(id: string, fallback: string): string {
+  return load().notes[id]?.title?.trim() || fallback;
+}
+
 export function setNotes(id: string, patch: Partial<ClipNotes>) {
   const d = load();
   commit({ ...d, notes: { ...d.notes, [id]: { ...d.notes[id], ...patch } } });

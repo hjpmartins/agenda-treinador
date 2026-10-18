@@ -142,13 +142,24 @@ declare class ClipEngineNative extends NativeModule<Events> {
   moveToBackground(): boolean;
 
   /**
-   * Vídeo para enviar: só a parte cortada (endMs 0 = até ao fim), em 720p, com a imagem
+   * Vídeo para enviar: só a parte cortada (endMs 0 = até ao fim), em 720p ou 1080p, com a imagem
    * parada freezeMs em cada desenho. momentsJson = JSON de [{ atMs, strokes }]. Devolve o uri.
    */
-  exportAnnotated(srcUri: string, startMs: number, endMs: number, momentsJson: string, freezeMs: number): Promise<string>;
+  exportAnnotated(
+    srcUri: string,
+    startMs: number,
+    endMs: number,
+    momentsJson: string,
+    freezeMs: number,
+    /** 720 (leve, WhatsApp) ou 1080 (qualidade máxima, YouTube). */
+    maxHeight: number
+  ): Promise<string>;
 
-  /** Partilhar vários vídeos de uma vez (uris file://, dentro de recebidos/ ou exportados/). */
-  shareFiles(uris: string[], title: string): void;
+  /**
+   * Partilhar vídeos (uris file://, dentro de recebidos/ ou exportados/). names[i] não vazio = o ficheiro vai
+   * com esse nome (título do clip); text = texto da mensagem (ex.: legenda no WhatsApp).
+   */
+  shareFiles(uris: string[], names: string[], text: string, title: string): Promise<void>;
 
   // Atualizações da app
   /** Caminho do APK desta versão se já foi descarregado, senão null. */

@@ -33,6 +33,8 @@ export type ClipNotes = {
   moments?: Moment[];
   players?: string[];
   tone?: Tone | null;
+  /** Título escrito no tablet (substitui o nome do clip; vai como texto e nome do ficheiro ao enviar). */
+  title?: string | null;
 };
 
 /** Valor guardado pela barra flutuante ("pos" | "neg" | "") → tipo. */

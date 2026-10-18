@@ -242,20 +242,22 @@ class ClipEngineModule : Module() {
      * desenho a imagem fica parada [freezeMs] com o desenho por cima.
      * momentsJson: [{ atMs, strokes: [{ tool, color, points: [[x,y],…] }] }] (tempos do ficheiro).
      */
-    AsyncFunction("exportAnnotated") { srcUri: String, startMs: Double, endMs: Double, momentsJson: String, freezeMs: Double, promise: Promise ->
+    AsyncFunction("exportAnnotated") { srcUri: String, startMs: Double, endMs: Double, momentsJson: String, freezeMs: Double, maxHeight: Double, promise: Promise ->
       val context = appContext.reactContext!!
       Thread({
         try {
           val src = java.io.File(Uri.parse(srcUri).path ?: srcUri)
           val dir = java.io.File(context.cacheDir, "exportados").apply { mkdirs() }
           dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 24 * 3600_000L }?.forEach { it.delete() }
-          val dst = java.io.File(dir, src.nameWithoutExtension + "-desenhos.mp4")
+          // 720 = leve (WhatsApp); 1080 = qualidade máxima (YouTube), nunca acima do original.
+          val maxH = if (maxHeight >= 1080) 1080 else 720
+          val dst = java.io.File(dir, src.nameWithoutExtension + "-desenhos-$maxH.mp4")
           // Tamanho de saída (para desenhar os traços à mesma escala).
           val probe = android.media.MediaMetadataRetriever().apply { setDataSource(src.path) }
           val w = probe.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 1920
           val h = probe.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 1080
           probe.release()
-          val scale = minOf(1.0, 720.0 / minOf(w, h))
+          val scale = minOf(1.0, maxH.toDouble() / minOf(w, h))
           val outW = ((w * scale).toInt() / 2) * 2
           val outH = ((h * scale).toInt() / 2) * 2
           val moments = org.json.JSONArray(momentsJson)
@@ -270,8 +272,8 @@ class ClipEngineModule : Module() {
           pt.clipsjogo.engine.media.LightTranscoder.export(
             src, dst,
             pt.clipsjogo.engine.media.LightTranscoder.Options(
-              maxHeight = 720,
-              bitrate = 3_000_000,
+              maxHeight = maxH,
+              bitrate = if (maxH >= 1080) 9_000_000 else 3_000_000,
               startUs = (startMs * 1000).toLong(),
               endUs = if (endMs > 0) (endMs * 1000).toLong() else Long.MAX_VALUE,
               freezes = freezes,
@@ -296,19 +298,36 @@ class ClipEngineModule : Module() {
     }
 
     /** Partilhar vários vídeos de uma vez (ex.: todos os clips de uma jogadora pelo WhatsApp). */
-    Function("shareFiles") { uris: List<String>, title: String ->
+    AsyncFunction("shareFiles") { uris: List<String>, names: List<String>, text: String, title: String ->
       val context = appContext.reactContext!!
       val authority = "${context.packageName}.clipengine.updates"
-      val contentUris = ArrayList(uris.map { u ->
-        androidx.core.content.FileProvider.getUriForFile(context, authority, java.io.File(Uri.parse(u).path ?: u))
-      })
-      if (contentUris.isEmpty()) return@Function
+      // Com título: vai uma cópia com o título no nome do ficheiro (ex.: "Ressalto #7.mp4").
+      val named = java.io.File(context.cacheDir, "exportados/titulos").apply { mkdirs() }
+      named.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 24 * 3600_000L }?.forEach { it.delete() }
+      val used = HashSet<String>()
+      val files = uris.mapIndexed { i, u ->
+        val src = java.io.File(Uri.parse(u).path ?: u)
+        val base = names.getOrNull(i)?.let(::safeFileName)?.takeIf { it.isNotEmpty() } ?: return@mapIndexed src
+        var name = base
+        var n = 2
+        while (!used.add(name.lowercase())) name = "$base (${n++})"
+        java.io.File(named, "$name.mp4").also { dst ->
+          if (dst.length() != src.length()) src.copyTo(dst, overwrite = true)
+          dst.setLastModified(System.currentTimeMillis())
+        }
+      }
+      val contentUris = ArrayList(files.map { androidx.core.content.FileProvider.getUriForFile(context, authority, it) })
+      if (contentUris.isEmpty()) return@AsyncFunction
       val send = android.content.Intent(
         if (contentUris.size == 1) android.content.Intent.ACTION_SEND else android.content.Intent.ACTION_SEND_MULTIPLE
       ).apply {
         type = "video/mp4"
         if (contentUris.size == 1) putExtra(android.content.Intent.EXTRA_STREAM, contentUris[0])
         else putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, contentUris)
+        if (text.isNotBlank()) {
+          putExtra(android.content.Intent.EXTRA_TEXT, text)
+          putExtra(android.content.Intent.EXTRA_TITLE, text.lineSequence().first())
+        }
         clipData = android.content.ClipData.newUri(context.contentResolver, title, contentUris[0]).also { cd ->
           contentUris.drop(1).forEach { cd.addItem(android.content.ClipData.Item(it)) }
         }
@@ -357,4 +376,8 @@ class ClipEngineModule : Module() {
 
     View(CameraPreviewView::class) {}
   }
+
+  /** Título → nome de ficheiro válido (sem / : * ? " < > | e no máximo 60 letras). */
+  private fun safeFileName(title: String): String =
+    title.replace(Regex("[\\\\/:*?\"<>|\\p{Cntrl}]"), " ").replace(Regex("\\s+"), " ").trim().take(60).trim()
 }

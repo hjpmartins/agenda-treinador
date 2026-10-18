@@ -24,8 +24,9 @@ import { shareClip } from '../components/exportShare';
 import { run, saveToGallery } from '../components/media';
 import { MotiveChips, MotivePicker } from '../components/MotivePicker';
 import { PlayerChips, PlayerPicker, playersShort } from '../components/PlayerPicker';
-import { groupByMotive, playerLabel } from '../lib/annotations';
-import { allNotes, getMotives, getNotes, getRoster, setNotes, useNotesVersion } from '../remote/notesStore';
+import { groupByMotive, playerLabel, type Tone } from '../lib/annotations';
+import { toneBackground, ToneChips, ToneToggle } from '../components/Tone';
+import { absorbBarTags, allNotes, getMotives, getNotes, getRoster, setNotes, useNotesVersion } from '../remote/notesStore';
 import { Button, Card, Chip } from '../components/ui';
 import { ADJUST_STEP_MS, fromMarks, lastSeconds, normalize, PRESET_SECONDS, type ClipRange } from '../lib/clipRange';
 import { classifySignal, formatBand, overallQuality } from '../lib/linkQuality';
@@ -154,7 +155,7 @@ function ScanView({ onPaired, onBack }: { onPaired: (p: Pairing) => void; onBack
 
 // ======================================================================== comando
 
-type Draft = ClipRange & { name: string; createdAt: number; motive: string | null; players: string[] };
+type Draft = ClipRange & { name: string; createdAt: number; motive: string | null; players: string[]; tone: Tone | null };
 
 function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconnect: () => void }) {
   const [snap, setSnap] = useState<RemoteSnapshot>(() => client.state);
@@ -206,7 +207,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
   const send = useCallback(
     (d: Draft) => {
       const id = client.requestClip(d.startMs, d.endMs, d.name);
-      if (d.motive || d.players.length) setNotes(id, { motive: d.motive, players: d.players });
+      if (d.motive || d.players.length || d.tone) setNotes(id, { motive: d.motive, players: d.players, tone: d.tone });
       setDraft(null);
       setCountdown(null);
       feedback(`Clip pedido · ${formatDuration(d.endMs - d.startMs)}`);
@@ -230,10 +231,12 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
       // Se já havia um rascunho por enviar, envia-o antes de criar o novo.
       if (draft) {
         const id = client.requestClip(draft.startMs, draft.endMs, draft.name);
-        if (draft.motive || draft.players.length) setNotes(id, { motive: draft.motive, players: draft.players });
+        if (draft.motive || draft.players.length || draft.tone) {
+          setNotes(id, { motive: draft.motive, players: draft.players, tone: draft.tone });
+        }
       }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      setDraft({ ...range, name: '', createdAt: Date.now(), motive: null, players: [] });
+      setDraft({ ...range, name: '', createdAt: Date.now(), motive: null, players: [], tone: null });
       setCountdown(AUTO_SEND_SECONDS);
     },
     [client, draft]
@@ -273,7 +276,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
         ? { label: 'A ligar à rede do telemóvel…', tone: 'warn' as const }
         : snap.connection === 'connecting'
           ? { label: 'À procura do telemóvel…', tone: 'warn' as const }
-          : { label: 'Sem ligação — a tentar de novo', tone: 'danger' as const };
+          : { label: 'Sem ligação ao telemóvel', tone: 'danger' as const };
 
   // Barra flutuante: fica por cima de outras apps (ex.: estatísticas) quando esta sai do ecrã.
   const [floatingOn, setFloatingOn] = useState(false);
@@ -282,9 +285,7 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
   useEffect(() => {
     const take = () => {
       try {
-        const picked = ClipEngine?.takeBarMotives() ?? {};
-        for (const [id, motive] of Object.entries(picked)) setNotes(id, { motive });
-        for (const [id, players] of Object.entries(ClipEngine?.takeBarPlayers() ?? {})) setNotes(id, { players });
+        absorbBarTags();
         // Qualidade mudada na barra (HD/Leve): a app passa a usar a mesma.
         const light = ClipEngine?.getBarLight();
         if (light != null && (light ? 'leve' : 'original') !== client.state.quality) {
@@ -411,6 +412,14 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
         {/* Avisos numa linha própria, por baixo do cronómetro. */}
         <View style={styles.chips}>
           <Chip label={connectionChip.label} tone={connectionChip.tone} />
+          {!connected && snap.connection !== 'joining' ? (
+            <Button
+              label="↻ Voltar a ligar"
+              variant="primary"
+              onPress={() => client.reconnect()}
+              style={compact && styles.smallButton}
+            />
+          ) : null}
           {connected && !recording ? (
             <Chip label={snap.notRecordingReason ?? 'A sincronizar com o telemóvel…'} tone="warn" />
           ) : null}
@@ -451,6 +460,10 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
             }}
             onPlayers={(players) => {
               setDraft((d) => (d ? { ...d, players } : d));
+              setCountdown((c) => (c == null ? null : AUTO_SEND_SECONDS));
+            }}
+            onTone={(tone) => {
+              setDraft((d) => (d ? { ...d, tone } : d));
               setCountdown((c) => (c == null ? null : AUTO_SEND_SECONDS));
             }}
             onCancel={() => {
@@ -661,6 +674,7 @@ function DraftPanel({
   onName,
   onMotive,
   onPlayers,
+  onTone,
   onCancel,
   onSend,
 }: {
@@ -671,6 +685,7 @@ function DraftPanel({
   onName: (name: string) => void;
   onMotive: (motive: string | null) => void;
   onPlayers: (players: string[]) => void;
+  onTone: (tone: Tone | null) => void;
   onCancel: () => void;
   onSend: () => void;
 }) {
@@ -691,8 +706,9 @@ function DraftPanel({
           onSubmitEditing={onSend}
         />
       </View>
-      {/* Motivos e jogadoras lado a lado (um por baixo do outro se não couber). */}
+      {/* Tipo, motivos e jogadoras lado a lado (um por baixo do outro se não couber). */}
       <View style={styles.tagCols}>
+        <ToneChips value={draft.tone} onChange={onTone} />
         <View style={styles.tagCol}>
           <MotiveChips value={draft.motive} onChange={onMotive} />
         </View>
@@ -792,6 +808,7 @@ function ClipRow({
 }) {
   const motive = getNotes(clip.id).motive;
   const players = playersShort(getNotes(clip.id).players);
+  const tone = getNotes(clip.id).tone;
   const local = clip.localUri;
   const transferring = clip.transfer != null;
   const st = local
@@ -805,7 +822,7 @@ function ClipRow({
         : CLIP_STATUS[clip.status];
   const busy = !local && clip.status !== 'failed';
   return (
-    <View style={styles.clipRow}>
+    <View style={[styles.clipRow, toneBackground(tone)]}>
       <View style={styles.clipHeader}>
         <View style={styles.flex}>
           <Text style={styles.clipName} numberOfLines={1}>
@@ -816,6 +833,7 @@ function ClipRow({
           </Text>
           {clip.error ? <Text style={styles.warn}>{clip.error}</Text> : null}
           <View style={styles.tagRow}>
+            <ToneToggle value={tone} onChange={(t) => setNotes(clip.id, { tone: t })} />
             <Pressable onPress={onMotive} hitSlop={6}>
               <Text style={motive ? styles.motive : styles.motiveEmpty}>{motive ?? '+ motivo'}</Text>
             </Pressable>
@@ -949,7 +967,7 @@ const styles = StyleSheet.create({
   sideHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space(1) },
   motive: { color: colors.accent, fontWeight: '700', marginTop: 2 },
   players: { color: '#5AA2FF', fontWeight: '700', marginTop: 2 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space(1.5) },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space(1.5), rowGap: 4, marginTop: 2 },
   tagCols: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2) },
   tagCol: { flexGrow: 1, flexBasis: 260 },
   motiveEmpty: { color: colors.muted, marginTop: 2 },
@@ -968,6 +986,8 @@ const styles = StyleSheet.create({
   clipRow: {
     gap: space(1),
     paddingVertical: space(1),
+    paddingHorizontal: 6,
+    borderRadius: radius.s,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },

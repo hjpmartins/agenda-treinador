@@ -52,6 +52,15 @@ object FloatingRemote {
   }
 
   private const val MOTIVES_PREFS = "clips_barra_motivos"
+  private const val TONES_PREFS = "clips_barra_tipo"
+
+  /** Tipo escolhido na barra (id do clip → "pos", "neg" ou "" = nenhum), para a app registar ao voltar. */
+  fun takeTones(context: Context): Map<String, String> {
+    val prefs = context.getSharedPreferences(TONES_PREFS, Context.MODE_PRIVATE)
+    val all = prefs.all.mapNotNull { (k, v) -> (v as? String)?.let { k to it } }.toMap()
+    prefs.edit().clear().apply()
+    return all
+  }
 
   /** Motivos escolhidos na barra (id do clip → motivo), para a app registar ao voltar. */
   fun takeMotives(context: Context): Map<String, String> {
@@ -144,6 +153,10 @@ object FloatingRemote {
     fun isLight(): Boolean = config?.light == true
 
     fun toggleLight() = setLight(!isLight())
+
+    fun setTone(context: Context, clipId: String, tone: String?) {
+      context.getSharedPreferences(TONES_PREFS, Context.MODE_PRIVATE).edit().putString(clipId, tone ?: "").apply()
+    }
 
     fun setMotive(context: Context, clipId: String, motive: String) {
       context.getSharedPreferences(MOTIVES_PREFS, Context.MODE_PRIVATE).edit().putString(clipId, motive).apply()

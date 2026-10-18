@@ -1,6 +1,7 @@
 import { File, Paths } from 'expo-file-system';
 import { useSyncExternalStore } from 'react';
-import { DEFAULT_MOTIVES, type ClipNotes, type Player } from '../lib/annotations';
+import { ClipEngine } from '../../modules/clip-engine';
+import { DEFAULT_MOTIVES, parseTone, type ClipNotes, type Player } from '../lib/annotations';
 
 /**
  * Anotações dos clips no tablet (motivo, corte, desenhos) e lista de motivos.
@@ -78,4 +79,17 @@ export function useNotesVersion(): number {
 
 export function allNotes(): Record<string, ClipNotes> {
   return load().notes;
+}
+
+/** Regista o que foi escolhido na barra flutuante (tipo, motivo, jogadoras) enquanto a app estava atrás. */
+export function absorbBarTags() {
+  try {
+    const engine = ClipEngine;
+    if (!engine) return;
+    for (const [id, motive] of Object.entries(engine.takeBarMotives())) setNotes(id, { motive });
+    for (const [id, players] of Object.entries(engine.takeBarPlayers())) setNotes(id, { players });
+    for (const [id, tone] of Object.entries(engine.takeBarTones())) setNotes(id, { tone: parseTone(tone) });
+  } catch {
+    // ignora
+  }
 }

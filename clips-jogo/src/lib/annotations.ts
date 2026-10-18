@@ -24,7 +24,21 @@ export type Trim = { startMs: number; endMs: number };
 /** Jogadora do plantel (vem da Agenda do Treinador ou é escrita à mão). */
 export type Player = { n: string; nome: string };
 /** players: números das jogadoras marcadas no clip. */
-export type ClipNotes = { motive?: string | null; trim?: Trim | null; moments?: Moment[]; players?: string[] };
+/** Tipo do lance: positivo (azul) ou negativo (vermelho). */
+export type Tone = 'pos' | 'neg';
+
+export type ClipNotes = {
+  motive?: string | null;
+  trim?: Trim | null;
+  moments?: Moment[];
+  players?: string[];
+  tone?: Tone | null;
+};
+
+/** Valor guardado pela barra flutuante ("pos" | "neg" | "") → tipo. */
+export function parseTone(v: string | null | undefined): Tone | null {
+  return v === 'pos' || v === 'neg' ? v : null;
+}
 
 /** "#8 Carlota" (primeiro nome), ou só o número/nome se faltar o outro. */
 export function playerLabel(p: Player): string {

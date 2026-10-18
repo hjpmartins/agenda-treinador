@@ -342,6 +342,9 @@ class ClipEngineModule : Module() {
     /** Motivos escolhidos na barra flutuante desde a última vez (id do clip → motivo). */
     Function("takeBarMotives") { FloatingRemote.takeMotives(appContext.reactContext!!) }
 
+    /** Tipo (+/−) escolhido na barra flutuante desde a última vez (id do clip → "pos" | "neg" | ""). */
+    Function("takeBarTones") { FloatingRemote.takeTones(appContext.reactContext!!) }
+
     Function("disarmFloatingBar") { FloatingRemote.disarm() }
 
     /** Qualidade escolhida na barra (true = leve), ou null se a barra não está ativa. */

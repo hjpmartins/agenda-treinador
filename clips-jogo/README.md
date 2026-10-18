@@ -47,7 +47,7 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
 1. Abre a app → **Gravar** → **Permitir** (câmara e microfone).
 2. Põe o telemóvel na horizontal (a app roda sozinha) e escolhe **1080p** ou **720p**.
 3. Carrega no botão vermelho. O cronómetro começa e aparecem os avisos de bateria, espaço e temperatura.
-4. Durante a gravação, carrega em **10s / 20s / 30s / 60s** para criar clips dos últimos N segundos. O contador mostra "x prontos · y a processar". Cada clip fica pronto 2–4 segundos depois do pedido.
+4. Durante a gravação, carrega em **15s / 25s / 45s / 60s** para criar clips dos últimos N segundos. O contador mostra "x prontos · y a processar". Cada clip fica pronto 2–4 segundos depois do pedido.
 5. **Ecrã de repouso** apaga o ecrã para poupar bateria, mas a gravação continua. Toca no ecrã para o acordar.
 6. **Parar gravação** → confirma. A app termina os clips pendentes e cria o vídeo completo (com barra de progresso).
 7. **Ver clips**: reproduz, **Galeria** (guarda no rolo da câmara) ou **Partilhar** (WhatsApp, Drive…).
@@ -80,8 +80,12 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
 - **Enviar com desenhos** (↗ Enviar no leitor, ou Partilhar num clip com corte/desenhos → "Com desenhos"): cria um
   vídeo em 720p só com a parte cortada; em cada desenho a imagem fica **parada 4 s com o desenho por cima** (o vídeo enviado não leva som) e depois
   continua. Abre a partilha do Android (WhatsApp, YouTube, Galeria…). "Original" envia o clip tal como está.
+- **Tipo + / −** (positivo a azul, negativo a vermelho): no painel do clip acabado de pedir (bloco "TIPO"), na barra
+  flutuante, ou depois nos botões **+** e **−** de cada clip na lista. O clip fica com o fundo dessa cor.
 - **Desconto** (botão no Comando): clips deste jogo agrupados por motivo; toca num motivo e os clips passam seguidos.
 - Em **Ver gravações e clips → Recebidos**, cada jogo tem "Ver seguidos" por motivo, para a análise durante a semana.
+- **Enviar vários de uma vez**: Ver gravações e clips → **Selecionar clips para enviar** → toca nos clips (ou **Todos**
+  / **Todos deste jogo**) → **Enviar (N)**. Os que têm corte ou desenhos vão na versão com desenhos.
 
 ### Jogadoras (plantel)
 
@@ -135,6 +139,8 @@ Se o telemóvel não estiver no ecrã Gravar, o tablet diz "Abre o ecrã Gravar 
 - **▶ Retomar**: a câmara liga-se (~2 s para acertar foco e exposição) e a gravação continua **no mesmo jogo**, com o
   tempo a continuar de onde parou. O vídeo completo fica sem o intervalo.
 - Durante a pausa não se pedem clips (o tablet mostra "Gravação em pausa (intervalo)").
+- Se levares o tablet para longe (ex.: balneário) e a ligação cair, ao voltar carrega em **↻ Voltar a ligar** no Comando
+  (o Android não volta sozinho à rede do telemóvel).
 
 ### Distância e qualidade da ligação
 
@@ -155,8 +161,8 @@ Para usar outra app em ecrã inteiro (ex.: estatísticas) e pedir clips ao mesmo
 
 1. No Comando, já ligado ao telemóvel, carrega em **Barra flutuante**.
 2. Da primeira vez, o Android pede **"Mostrar sobre outras apps"** para o Clips de Jogo: ativa e volta à app; carrega outra vez em **Barra flutuante**.
-3. A app vai para trás e aparece uma barra pequena por cima de tudo: **`● 12:34` `10s` `20s` `30s` `60s` `Início` `↗`**.
-   - **10s/20s/30s/60s**: pede logo o clip dos últimos segundos (o cronómetro mostra "✓ 20s").
+3. A app vai para trás e aparece uma barra pequena por cima de tudo: **`● 12:34` `15s` `25s` `45s` `60s` `Início` `↗`**.
+   - **15s/25s/45s/60s**: pede logo o clip dos últimos segundos (o cronómetro mostra "✓ 25s").
    - **Início** → **Fim**: marca o início e depois o fim do clip. Toque longo cancela a marca.
    - **Arrastar o cronómetro** muda a barra de sítio; **um toque no cronómetro** encolhe-a (fica só o cronómetro) ou expande-a.
    - **HD / Leve**: qualidade da cópia dos clips para o tablet (toca para trocar; a app passa a usar a mesma).

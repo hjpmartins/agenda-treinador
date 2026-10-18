@@ -5,7 +5,7 @@
 
 export type ClipRange = { startMs: number; endMs: number };
 
-export const PRESET_SECONDS = [10, 20, 30, 60] as const;
+export const PRESET_SECONDS = [15, 25, 45, 60] as const;
 export const ADJUST_STEP_MS = 5_000;
 const MIN_CLIP_MS = 2_000;
 

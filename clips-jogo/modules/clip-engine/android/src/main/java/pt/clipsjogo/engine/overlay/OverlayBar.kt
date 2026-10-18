@@ -36,7 +36,9 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
     const val OK = 0xFF2ECC71.toInt()
     const val REC = 0xFFFF3B30.toInt()
     const val PLAYER_BLUE = 0xFF2D7FF9.toInt()
-    val PRESETS = intArrayOf(10, 20, 30, 60)
+    const val TONE_POS = 0xFF1E6FE0.toInt()
+    const val TONE_NEG = 0xFFE0352B.toInt()
+    val PRESETS = intArrayOf(15, 25, 45, 60)
   }
 
   private val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -45,8 +47,10 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
 
   private val root = LinearLayout(context)
   private val row = LinearLayout(context)
-  // Painel por baixo da barra: motivos (à esquerda) e jogadoras (à direita), tudo à vista.
+  // Painel por baixo da barra: tipo (+/−), motivos e jogadoras, tudo à vista.
   private val tagPanel = LinearLayout(context)
+  private val toneColumn = LinearLayout(context)
+  private val toneGrid = GridLayout(context)
   private val motiveColumn = LinearLayout(context)
   private val playerColumn = LinearLayout(context)
   private val motiveGrid = GridLayout(context)
@@ -197,9 +201,12 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
       grid.columnCount = columns
       col.addView(grid)
     }
+    column(toneColumn, "TIPO", toneGrid, 1)
     column(motiveColumn, "MOTIVO", motiveGrid, 2)
     column(playerColumn, "JOGADORAS", playerGrid, 3)
     tagPanel.orientation = LinearLayout.HORIZONTAL
+    tagPanel.addView(toneColumn)
+    tagPanel.addView(View(context).apply { layoutParams = LinearLayout.LayoutParams(dp(14), 1) })
     tagPanel.addView(motiveColumn)
     tagPanel.addView(View(context).apply { layoutParams = LinearLayout.LayoutParams(dp(14), 1) })
     tagPanel.addView(playerColumn)
@@ -221,18 +228,20 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
   }
 
   /**
-   * Depois de pedir um clip: motivos (laranja, um) e jogadoras (azul, várias) para
+   * Depois de pedir um clip: tipo (+/−), motivos (laranja, um) e jogadoras (azul, várias) para
    * tocar. Tudo opcional; a fila esconde-se uns segundos depois do último toque.
    */
   private var chosenMotive: String? = null
+  private var chosenTone: String? = null
   private val chosenPlayers = LinkedHashSet<String>()
 
   private fun showMotives(clipId: String?) {
     ui.removeCallbacks(hideMotives)
     motiveClipId = clipId
     chosenMotive = null
+    chosenTone = null
     chosenPlayers.clear()
-    if (clipId == null || (actions.motives().isEmpty() && actions.players().isEmpty()) || collapsed) {
+    if (clipId == null || collapsed) {
       tagPanel.visibility = View.GONE
       return
     }
@@ -269,8 +278,15 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
 
   private fun renderChips() {
     val id = motiveClipId ?: return
+    toneGrid.removeAllViews()
     motiveGrid.removeAllViews()
     playerGrid.removeAllViews()
+    for ((tone, label, color) in listOf(Triple("pos", "+ Positivo", TONE_POS), Triple("neg", "− Negativo", TONE_NEG))) {
+      toneGrid.addView(chip(label, chosenTone == tone, color, 100) {
+        chosenTone = if (chosenTone == tone) null else tone
+        actions.setTone(context, id, chosenTone)
+      })
+    }
     val motives = actions.motives()
     val players = actions.players()
     motiveColumn.visibility = if (motives.isEmpty()) View.GONE else View.VISIBLE

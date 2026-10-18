@@ -177,18 +177,42 @@ export class RemoteClient {
     this.listeners.forEach((l) => l(this.snapshot));
   }
 
-  async start(): Promise<void> {
+  private async joinNetwork() {
     const { ssid, passphrase, security } = this.pairing;
-    if (ssid && ClipEngine) {
-      this.emit({ connection: 'joining', error: null });
-      try {
-        await ClipEngine.joinNetwork(ssid, passphrase ?? '', security);
-      } catch (e) {
-        // Pode já estar ligado à mesma rede (ex.: router portátil): tentamos na mesma.
-        this.emit({ error: e instanceof Error ? e.message : String(e) });
-      }
+    if (!ssid || !ClipEngine) return;
+    this.emit({ connection: 'joining', error: null });
+    try {
+      await ClipEngine.joinNetwork(ssid, passphrase ?? '', security);
+    } catch (e) {
+      // Pode já estar ligado à mesma rede (ex.: router portátil): tentamos na mesma.
+      this.emit({ error: e instanceof Error ? e.message : String(e) });
     }
-    if (!ssid) ClipEngine?.keepWifiAwake().catch(() => {});
+  }
+
+  private rejoining = false;
+
+  /**
+   * Voltar a ligar à rede do telemóvel (ex.: o tablet foi ao balneário no
+   * intervalo). Depois de sair do alcance o Android não volta sozinho a esta
+   * rede: é preciso pedi-la outra vez, como ao abrir a app.
+   */
+  async reconnect(): Promise<void> {
+    if (this.rejoining || this.stopped) return;
+    this.rejoining = true;
+    this.baseUrl = null;
+    try {
+      await this.joinNetwork();
+    } finally {
+      this.rejoining = false;
+    }
+    if (this.stopped) return;
+    if (this.snapshot.connection !== 'connected') this.emit({ connection: 'connecting' });
+    this.pollStatus();
+  }
+
+  async start(): Promise<void> {
+    await this.joinNetwork();
+    if (!this.pairing.ssid) ClipEngine?.keepWifiAwake().catch(() => {});
     if (this.stopped) return;
     this.emit({ connection: 'connecting' });
     this.timers.push(setInterval(() => this.pollStatus(), 1000));

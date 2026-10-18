@@ -7,6 +7,7 @@ import {
   findMoment,
   groupByMotive,
   normalizeTrim,
+  parseTone,
   undoStroke,
   type Stroke,
 } from '../src/lib/annotations.ts';
@@ -71,4 +72,11 @@ test('jogadoras nos clips', () => {
   const roster = [{ n: '5', nome: 'A' }, { n: '8', nome: 'B' }, { n: '9', nome: 'C' }];
   const g = groupByPlayer([{ id: 'x' }, { id: 'y' }], { x: { players: ['8', '5'] }, y: { players: ['8'] } }, roster);
   assert.deepEqual(g.map((x) => [x.player.n, x.clips.length]), [['5', 1], ['8', 2]]);
+});
+
+test('parseTone: valores da barra flutuante', () => {
+  assert.equal(parseTone('pos'), 'pos');
+  assert.equal(parseTone('neg'), 'neg');
+  assert.equal(parseTone(''), null);
+  assert.equal(parseTone(undefined), null);
 });

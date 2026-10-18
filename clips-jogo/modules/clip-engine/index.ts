@@ -134,6 +134,8 @@ declare class ClipEngineNative extends NativeModule<Events> {
   takeBarPlayers(): Record<string, string[]>;
   /** Motivos escolhidos na barra flutuante desde a última chamada (id do clip → motivo). */
   takeBarMotives(): Record<string, string>;
+  /** Tipo (+/−) escolhido na barra: id do clip → "pos" | "neg" | "" (nenhum). */
+  takeBarTones(): Record<string, string>;
   disarmFloatingBar(): void;
   /** Qualidade escolhida na barra flutuante (true = leve), ou null se a barra não está ativa. */
   getBarLight(): boolean | null;

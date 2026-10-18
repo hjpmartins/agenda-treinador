@@ -77,7 +77,8 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
   Podes desenhar em vários momentos do mesmo clip; ao reproduzir, a imagem **para em cada desenho** (▶ para continuar).
   Os desenhos ficam guardados (marcas amarelas na barra).
 - **Zoom**: dois dedos para aproximar e afastar; com zoom, um dedo arrasta a imagem. Dois toques rápidos aproximam
-  nesse ponto (ou voltam ao normal); "🔍 … · Repor" também volta ao normal. Só para ver: o vídeo enviado não leva zoom.
+  nesse ponto (ou voltam ao normal). Também há os botões **🔍+ / 🔍−**; "🔍 … · Repor" volta ao normal. Só para ver: o
+  vídeo enviado não leva zoom.
 - **✂ Cortar**: aparecem duas **pegas laranja** na barra — a da esquerda é o início, a da direita o fim. Arrasta-as e a
   imagem acompanha a pega; "▶ Ver o corte" mostra o resultado. O clip passa a ver-se só nessa parte (o ficheiro
   original não muda); "Repor" volta ao clip inteiro.

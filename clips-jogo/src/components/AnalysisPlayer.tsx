@@ -243,14 +243,15 @@ function ClipAnalysis({
   // ------------------------------------------------------------ zoom (dois dedos / dois toques)
   const zoomRef = useRef({ zoom, box });
   zoomRef.current = { zoom, box };
-  const zoomPan = useMemo(() => {
-    let origin = { x: 0, y: 0 };
+  // Toques lidos diretamente (sem "responder"): nenhum outro elemento pode ficar com o gesto.
+  const zoomTouch = useMemo(() => {
     let base: { zoom: Zoom; mid: XY; dist: number; touches: number } | null = null;
     let tap: { at: number; p: XY; moved: boolean } | null = null;
     let lastTap: { at: number; p: XY } | null = null;
+    let origin = { x: 0, y: 0 };
     const read = (e: any): { mid: XY; dist: number; n: number } => {
-      const t: { pageX: number; pageY: number }[] = e.nativeEvent.touches?.length ? e.nativeEvent.touches : [e.nativeEvent];
-      const pts = t.slice(0, 2).map((p) => ({ x: p.pageX - origin.x, y: p.pageY - origin.y }));
+      const all: { pageX: number; pageY: number }[] = e.nativeEvent.touches?.length ? e.nativeEvent.touches : [e.nativeEvent];
+      const pts = all.slice(0, 2).map((p) => ({ x: p.pageX - origin.x, y: p.pageY - origin.y }));
       const mid = pts.length === 2 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : pts[0];
       const dist = pts.length === 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
       return { mid, dist, n: pts.length };
@@ -258,19 +259,23 @@ function ClipAnalysis({
     const rebase = (e: any) => {
       const r = read(e);
       base = { zoom: zoomRef.current.zoom, mid: r.mid, dist: r.dist, touches: r.n };
+      return r;
     };
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => {
-        // Canto da caixa no ecrã (a camada não tem filhos: locationX é relativo a ela).
-        origin = { x: e.nativeEvent.pageX - e.nativeEvent.locationX, y: e.nativeEvent.pageY - e.nativeEvent.locationY };
-        rebase(e);
-        tap = { at: Date.now(), p: read(e).mid, moved: false };
+    return {
+      onTouchStart: (e: any) => {
+        if (!base) {
+          // Canto da caixa no ecrã (a camada não tem filhos: locationX é relativo a ela).
+          origin = { x: e.nativeEvent.pageX - e.nativeEvent.locationX, y: e.nativeEvent.pageY - e.nativeEvent.locationY };
+        }
+        const r = rebase(e);
+        tap = r.n === 1 ? { at: Date.now(), p: r.mid, moved: false } : null;
       },
-      onPanResponderMove: (e) => {
+      onTouchMove: (e: any) => {
         const r = read(e);
-        if (!base || base.touches !== r.n) return rebase(e);
+        if (!base || base.touches !== r.n) {
+          rebase(e);
+          return;
+        }
         const { w, h } = zoomRef.current.box;
         if (tap && Math.hypot(r.mid.x - tap.p.x, r.mid.y - tap.p.y) > 10) tap.moved = true;
         if (r.n === 2) {
@@ -281,7 +286,14 @@ function ClipAnalysis({
           setZoom(pinchZoom(base.zoom, base.mid, 1, r.mid, 1, w, h));
         }
       },
-      onPanResponderRelease: () => {
+      onTouchEnd: (e: any) => {
+        const left = e.nativeEvent.touches?.length ?? 0;
+        if (left > 0) {
+          // Ainda há um dedo: continua a arrastar a partir daqui.
+          rebase(e);
+          tap = null;
+          return;
+        }
         base = null;
         const t = tap;
         tap = null;
@@ -294,12 +306,18 @@ function ClipAnalysis({
           lastTap = { at: t.at, p: t.p };
         }
       },
-      onPanResponderTerminate: () => {
+      onTouchCancel: () => {
         base = null;
         tap = null;
       },
-    });
+    };
   }, []);
+  /** Botões 🔍+ / 🔍−: aproxima ou afasta à volta do centro do que se está a ver. */
+  const zoomBy = (factor: number) => {
+    const { w, h } = box;
+    const c = { x: w / 2, y: h / 2 };
+    setZoom((z) => pinchZoom(z, c, 1, c, factor, w, h));
+  };
   const zoomed = zoom.s > 1.01;
 
   // ------------------------------------------------------------ corte (pegas na barra)
@@ -353,7 +371,7 @@ function ClipAnalysis({
           {mode === 'draw' ? (
             <View style={StyleSheet.absoluteFill} {...pan.panHandlers} />
           ) : (
-            <View style={StyleSheet.absoluteFill} {...zoomPan.panHandlers} />
+            <View style={StyleSheet.absoluteFill} {...zoomTouch} />
           )}
         </View>
         <View style={styles.topBar}>
@@ -456,6 +474,9 @@ function ClipAnalysis({
         <Btn label={isPlaying ? '❚❚' : '▶'} primary big onPress={togglePlay} />
         <Btn label="1 ▶" onPress={() => step(1)} />
         {onNext ? <Btn label="⏭" onPress={onNext} /> : null}
+        <View style={styles.sep} />
+        <Btn label="🔍−" onPress={() => zoomBy(1 / 1.5)} />
+        <Btn label="🔍+" on={zoomed} onPress={() => zoomBy(1.5)} />
         <View style={styles.sep} />
         {RATES.map((r) => (
           <Btn key={r} label={r === 1 ? '1x' : `${String(r).replace('.', ',')}x`} on={rate === r} onPress={() => setRate(r)} />

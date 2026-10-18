@@ -232,6 +232,57 @@ object Link {
       return JSONObject().put("state", state).put("sizeBytes", size)
     }
 
+    override fun preview(): ByteArray? {
+      // Câmara desligada (modo espera ou pausa): a imagem no ecrã seria antiga.
+      if (ClipEngine.paused || (ClipEngine.standby && ClipEngine.state != ClipEngine.STATE_RECORDING)) return null
+      return pt.clipsjogo.engine.CameraPreviewView.snapshotJpeg()
+    }
+
+    override fun sessions(): JSONObject = JSONObject().put("sessions", JSONArray().apply {
+      ClipEngine.reviewableSessions().forEach { s ->
+        put(JSONObject().apply {
+          put("id", s.id)
+          put("startedAtMs", s.startedAtMs)
+          put("durationMs", s.durationUs / 1000.0)
+          put("quality", s.quality)
+          put("clips", s.clips.size)
+          put("parts", JSONArray().apply {
+            ClipEngine.fullVideoPieces(s).forEach { p ->
+              put(JSONObject().put("index", p.index).put("startMs", p.startUs / 1000.0).put("endMs", p.endUs / 1000.0).put("sizeBytes", p.sizeBytes))
+            }
+          })
+        })
+      }
+    })
+
+    override fun sessionVideo(sessionId: String, part: Int): java.io.File? {
+      val s = ClipEngine.reviewSession(sessionId) ?: return null
+      return s.fullVideoParts.getOrNull(part)?.let { java.io.File(s.dir, it) }?.takeIf { it.exists() }
+    }
+
+    override fun requestSessionClip(sessionId: String, body: JSONObject): JSONObject {
+      fun str(key: String) = if (body.isNull(key)) null else body.optString(key).ifEmpty { null }
+      val clip = ClipEngine.requestReviewClip(
+        sessionId,
+        str("id"),
+        (body.getDouble("startMs") * 1000).toLong(),
+        (body.getDouble("endMs") * 1000).toLong(),
+        str("name")
+      )
+      return clipJson(sessionId, clip)
+    }
+
+    override fun sessionClips(sessionId: String): JSONObject {
+      val s = ClipEngine.reviewSession(sessionId) ?: throw IllegalStateException("Este jogo já não está no telemóvel.")
+      return JSONObject().put("clips", JSONArray().apply { s.clips.forEach { put(clipJson(s.id, it)) } })
+    }
+
+    override fun sessionClipFile(sessionId: String, clipId: String): java.io.File? {
+      val s = ClipEngine.reviewSession(sessionId) ?: return null
+      val clip = s.clips.firstOrNull { it.id == clipId && it.status == ClipInfo.STATUS_READY } ?: return null
+      return clip.fileName?.let { java.io.File(s.clipsDir, it) }?.takeIf { it.exists() }
+    }
+
     override fun clips(): JSONObject {
       val s = ClipEngine.currentSession()
       return JSONObject().apply {

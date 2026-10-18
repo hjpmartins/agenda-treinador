@@ -14,7 +14,12 @@ import java.io.FileInputStream
  *  - GET  /api/clips/<id>/file   o ficheiro MP4 do clip (aceita Range, para retomar);
  *  - GET  /api/clips/<id>/light  prepara/consulta a cópia leve (720p) para ver no tablet;
  *  - GET  /api/clips/<id>/file?q=leve   a cópia leve (ou o original, se não foi possível fazê-la);
- *  - POST /api/recording/start | /api/recording/stop   iniciar/parar a gravação a partir do tablet.
+ *  - POST /api/recording/start | /api/recording/stop   iniciar/parar a gravação a partir do tablet;
+ *  - GET  /api/preview.jpg   imagem atual da câmara (confirmar o enquadramento);
+ *  - GET  /api/sessions      jogos já gravados (para rever no tablet);
+ *  - GET  /api/sessions/<id>/video/<parte>   vídeo completo (aceita Range: o tablet vê-o sem o copiar);
+ *  - POST /api/sessions/<id>/clip   clip cortado do vídeo completo;
+ *  - GET  /api/sessions/<id>/clips  e  /api/sessions/<id>/clips/<clip>/file.
  *
  * Todos os pedidos levam o código do QR (cabeçalho X-Token), para que outros
  * dispositivos na mesma rede não consigam pedir clips.
@@ -34,6 +39,12 @@ class LinkServer(
     fun stopRecording(): JSONObject
     fun pauseRecording(): JSONObject
     fun resumeRecording(): JSONObject
+    fun preview(): ByteArray?
+    fun sessions(): JSONObject
+    fun sessionVideo(sessionId: String, part: Int): File?
+    fun requestSessionClip(sessionId: String, body: JSONObject): JSONObject
+    fun sessionClips(sessionId: String): JSONObject
+    fun sessionClipFile(sessionId: String, clipId: String): File?
   }
 
   @Volatile var lastSeenElapsedMs = 0L
@@ -71,6 +82,34 @@ class LinkServer(
         session.method == Method.POST && session.uri == "/api/recording/stop" -> json(Response.Status.OK, api.stopRecording())
         session.method == Method.POST && session.uri == "/api/recording/pause" -> json(Response.Status.OK, api.pauseRecording())
         session.method == Method.POST && session.uri == "/api/recording/resume" -> json(Response.Status.OK, api.resumeRecording())
+        session.method == Method.GET && session.uri == "/api/preview.jpg" -> {
+          val jpeg = api.preview()
+            ?: return json(Response.Status.NOT_FOUND, JSONObject().put("error", "Sem imagem: abre o ecrã Gravar no telemóvel (câmara ligada)."))
+          newFixedLengthResponse(Response.Status.OK, "image/jpeg", java.io.ByteArrayInputStream(jpeg), jpeg.size.toLong()).apply {
+            addHeader("Cache-Control", "no-store")
+          }
+        }
+        session.method == Method.GET && session.uri == "/api/sessions" -> json(Response.Status.OK, api.sessions())
+        session.method == Method.GET && VIDEO_ROUTE.matches(session.uri) -> {
+          val m = VIDEO_ROUTE.find(session.uri)!!
+          val file = api.sessionVideo(m.groupValues[1], m.groupValues[2].toInt())
+            ?: return json(Response.Status.NOT_FOUND, JSONObject().put("error", "Vídeo não encontrado"))
+          serveFile(file, session.headers["range"])
+        }
+        session.method == Method.POST && SESSION_CLIP_ROUTE.matches(session.uri) -> {
+          val sid = SESSION_CLIP_ROUTE.find(session.uri)!!.groupValues[1]
+          val files = HashMap<String, String>()
+          session.parseBody(files)
+          json(Response.Status.OK, api.requestSessionClip(sid, JSONObject(files["postData"] ?: "{}")))
+        }
+        session.method == Method.GET && SESSION_CLIPS_ROUTE.matches(session.uri) ->
+          json(Response.Status.OK, api.sessionClips(SESSION_CLIPS_ROUTE.find(session.uri)!!.groupValues[1]))
+        session.method == Method.GET && SESSION_FILE_ROUTE.matches(session.uri) -> {
+          val m = SESSION_FILE_ROUTE.find(session.uri)!!
+          val file = api.sessionClipFile(m.groupValues[1], m.groupValues[2])
+            ?: return json(Response.Status.NOT_FOUND, JSONObject().put("error", "Clip ainda não está pronto"))
+          serveFile(file, session.headers["range"])
+        }
         session.method == Method.GET && LIGHT_ROUTE.matches(session.uri) -> {
           val id = LIGHT_ROUTE.find(session.uri)!!.groupValues[1]
           json(Response.Status.OK, api.clipLight(id))
@@ -115,5 +154,9 @@ class LinkServer(
     private val FILE_ROUTE = Regex("^/api/clips/([A-Za-z0-9_-]+)/file$")
     private val LIGHT_ROUTE = Regex("^/api/clips/([A-Za-z0-9_-]+)/light$")
     private val RANGE = Regex("bytes=(\\d+)-(\\d*)")
+    private val VIDEO_ROUTE = Regex("^/api/sessions/([A-Za-z0-9_-]+)/video/(\\d+)$")
+    private val SESSION_CLIP_ROUTE = Regex("^/api/sessions/([A-Za-z0-9_-]+)/clip$")
+    private val SESSION_CLIPS_ROUTE = Regex("^/api/sessions/([A-Za-z0-9_-]+)/clips$")
+    private val SESSION_FILE_ROUTE = Regex("^/api/sessions/([A-Za-z0-9_-]+)/clips/([A-Za-z0-9_-]+)/file$")
   }
 }

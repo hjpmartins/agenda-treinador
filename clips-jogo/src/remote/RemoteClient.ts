@@ -80,12 +80,12 @@ type QueuedRequest = {
 
 const now = () => performance.now();
 
-function randomId(): string {
+export function randomId(): string {
   const hex = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0');
   return `${hex()}${hex()}-${hex()}-${hex()}-${hex()}-${hex()}${hex()}${hex()}`;
 }
 
-async function fetchJson(url: string, token: string, init: RequestInit = {}, timeoutMs = 4000): Promise<any> {
+export async function fetchJson(url: string, token: string, init: RequestInit = {}, timeoutMs = 4000): Promise<any> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -227,6 +227,11 @@ export class RemoteClient {
     this.timers.forEach(clearInterval);
     this.timers = [];
     ClipEngine?.leaveNetwork().catch(() => {});
+  }
+
+  /** Endereço do telemóvel que está a responder (null sem ligação). */
+  get currentUrl(): string | null {
+    return this.snapshot.connection === 'connected' ? this.baseUrl : null;
   }
 
   /** Endereços do telemóvel, o que está a funcionar primeiro (para a barra flutuante). */

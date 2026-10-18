@@ -27,6 +27,8 @@ import { PlayerChips, PlayerPicker, playersShort } from '../components/PlayerPic
 import { groupByMotive, playerLabel, type Tone } from '../lib/annotations';
 import { toneBackground, ToneChips, ToneToggle } from '../components/Tone';
 import { ClipTitle, TitleEditor } from '../components/TitleEditor';
+import { CameraPeek } from '../components/CameraPeek';
+import { ReviewGame } from '../components/ReviewGame';
 import { absorbBarTags, allNotes, getMotives, getNotes, getRoster, setNotes, useNotesVersion } from '../remote/notesStore';
 import { Button, Card, Chip } from '../components/ui';
 import { ADJUST_STEP_MS, fromMarks, lastSeconds, normalize, PRESET_SECONDS, type ClipRange } from '../lib/clipRange';
@@ -183,6 +185,9 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
   const [playersFor, setPlayersFor] = useState<string | null>(null);
   const [titleFor, setTitleFor] = useState<{ id: string; name: string } | null>(null);
   const [showDesconto, setShowDesconto] = useState(false);
+  // Endereço do telemóvel guardado ao abrir (uma falha curta de ligação não fecha a janela).
+  const [peekUrl, setPeekUrl] = useState<string | null>(null);
+  const [reviewUrl, setReviewUrl] = useState<string | null>(null);
   useNotesVersion();
   const pulse = useRef(new Animated.Value(0)).current;
 
@@ -531,6 +536,20 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
           <Button label="Desconto" variant="primary" onPress={() => setShowDesconto(true)} style={compact && styles.smallButton} />
           <Button label="Desligar" variant="ghost" onPress={onDisconnect} style={compact && styles.smallButton} />
         </View>
+        <View style={styles.peekRow}>
+          <Button
+            label="📷 Ver câmara"
+            disabled={!connected}
+            onPress={() => setPeekUrl(client.currentUrl)}
+            style={[styles.flex, compact && styles.smallButton]}
+          />
+          <Button
+            label="▶ Rever jogo"
+            disabled={!connected || recording || phonePaused}
+            onPress={() => setReviewUrl(client.currentUrl)}
+            style={[styles.flex, compact && styles.smallButton]}
+          />
+        </View>
         <Button
           label={floatingOn ? 'Barra flutuante: ligada' : 'Barra flutuante'}
           sublabel={floatingOn ? 'Aparece quando sais desta app · toca para desligar' : 'Pede clips por cima de outra app'}
@@ -613,6 +632,15 @@ function CommandView({ client, onDisconnect }: { client: RemoteClient; onDisconn
         onChange={(players) => playersFor && setNotes(playersFor, { players })}
         onClose={() => setPlayersFor(null)}
       />
+      {peekUrl ? <CameraPeek baseUrl={peekUrl} token={client.pairing.token} onClose={() => setPeekUrl(null)} /> : null}
+      {reviewUrl ? (
+        <ReviewGame
+          baseUrl={reviewUrl}
+          token={client.pairing.token}
+          phoneName={snap.phone?.device ?? 'telemóvel'}
+          onClose={() => setReviewUrl(null)}
+        />
+      ) : null}
       {showDesconto ? (
         <DescontoModal
           clips={snap.clips}
@@ -959,6 +987,7 @@ const styles = StyleSheet.create({
   flashText: { color: '#fff', fontWeight: '800', fontSize: 20 },
 
   copyBox: { gap: 6 },
+  peekRow: { flexDirection: 'row', gap: space(1) },
   segmented: { flexDirection: 'row', backgroundColor: colors.surfaceHigh, borderRadius: radius.s, padding: 3, gap: 3 },
   segment: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.s - 2 },
   segmentOn: { backgroundColor: colors.accent },

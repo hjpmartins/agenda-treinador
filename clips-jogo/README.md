@@ -155,6 +155,24 @@ Se o telemóvel não estiver no ecrã Gravar, o tablet diz "Abre o ecrã Gravar 
 - Se levares o tablet para longe (ex.: balneário) e a ligação cair, ao voltar carrega em **↻ Voltar a ligar** no Comando
   (o Android não volta sozinho à rede do telemóvel).
 
+### Ver a câmara a partir do tablet
+
+- No Comando, **📷 Ver câmara** mostra o que o telemóvel está a filmar, com uma imagem nova de 1,5 em 1,5 s: serve
+  para confirmar o enquadramento (ninguém à frente, ninguém mexeu no tripé) sem ir à bancada.
+- Não é vídeo, por isso não aquece mais o telemóvel. Só há imagem com o ecrã Gravar aberto no telemóvel e a câmara
+  ligada (não funciona no modo espera nem na pausa).
+
+### Rever o jogo e fazer clips depois
+
+- Com o tablet ligado ao telemóvel (por exemplo em casa: telemóvel em **Gravar → Ligar tablet**, pode ficar no modo
+  espera), no Comando carrega em **▶ Rever jogo** e escolhe o jogo.
+- O vídeo completo passa **a partir do telemóvel** (não é copiado para o tablet). Tens ▶/❚❚, −10 s/−3 s/+3 s/+10 s,
+  velocidade e a barra para andar no vídeo.
+- **15s / 25s / 45s / 60s** fazem o clip dos últimos segundos a partir de onde estás (ex.: aos 5:20, "15s" faz o clip
+  5:05–5:20). **Início / Fim** marca um clip à mão.
+- Depois de pedires, aparece o painel para o título, tipo +/−, motivo e jogadoras. O clip é cortado no telemóvel e
+  copiado para o tablet: fica em **Ver gravações e clips**, junto dos clips desse jogo.
+
 ### Distância e qualidade da ligação
 
 - No Comando, o aviso **"Wi-Fi bom/razoável/fraco · -62 dBm · 2,4 GHz · 35 ms"** mostra o sinal do tablet, a banda,

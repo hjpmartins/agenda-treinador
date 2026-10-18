@@ -417,6 +417,99 @@ object ClipEngine {
     io.execute { storage.saveClips(s) }
   }
 
+  // ---------------------------------------------------------------- rever jogo (tablet)
+
+  /**
+   * Jogos já terminados que o tablet está a rever: guardados aqui para que os
+   * clips pedidos seguidos não se percam entre leituras do disco.
+   */
+  private val reviewSessions = java.util.concurrent.ConcurrentHashMap<String, SessionInfo>()
+
+  fun reviewSession(id: String): SessionInfo? {
+    reviewSessions[id]?.let { if (it.dir.exists()) return it else reviewSessions.remove(id) }
+    if (session?.id == id) return null
+    val s = (if (lastSession?.id == id) lastSession else storage.loadAll().firstOrNull { it.id == id }) ?: return null
+    if (s.status != SessionInfo.STATUS_DONE || s.fullVideoParts.isEmpty()) return null
+    return reviewSessions.getOrPut(id) { s }
+  }
+
+  /** Jogos com vídeo completo (para o tablet escolher qual rever). */
+  fun reviewableSessions(): List<SessionInfo> =
+    storage.loadAll()
+      .filter { it.id != session?.id && it.status == SessionInfo.STATUS_DONE && it.fullVideoParts.isNotEmpty() }
+      .map { reviewSessions[it.id] ?: it }
+
+  /**
+   * Partes do vídeo completo na linha temporal da gravação (o vídeo completo não
+   * tem o intervalo, por isso o tempo do vídeo é o tempo do jogo).
+   */
+  fun fullVideoPieces(s: SessionInfo): List<pt.clipsjogo.engine.core.Segment> {
+    val names = s.fullVideoParts
+    val parts = if (s.segments.isNotEmpty()) CutPlanner.splitIntoParts(s.segments, MAX_PART_BYTES) else emptyList()
+    if (parts.size != names.size) {
+      // Sem a lista de segmentos: uma parte só, do início ao fim.
+      return listOf(pt.clipsjogo.engine.core.Segment(0, names.first(), 0L, s.durationUs, File(s.dir, names.first()).length()))
+    }
+    return parts.mapIndexed { i, part ->
+      pt.clipsjogo.engine.core.Segment(i, names[i], part.first().startUs, part.last().endUs, File(s.dir, names[i]).length())
+    }
+  }
+
+  /** Clip pedido pelo tablet a rever o jogo: cortado do vídeo completo (sem re-codificar). */
+  fun requestReviewClip(sessionId: String, id: String?, startUs: Long, endUs: Long, name: String?): ClipInfo {
+    val s = reviewSession(sessionId) ?: throw IllegalStateException("Este jogo já não está no telemóvel.")
+    val clip = synchronized(s) {
+      s.clips.firstOrNull { it.id == id }?.let { return it } // pedido repetido (reenvio)
+      ClipInfo(
+        id = id ?: UUID.randomUUID().toString(),
+        name = name?.takeIf { it.isNotBlank() } ?: "Clip ${s.clips.size + 1}",
+        requestedStartUs = startUs,
+        requestedEndUs = endUs,
+        createdAtMs = System.currentTimeMillis()
+      ).also { s.clips.add(it) }
+    }
+    io.execute { storage.saveClips(s) }
+    listener?.onClipUpdated(s.id, clip)
+    cutter.execute { cutFromFullVideo(s, clip) }
+    return clip
+  }
+
+  /** Corre no cutter. */
+  private fun cutFromFullVideo(s: SessionInfo, clip: ClipInfo) {
+    if (clip.status != ClipInfo.STATUS_PENDING) return
+    val pieces = fullVideoPieces(s)
+    val total = pieces.last().endUs
+    val start = clip.requestedStartUs.coerceIn(0L, total)
+    val end = clip.requestedEndUs.coerceIn(start, total)
+    val used = pieces.filter { it.endUs > start && it.startUs < end }
+    if (end - start < 500_000L || used.isEmpty()) {
+      updateClip(s, clip) {
+        status = ClipInfo.STATUS_FAILED
+        error = "Esse momento não está no vídeo do jogo."
+      }
+      return
+    }
+    updateClip(s, clip) { status = ClipInfo.STATUS_CUTTING }
+    val fileName = clipFileName(s, clip)
+    try {
+      s.clipsDir.mkdirs()
+      val result = ClipCutter.cut(s.dir, used, start, end, File(s.clipsDir, fileName), s.rotation, withAudio = false)
+      updateClip(s, clip) {
+        status = ClipInfo.STATUS_READY
+        this.fileName = fileName
+        startUs = result.startUs
+        endUs = result.endUs
+        sizeBytes = result.sizeBytes
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "Falha a cortar ${clip.id} do vídeo completo", e)
+      updateClip(s, clip) {
+        status = ClipInfo.STATUS_FAILED
+        error = e.message ?: "Erro a cortar o clip."
+      }
+    }
+  }
+
   // ---------------------------------------------------------------- finalização
 
   /** Corre no cutter: acaba os clips pendentes e cria o vídeo completo. */
@@ -501,12 +594,14 @@ object ClipEngine {
   fun findSession(id: String): SessionInfo? {
     session?.let { if (it.id == id) return it }
     lastSession?.let { if (it.id == id) return it }
+    reviewSessions[id]?.let { return it }
     return storage.loadAll().firstOrNull { it.id == id }
   }
 
   fun deleteSession(id: String) {
     check(session?.id != id) { "Não é possível apagar a gravação em curso." }
     findSession(id)?.dir?.deleteRecursively()
+    reviewSessions.remove(id)
     if (lastSession?.id == id) lastSession = null
   }
 
@@ -524,6 +619,7 @@ object ClipEngine {
         .forEach { old ->
           Log.i(TAG, "A apagar jogo antigo ${old.id}")
           old.dir.deleteRecursively()
+          reviewSessions.remove(old.id)
           if (lastSession?.id == old.id) lastSession = null
         }
     } catch (e: Exception) {

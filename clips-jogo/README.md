@@ -107,7 +107,8 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
 - **Marcar jogadoras num clip** (várias): no painel do clip acabado de pedir (motivos e jogadoras em blocos separados),
   na **barra flutuante** (painel por baixo da barra: tipo, motivos e jogadoras; fecha com **✓ OK**, por baixo do tipo, ou 8 s depois
   do último toque), ou depois em "+ jogadora" na lista / no leitor.
-- **Ver gravações e clips → Por jogadora**: clips de cada jogadora (dos jogos guardados) → **▶ Ver seguidos** ou
+- **Ver gravações e clips**: em cada jogo há **Por jogadora** (só os clips desse jogo); no topo, **Por jogadora · todos os
+  jogos** junta os jogos guardados. Toca numa jogadora → **▶ Ver seguidos** ou
   **Enviar todos** (WhatsApp…): os que têm corte ou desenhos vão na versão com desenhos.
 
 ### Iniciar e parar a gravação a partir do tablet

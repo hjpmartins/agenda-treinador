@@ -329,7 +329,8 @@ function ReceivedSection({
   const notes = allNotes();
   const toItem = (c: ReceivedClip): AnalysisItem => ({ id: c.id, uri: c.uri, title: c.name });
   const willPrune = nextToPrune(clips);
-  const [forPlayer, setForPlayer] = useState<Player | null>(null);
+  /** Clips de uma jogadora: de um jogo (scope = "jogo de 14/10 21:30") ou de todos os jogos guardados. */
+  const [forPlayer, setForPlayer] = useState<{ player: Player; clips: ReceivedClip[]; scope: string } | null>(null);
   const byPlayer = groupByPlayer(
     [...clips].sort((a, b) => a.createdAtMs - b.createdAtMs),
     notes,
@@ -350,10 +351,14 @@ function ReceivedSection({
       ) : null}
       {byPlayer.length > 0 ? (
         <Card style={{ gap: space(1) }}>
-          <Text style={styles.sessionTitle}>Por jogadora</Text>
+          <Text style={styles.sessionTitle}>Por jogadora · todos os jogos</Text>
           <View style={styles.motiveRow}>
             {byPlayer.map((g) => (
-              <Pressable key={g.player.n + g.player.nome} onPress={() => setForPlayer(g.player)} style={styles.playerChip}>
+              <Pressable
+                key={g.player.n + g.player.nome}
+                onPress={() => setForPlayer({ player: g.player, clips: g.clips, scope: 'todos os jogos' })}
+                style={styles.playerChip}
+              >
                 <Text style={styles.motiveChipText}>
                   {playerLabel(g.player)} ({g.clips.length})
                 </Text>
@@ -364,8 +369,9 @@ function ReceivedSection({
       ) : null}
       {forPlayer ? (
         <PlayerClipsModal
-          player={forPlayer}
-          clips={byPlayer.find((g) => g.player.n === forPlayer.n && g.player.nome === forPlayer.nome)?.clips ?? []}
+          player={forPlayer.player}
+          clips={forPlayer.clips}
+          scope={forPlayer.scope}
           onPlay={(items) => {
             setForPlayer(null);
             onPlay(items, 0);
@@ -410,6 +416,26 @@ function ReceivedSection({
               ))}
             </View>
           ) : null}
+          {(() => {
+            // Jogadoras só deste jogo.
+            const groups = groupByPlayer(list.slice().sort((a, b) => a.startMs - b.startMs), notes, getRoster());
+            return groups.length > 0 ? (
+              <View style={styles.motiveRow}>
+                <Text style={styles.muted}>Por jogadora:</Text>
+                {groups.map((g) => (
+                  <Pressable
+                    key={g.player.n + g.player.nome}
+                    onPress={() => setForPlayer({ player: g.player, clips: g.clips, scope: `jogo de ${sessionLabel(sessionId)}` })}
+                    style={styles.playerChip}
+                  >
+                    <Text style={styles.motiveChipText}>
+                      {playerLabel(g.player)} ({g.clips.length})
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null;
+          })()}
           {list
             .slice()
             .sort((a, b) => a.startMs - b.startMs)
@@ -471,11 +497,13 @@ function ReceivedSection({
 function PlayerClipsModal({
   player,
   clips,
+  scope,
   onPlay,
   onClose,
 }: {
   player: Player;
   clips: ReceivedClip[];
+  scope: string;
   onPlay: (items: AnalysisItem[]) => void;
   onClose: () => void;
 }) {
@@ -488,6 +516,7 @@ function PlayerClipsModal({
           <Text style={styles.sessionTitle}>
             {playerLabel(player)} · {clips.length} clip{clips.length === 1 ? '' : 's'}
           </Text>
+          <Text style={styles.muted}>{scope}</Text>
           <ScrollView style={{ maxHeight: 280 }} contentContainerStyle={{ gap: 6 }}>
             {clips.map((c) => (
               <Text key={c.id} style={styles.muted}>

@@ -445,6 +445,10 @@ object ClipEngine {
    */
   fun fullVideoPieces(s: SessionInfo): List<pt.clipsjogo.engine.core.Segment> {
     val names = s.fullVideoParts
+    if (names.size == 1 && s.segments.isNotEmpty()) {
+      // Um só ficheiro: o tempo 0 é o início do primeiro segmento.
+      return listOf(pt.clipsjogo.engine.core.Segment(0, names.first(), s.segments.first().startUs, s.segments.last().endUs, File(s.dir, names.first()).length()))
+    }
     val parts = if (s.segments.isNotEmpty()) CutPlanner.splitIntoParts(s.segments, MAX_PART_BYTES) else emptyList()
     if (parts.size != names.size) {
       // Sem a lista de segmentos: uma parte só, do início ao fim.
@@ -543,6 +547,14 @@ object ClipEngine {
     if (StatFs(s.dir.absolutePath).availableBytes < needed) {
       throw IllegalStateException("Não há espaço livre suficiente")
     }
+    // Um só ficheiro (sem o limite de 4 GB do MediaMuxer). Se algo correr mal, volta às partes.
+    if (exportSingleFile(s)) {
+      s.status = SessionInfo.STATUS_DONE
+      storage.saveSession(s)
+      s.segmentsDir.deleteRecursively()
+      listener?.onFinalizeProgress(s.id, 1f)
+      return
+    }
     val parts = CutPlanner.splitIntoParts(s.segments, MAX_PART_BYTES)
     val total = s.segments.last().endUs.toFloat()
     val names = mutableListOf<String>()
@@ -560,6 +572,40 @@ object ClipEngine {
     // O vídeo completo e os clips já existem: os segmentos deixam de ser precisos.
     s.segmentsDir.deleteRecursively()
     listener?.onFinalizeProgress(s.id, 1f)
+  }
+
+  /** Junta os segmentos num só MP4 e confirma que o Android o consegue ler. */
+  private fun exportSingleFile(s: SessionInfo): Boolean {
+    val name = "jogo_${s.id}.mp4"
+    val out = File(s.dir, name)
+    return try {
+      val inputs = s.segments.map { pt.clipsjogo.engine.media.Mp4Concat.Input(File(s.segmentsDir, it.fileName), it.startUs) }
+      val r = pt.clipsjogo.engine.media.Mp4Concat.concat(inputs, out) { p -> listener?.onFinalizeProgress(s.id, p * 0.97f) }
+      // Verificação: o ficheiro abre, tem vídeo e a duração bate com a gravação.
+      val ex = android.media.MediaExtractor()
+      val ok = try {
+        ex.setDataSource(out.absolutePath)
+        val video = (0 until ex.trackCount).map { ex.getTrackFormat(it) }
+          .firstOrNull { it.getString(android.media.MediaFormat.KEY_MIME)?.startsWith("video/") == true }
+        val dur = video?.takeIf { it.containsKey(android.media.MediaFormat.KEY_DURATION) }?.getLong(android.media.MediaFormat.KEY_DURATION) ?: 0L
+        val expected = s.segments.last().endUs - s.segments.first().startUs
+        video != null && r.videoSamples > 0 && dur > expected * 9 / 10
+      } finally {
+        ex.release()
+      }
+      if (ok) {
+        s.fullVideoParts = listOf(name)
+        Log.i(TAG, "Vídeo completo num só ficheiro: ${r.sizeBytes / 1_000_000} MB, ${r.durationUs / 1_000_000} s")
+      } else {
+        Log.w(TAG, "Vídeo único não passou na verificação; a usar partes.")
+        out.delete()
+      }
+      ok
+    } catch (e: Exception) {
+      Log.w(TAG, "Falha a juntar num só ficheiro; a usar partes.", e)
+      out.delete()
+      false
+    }
   }
 
   /** Volta a criar o vídeo completo de uma sessão interrompida, a partir dos segmentos. */

@@ -235,7 +235,7 @@ Microfone ────────► Encoder AAC ──────────
 ### Vídeo completo
 
 - Quando paras, a app junta todos os segmentos num MP4 normal (também sem re-codificar) e apaga os segmentos.
-- Acima de ~3,5 GB divide em partes (`parte1`, `parte2`…), porque ficheiros maiores dão problemas em muitas apps e leitores. Em 1080p, isso é cerca de 45 min por parte.
+- O jogo inteiro fica **num só ficheiro**, mesmo acima de 4 GB: os segmentos são juntos por `Mp4Concat` (MP4 com offsets de 64 bits, sem re-codificar), porque o MediaMuxer do Android não passa dos 4 GB. O ficheiro é verificado no fim; se falhar, a app volta ao método antigo e divide em partes de ~3,5 GB (`parte1`, `parte2`…).
 
 ### Espaço e bateria
 

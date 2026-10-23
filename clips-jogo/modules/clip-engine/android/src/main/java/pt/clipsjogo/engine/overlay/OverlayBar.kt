@@ -210,8 +210,12 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
     tagPanel.addView(motiveColumn)
     tagPanel.addView(View(context).apply { layoutParams = LinearLayout.LayoutParams(dp(14), 1) })
     tagPanel.addView(playerColumn)
-    tagPanel.addView(button("✓", SURFACE_HIGH, 46) { showMotives(null) }.apply {
-      (layoutParams as LinearLayout.LayoutParams).gravity = Gravity.TOP
+    // Fechar (✓) por baixo do tipo, à esquerda: fica sempre à vista, mesmo com a barra encostada à direita.
+    toneColumn.addView(button("✓ OK", OK, 100) { showMotives(null) }.apply {
+      (layoutParams as LinearLayout.LayoutParams).apply {
+        marginStart = 0
+        topMargin = dp(6)
+      }
     })
     tagPanel.layoutParams = LinearLayout.LayoutParams(
       LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
@@ -243,11 +247,33 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
     chosenPlayers.clear()
     if (clipId == null || collapsed) {
       tagPanel.visibility = View.GONE
+      restoreX()
       return
     }
     renderChips()
     tagPanel.visibility = View.VISIBLE
+    root.post { keepOnScreen() }
     ui.postDelayed(hideMotives, 8000)
+  }
+
+  /** Posição da barra antes de o painel a empurrar para dentro do ecrã. */
+  private var xBeforePanel: Int? = null
+
+  /** Com o painel aberto, a janela não pode sair pela direita (o ✓ e as jogadoras ficavam escondidos). */
+  private fun keepOnScreen() {
+    val screenW = context.resources.displayMetrics.widthPixels
+    val w = root.width
+    if (w <= 0 || params.x + w <= screenW) return
+    if (xBeforePanel == null) xBeforePanel = params.x
+    params.x = maxOf(0, screenW - w)
+    try { wm.updateViewLayout(root, params) } catch (_: Exception) {}
+  }
+
+  private fun restoreX() {
+    val x = xBeforePanel ?: return
+    xBeforePanel = null
+    params.x = x
+    try { wm.updateViewLayout(root, params) } catch (_: Exception) {}
   }
 
   private fun chip(label: String, selected: Boolean, selColor: Int, widthDp: Int, onTap: () -> Unit) = TextView(context).apply {
@@ -394,6 +420,7 @@ internal class OverlayBar(private val context: Context, private val actions: Flo
           if (dragging) {
             params.x = (startX + dx).toInt().coerceAtLeast(0)
             params.y = (startY + dy).toInt().coerceAtLeast(0)
+            xBeforePanel = null // mudou de sítio à mão: fica onde a puseram
             try { wm.updateViewLayout(root, params) } catch (_: Exception) {}
           }
         }

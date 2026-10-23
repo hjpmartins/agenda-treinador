@@ -84,7 +84,7 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
   original não muda); "Repor" volta ao clip inteiro.
 - **Título**: toca no nome do clip (na lista, no Comando ou no topo do leitor) para escrever um título. Ao pedir o clip
   no Comando também há o campo "Título". Ao enviar, o título vai como texto da mensagem e como nome do ficheiro.
-- **Enviar** (↗ Enviar no leitor, ou Partilhar): sem corte nem desenhos vai o clip original. Com corte ou desenhos
+- **Enviar** (↗ Enviar no leitor, ou Partilhar): sem corte, desenhos nem zoom vai o clip original. Com algum deles
   escolhe-se:
   - **Editado · WhatsApp** — com corte, desenhos e zoom, em 720p (leve);
   - **Editado · Qualidade máxima** — o mesmo em 1080p (se o clip for HD), para o YouTube ou para guardar;
@@ -105,7 +105,7 @@ A versão instalada aparece no fundo do ecrã inicial. Os APKs também ficam em 
 - **Plantel**: na Agenda do Treinador (no tablet), ecrã **Plantel → "Enviar para Clips de Jogo"** — abre esta app e
   importa número e nome das jogadoras. Também se edita à mão: ecrã inicial → **Plantel**.
 - **Marcar jogadoras num clip** (várias): no painel do clip acabado de pedir (motivos e jogadoras em blocos separados),
-  na **barra flutuante** (painel por baixo da barra: motivos à esquerda, jogadoras à direita; fecha com ✓ ou 8 s depois
+  na **barra flutuante** (painel por baixo da barra: tipo, motivos e jogadoras; fecha com **✓ OK**, por baixo do tipo, ou 8 s depois
   do último toque), ou depois em "+ jogadora" na lista / no leitor.
 - **Ver gravações e clips → Por jogadora**: clips de cada jogadora (dos jogos guardados) → **▶ Ver seguidos** ou
   **Enviar todos** (WhatsApp…): os que têm corte ou desenhos vão na versão com desenhos.

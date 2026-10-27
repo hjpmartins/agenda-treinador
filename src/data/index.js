@@ -175,15 +175,20 @@ function estatisticaNumero(campo, stats) {
   if (campo.madeKey) return Number(stats[campo.madeKey]) || 0;
   return Number(stats[campo.key]) || 0;
 }
+// "5/10 (50%)" — sem percentagem quando ainda não houve nenhuma tentativa
+// (0/0 ficaria "0%", enganador).
+function fracaoComPercentagem(made, tentados) {
+  return tentados > 0 ? `${made}/${tentados} (${Math.round((made / tentados) * 100)}%)` : `${made}/${tentados}`;
+}
 // Soma um campo de estatística ao longo de vários registos (jogadoras ou
 // jogos) e devolve já formatado para apresentação — fração
-// "convertidos/tentados" nos campos de lançamento, número simples nos
-// restantes.
+// "convertidos/tentados (percentagem)" nos campos de lançamento, número
+// simples nos restantes.
 function somaEstatistica(campo, statsList) {
   if (campo.madeKey) {
     const made = statsList.reduce((sum, s) => sum + (Number((s || {})[campo.madeKey]) || 0), 0);
     const missed = statsList.reduce((sum, s) => sum + (Number((s || {})[campo.missKey]) || 0), 0);
-    return `${made}/${made + missed}`;
+    return fracaoComPercentagem(made, made + missed);
   }
   const total = statsList.reduce((sum, s) => sum + (Number((s || {})[campo.key]) || 0), 0);
   return String(total);
@@ -259,6 +264,7 @@ export {
   ESTATISTICAS_CAMPOS,
   estatisticaNumero,
   somaEstatistica,
+  fracaoComPercentagem,
   LIVE_SHOT_TYPES,
   LIVE_STAT_BUTTONS,
   emptyLibraryItem,

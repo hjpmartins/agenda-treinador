@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Undo2, Plus, Trash2, PenTool } from "lucide-react";
-import { LIVE_SHOT_TYPES, LIVE_STAT_BUTTONS } from "../../data";
+import { LIVE_SHOT_TYPES, LIVE_STAT_BUTTONS, fracaoComPercentagem } from "../../data";
 import { formatDateFull, shortName } from "../../utils";
 import { EmptyState } from "../common/Modal";
 
@@ -379,7 +379,7 @@ function LiveStatsView({ jogo, players, onClose, onSave, onAutoSave, onOpenWhite
                   {LIVE_SHOT_TYPES.map((t) => {
                     const made = Number(s[t.madeKey]) || 0;
                     const missed = Number(s[t.missKey]) || 0;
-                    return `${t.label} ${made}/${made + missed}`;
+                    return `${t.label} ${fracaoComPercentagem(made, made + missed)}`;
                   }).join("  ·  ")}
                 </div>
 

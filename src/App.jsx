@@ -29,6 +29,7 @@ import { TeamsModal } from "./components/teams/TeamsModal";
 import { TransferModal, MovePlayerModal } from "./components/teams/TransferModals";
 import { ImportBackupConfirmModal } from "./components/common/Modal";
 import { ToastHost } from "./components/common/Toast";
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { showToast } from "./lib/toast";
 
 export default function App() {
@@ -714,6 +715,7 @@ export default function App() {
                   <button onClick={() => setImportSuccess(null)} className="shrink-0 text-[#4C9A6A] hover:text-[#F2EDE3]"><X size={14} /></button>
                 </div>
               )}
+              <ErrorBoundary key={tab}>
               {tab === "inicio" && (
                 <DashboardView
                   team={activeTeam}
@@ -810,6 +812,7 @@ export default function App() {
                   onAdicionarAoHistorico={adicionarLesaoAoHistorico}
                 />
               )}
+              </ErrorBoundary>
             </>
           )}
         </main>

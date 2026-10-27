@@ -62,7 +62,7 @@ function PlayerModal({ initial, sessions, onClose, onSave }) {
             <Users size={26} className="text-[#5A6272]" />
           )}
         </div>
-        <div>
+        <div className="flex-1">
           <div className="flex gap-2">
             <label className="cursor-pointer text-xs px-3 py-2 rounded border border-dashed border-[#2E3644] hover:border-[#5A6272] text-[#8A93A3] hover:text-[#F2EDE3]">
               {form.foto ? "Alterar foto" : "Adicionar foto"}
@@ -76,6 +76,15 @@ function PlayerModal({ initial, sessions, onClose, onSave }) {
           </div>
           {fotoError && <div className="text-[11px] text-[#D64545] mt-1">{fotoError}</div>}
         </div>
+        {temDadosEvolucao && (
+          <button
+            type="button"
+            onClick={() => setShowEvolucao(true)}
+            className="flex items-center gap-1.5 text-sm font-medium px-3.5 py-2.5 rounded-md bg-[#EA5B13] hover:bg-[#FF6B1A] text-[#14181F] transition-colors shrink-0"
+          >
+            <TrendingUp size={15} /> Ver evolução
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -165,14 +174,7 @@ function PlayerModal({ initial, sessions, onClose, onSave }) {
       </div>
 
       <div className="mt-5 pt-4 border-t border-[#2E3644]">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-xs uppercase tracking-wide text-[#8A93A3]" style={{ fontFamily: "'Oswald', sans-serif" }}>Avaliação corporal</div>
-          {temDadosEvolucao && (
-            <button type="button" onClick={() => setShowEvolucao(true)} className="flex items-center gap-1 text-[11px] text-[#EA5B13] hover:text-[#FF6B1A]">
-              <TrendingUp size={13} /> Ver evolução
-            </button>
-          )}
-        </div>
+        <div className="text-xs uppercase tracking-wide text-[#8A93A3] mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>Avaliação corporal</div>
         <div className="space-y-2">
           {sortedAvaliacoes.map((a) => (
             <div key={a.id} className="border border-[#2E3644] rounded-md p-2.5 bg-[#14181F]">

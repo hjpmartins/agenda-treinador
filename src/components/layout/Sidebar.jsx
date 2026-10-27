@@ -1,6 +1,6 @@
-import { Home, Users, Dumbbell, Swords, BookOpen, Globe, CalendarDays, PenTool } from "lucide-react";
+import { Home, Users, Dumbbell, Swords, BookOpen, Globe, CalendarDays, PenTool, MessageCircleMore } from "lucide-react";
 
-function Sidebar({ tab, setTab, playerCount, sessionCount, jogosCount, libraryCount, publicLibraryCount, onOpenWhiteboard }) {
+function Sidebar({ tab, setTab, playerCount, sessionCount, jogosCount, libraryCount, publicLibraryCount, atletasPendentesCount, onOpenWhiteboard }) {
   const items = [
     { id: "inicio", label: "Início", icon: Home, count: null },
     { id: "jogadores", label: "Plantel", icon: Users, count: playerCount },
@@ -9,6 +9,7 @@ function Sidebar({ tab, setTab, playerCount, sessionCount, jogosCount, libraryCo
     { id: "biblioteca", label: "Biblioteca", icon: BookOpen, count: libraryCount },
     { id: "biblioteca-publica", label: "Pública", icon: Globe, count: publicLibraryCount },
     { id: "calendario", label: "Calendário", icon: CalendarDays, count: null },
+    { id: "atletas", label: "Espaço Atletas", icon: MessageCircleMore, count: atletasPendentesCount || null },
     // Não é um separador normal (não muda `tab`) — abre o quadro tático em
     // ecrã inteiro por cima de tudo, para poder usar-se a meio de qualquer
     // outro ecrã (ex: durante o registo de estatísticas ao vivo).

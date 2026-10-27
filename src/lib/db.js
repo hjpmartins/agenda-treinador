@@ -9,6 +9,7 @@ const PLAYER_FIELDS = {
   epocasClube: "epocas_clube",
   outrosDesportos: "outros_desportos",
   testesFisicos: "testes_fisicos",
+  portalToken: "portal_token",
 };
 
 const SESSION_FIELDS = {
@@ -39,6 +40,12 @@ const PUBLIC_LIBRARY_FIELDS = {
 const TEAM_FIELDS = {
   temporadaAtual: "temporada_atual",
 };
+
+const AVISO_FIELDS = { equipaId: "team_id" };
+const PERGUNTA_FIELDS = { equipaId: "team_id" };
+const RESPOSTA_FIELDS = { perguntaId: "pergunta_id", playerId: "player_id" };
+const RSVP_FIELDS = { sessionId: "session_id", playerId: "player_id" };
+const LESAO_REPORTADA_FIELDS = { playerId: "player_id" };
 
 // Colunas do tipo "date" no Postgres não aceitam string vazia (só uma data
 // válida ou null) — ao contrário das colunas de texto, onde "" é normal.
@@ -254,18 +261,104 @@ async function saveSettings(patch) {
   if (error) throw error;
 }
 
+// ---------------- Espaço Atletas (lado do treinador) ----------------
+// As atletas em si não entram por aqui — leem/respondem através das
+// funções "portal_*" em src/lib/portalDb.js, sem conta nenhuma. Isto é só
+// o que o treinador vê e gere: criar avisos/perguntas, e as listas de
+// respostas/RSVPs/lesões reportadas já vêm filtradas pela RLS da própria
+// base de dados (só as linhas que pertencem às equipas deste treinador),
+// por isso não é preciso filtrar nada aqui no cliente.
+
+async function listAvisos() {
+  const { data, error } = await supabase.from("avisos").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return data.map((row) => fromDb(AVISO_FIELDS, row));
+}
+
+async function createAviso(aviso) {
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from("avisos")
+    .insert({ ...toDb(AVISO_FIELDS, aviso), user_id: userId })
+    .select()
+    .single();
+  if (error) throw error;
+  return fromDb(AVISO_FIELDS, data);
+}
+
+async function deleteAviso(id) {
+  const { error } = await supabase.from("avisos").delete().eq("id", id);
+  if (error) throw error;
+}
+
+async function listPerguntas() {
+  const { data, error } = await supabase.from("perguntas").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return data.map((row) => fromDb(PERGUNTA_FIELDS, row));
+}
+
+async function createPergunta(pergunta) {
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from("perguntas")
+    .insert({ ...toDb(PERGUNTA_FIELDS, pergunta), user_id: userId })
+    .select()
+    .single();
+  if (error) throw error;
+  return fromDb(PERGUNTA_FIELDS, data);
+}
+
+async function updatePergunta(id, patch) {
+  const { data, error } = await supabase.from("perguntas").update(toDb(PERGUNTA_FIELDS, patch)).eq("id", id).select().single();
+  if (error) throw error;
+  return fromDb(PERGUNTA_FIELDS, data);
+}
+
+async function deletePergunta(id) {
+  const { error } = await supabase.from("perguntas").delete().eq("id", id);
+  if (error) throw error;
+}
+
+async function listRespostas() {
+  const { data, error } = await supabase.from("respostas_perguntas").select("*");
+  if (error) throw error;
+  return data.map((row) => fromDb(RESPOSTA_FIELDS, row));
+}
+
+async function listRsvps() {
+  const { data, error } = await supabase.from("presencas_rsvp").select("*");
+  if (error) throw error;
+  return data.map((row) => fromDb(RSVP_FIELDS, row));
+}
+
+async function listLesoesReportadas() {
+  const { data, error } = await supabase.from("lesoes_reportadas").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return data.map((row) => fromDb(LESAO_REPORTADA_FIELDS, row));
+}
+
+async function marcarLesaoRevista(id) {
+  const { error } = await supabase.from("lesoes_reportadas").update({ estado: "revisto" }).eq("id", id);
+  if (error) throw error;
+}
+
 // ---------------- Carregar tudo de uma vez / importar cópia de segurança ----------------
 
 async function loadAll() {
-  const [teams, players, sessions, library, publicLibrary, settings] = await Promise.all([
+  const [teams, players, sessions, library, publicLibrary, settings, avisos, perguntas, respostas, rsvps, lesoesReportadas] = await Promise.all([
     listTeams(),
     listPlayers(),
     listSessions(),
     listLibrary(),
     listPublicLibrary(),
     getSettings(),
+    listAvisos(),
+    listPerguntas(),
+    listRespostas(),
+    listRsvps(),
+    listLesoesReportadas(),
   ]);
-  return { teams, players, sessions, library, publicLibrary, ...settings };
+  return { teams, players, sessions, library, publicLibrary, avisos, perguntas, respostas, rsvps, lesoesReportadas, ...settings };
 }
 
 // Substitui TODOS os dados do utilizador pelos de uma cópia de segurança importada.
@@ -333,4 +426,15 @@ export {
   unpublishLibraryItem,
   getSettings,
   saveSettings,
+  listAvisos,
+  createAviso,
+  deleteAviso,
+  listPerguntas,
+  createPergunta,
+  updatePergunta,
+  deletePergunta,
+  listRespostas,
+  listRsvps,
+  listLesoesReportadas,
+  marcarLesaoRevista,
 };

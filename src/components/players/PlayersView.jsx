@@ -1,7 +1,19 @@
-import { Upload, Plus, ArrowRightLeft, Printer, Pencil, Trash2, Video } from "lucide-react";
+import { Upload, Plus, ArrowRightLeft, Printer, Pencil, Trash2, Video, Link2 } from "lucide-react";
 import { countTreinosRealizados, calcPresenca, shortName } from "../../utils";
 import { printPlayer } from "../../print";
 import { EmptyState } from "../common/Modal";
+import { showToast } from "../../lib/toast";
+
+// Link pessoal da atleta no Espaço Atletas (sem conta/password — basta
+// ter o link). Cada jogador já tem um portal_token próprio, gerado pela
+// base de dados (ver supabase/schema.sql).
+function copiarLinkAtleta(p) {
+  const url = `${window.location.origin}/atleta/${p.portalToken}`;
+  navigator.clipboard.writeText(url).then(
+    () => showToast("Link da atleta copiado."),
+    () => showToast("Não foi possível copiar — o link é: " + url)
+  );
+}
 
 // Abre a app "Clips de Jogo" (no tablet Android) com o plantel: número e nome de cada jogadora.
 function clipsJogoLink(players) {
@@ -86,6 +98,9 @@ function PlayersView({ players, sessions, clubLogo, onAdd, onImportClick, onEdit
                     </button>
                     <button onClick={() => printPlayer(p, sessions, clubLogo)} title="Descarregar / Imprimir ficha" className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
                       <Printer size={14} />
+                    </button>
+                    <button onClick={() => copiarLinkAtleta(p)} title="Copiar link do Espaço Atletas" className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
+                      <Link2 size={14} />
                     </button>
                     <button onClick={() => onEdit(p)} title="Editar" className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
                       <Pencil size={14} />

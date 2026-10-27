@@ -24,6 +24,7 @@ import { LibraryModal } from "./components/library/LibraryModal";
 import { LibraryImportModal } from "./components/library/LibraryImportModal";
 import { PublicLibraryView } from "./components/library/PublicLibraryView";
 import { CalendarView } from "./components/calendar/CalendarView";
+import { EspacoAtletasView } from "./components/portal/EspacoAtletasView";
 import { TeamsModal } from "./components/teams/TeamsModal";
 import { TransferModal, MovePlayerModal } from "./components/teams/TransferModals";
 import { ImportBackupConfirmModal } from "./components/common/Modal";
@@ -41,6 +42,12 @@ export default function App() {
   const [library, setLibrary] = useState([]);
   const [publicLibrary, setPublicLibrary] = useState([]);
   const [teams, setTeams] = useState([]);
+  // Espaço Atletas (ver src/components/portal): dados do lado do treinador.
+  const [avisos, setAvisos] = useState([]);
+  const [perguntas, setPerguntas] = useState([]);
+  const [respostas, setRespostas] = useState([]);
+  const [rsvps, setRsvps] = useState([]);
+  const [lesoesReportadas, setLesoesReportadas] = useState([]);
   const [clubLogo, setClubLogo] = useState("");
   const [activeTeamId, setActiveTeamId] = useState(null);
   const [viewingTemporada, setViewingTemporada] = useState(null);
@@ -94,6 +101,11 @@ export default function App() {
       setLibrary([]);
       setPublicLibrary([]);
       setTeams([]);
+      setAvisos([]);
+      setPerguntas([]);
+      setRespostas([]);
+      setRsvps([]);
+      setLesoesReportadas([]);
       setClubLogo("");
       setActiveTeamId(null);
       setViewingTemporada(null);
@@ -122,6 +134,11 @@ export default function App() {
         setSessions(loadedSessions);
         setLibrary(result.library.map(normalizeDiagramas));
         setPublicLibrary(result.publicLibrary.map(normalizeDiagramas));
+        setAvisos(result.avisos || []);
+        setPerguntas(result.perguntas || []);
+        setRespostas(result.respostas || []);
+        setRsvps(result.rsvps || []);
+        setLesoesReportadas(result.lesoesReportadas || []);
         setClubLogo(result.clubLogo || "");
         setActiveTeamId(resolvedActiveTeamId);
         setViewingTemporada((loadedTeams.find((t) => t.id === resolvedActiveTeamId) || loadedTeams[0]).temporadaAtual);
@@ -322,6 +339,79 @@ export default function App() {
       setImportSuccess(`"${item.nome}" adicionado à tua biblioteca.`);
     } catch (e) {
       setError(`Não foi possível carregar este exercício para a tua biblioteca (${e.message || e}).`);
+    }
+  };
+
+  // ---------------- Espaço Atletas ----------------
+
+  const createAviso = async (aviso) => {
+    try {
+      const created = await db.createAviso({ ...aviso, equipaId: activeTeamId });
+      setAvisos([created, ...avisos]);
+    } catch (e) {
+      setError(`Não foi possível publicar o aviso (${e.message || e}).`);
+    }
+  };
+
+  const deleteAviso = async (id) => {
+    try {
+      await db.deleteAviso(id);
+      setAvisos(avisos.filter((a) => a.id !== id));
+    } catch (e) {
+      setError(`Não foi possível apagar o aviso (${e.message || e}).`);
+    }
+  };
+
+  const createPergunta = async (pergunta) => {
+    try {
+      const created = await db.createPergunta({ ...pergunta, equipaId: activeTeamId });
+      setPerguntas([created, ...perguntas]);
+    } catch (e) {
+      setError(`Não foi possível lançar a pergunta (${e.message || e}).`);
+    }
+  };
+
+  const fecharPergunta = async (id) => {
+    try {
+      const updated = await db.updatePergunta(id, { ativa: false });
+      setPerguntas(perguntas.map((q) => (q.id === id ? updated : q)));
+    } catch (e) {
+      setError(`Não foi possível fechar a pergunta (${e.message || e}).`);
+    }
+  };
+
+  const deletePergunta = async (id) => {
+    try {
+      await db.deletePergunta(id);
+      setPerguntas(perguntas.filter((q) => q.id !== id));
+    } catch (e) {
+      setError(`Não foi possível apagar a pergunta (${e.message || e}).`);
+    }
+  };
+
+  const marcarLesaoRevista = async (id) => {
+    try {
+      await db.marcarLesaoRevista(id);
+      setLesoesReportadas(lesoesReportadas.map((l) => (l.id === id ? { ...l, estado: "revisto" } : l)));
+    } catch (e) {
+      setError(`Não foi possível marcar como revisto (${e.message || e}).`);
+    }
+  };
+
+  // Copia o texto reportado pela atleta para o histórico de lesões da
+  // ficha dela (mesmo array que o PlayerModal.jsx já edita) e marca o
+  // pedido como revisto, num só passo.
+  const adicionarLesaoAoHistorico = async (lesao) => {
+    try {
+      const player = players.find((p) => p.id === lesao.playerId);
+      if (!player) throw new Error("Jogadora não encontrada.");
+      const novaLesao = { id: uid(), ano: new Date(lesao.createdAt).getFullYear().toString(), descricao: lesao.texto };
+      const updated = await db.updatePlayer(player.id, { lesoes: [...(player.lesoes || []), novaLesao] });
+      setPlayers(players.map((p) => (p.id === updated.id ? updated : p)));
+      await db.marcarLesaoRevista(lesao.id);
+      setLesoesReportadas(lesoesReportadas.map((l) => (l.id === lesao.id ? { ...l, estado: "revisto" } : l)));
+    } catch (e) {
+      setError(`Não foi possível adicionar ao histórico (${e.message || e}).`);
     }
   };
 
@@ -545,6 +635,14 @@ export default function App() {
   const teamPlayers = players.filter((p) => p.equipaId === activeTeamId);
   const teamSessions = sessions.filter((s) => s.equipaId === activeTeamId);
   const activeTeam = teams.find((t) => t.id === activeTeamId);
+  // Espaço Atletas, só da equipa ativa (mesmo padrão de teamPlayers/teamSessions acima).
+  const teamPlayerIds = new Set(teamPlayers.map((p) => p.id));
+  const teamAvisos = avisos.filter((a) => a.equipaId === activeTeamId);
+  const teamPerguntas = perguntas.filter((q) => q.equipaId === activeTeamId);
+  const teamRespostas = respostas.filter((r) => teamPlayerIds.has(r.playerId));
+  const teamRsvps = rsvps.filter((r) => teamPlayerIds.has(r.playerId));
+  const teamLesoesReportadas = lesoesReportadas.filter((l) => teamPlayerIds.has(l.playerId));
+  const atletasPendentesCount = teamLesoesReportadas.filter((l) => l.estado === "pendente").length;
   const temporadasDisponiveis = Array.from(new Set(teamSessions.map((s) => s.temporada).filter(Boolean))).sort().reverse();
   const currentViewingTemporada = viewingTemporada || (activeTeam && activeTeam.temporadaAtual);
   if (currentViewingTemporada && !temporadasDisponiveis.includes(currentViewingTemporada)) {
@@ -594,6 +692,7 @@ export default function App() {
           jogosCount={seasonSessions.filter((s) => s.type === "jogo").length}
           libraryCount={library.length}
           publicLibraryCount={publicLibrary.length}
+          atletasPendentesCount={atletasPendentesCount}
           onOpenWhiteboard={() => setWhiteboardOpen(true)}
         />
         <main className="flex-1 p-5 md:p-8 max-w-5xl">
@@ -691,6 +790,24 @@ export default function App() {
                   onAddOnDay={(dateStr) => setSessionModal({ ...emptySession, date: dateStr })}
                   onEdit={(s) => (s.type === "jogo" ? setJogoModal(s) : setSessionModal(s))}
                   onDelete={deleteSession}
+                />
+              )}
+              {tab === "atletas" && (
+                <EspacoAtletasView
+                  players={teamPlayers}
+                  sessions={seasonSessions}
+                  avisos={teamAvisos}
+                  onCreateAviso={createAviso}
+                  onDeleteAviso={deleteAviso}
+                  perguntas={teamPerguntas}
+                  respostas={teamRespostas}
+                  onCreatePergunta={createPergunta}
+                  onFecharPergunta={fecharPergunta}
+                  onDeletePergunta={deletePergunta}
+                  rsvps={teamRsvps}
+                  lesoesReportadas={teamLesoesReportadas}
+                  onMarcarLesaoRevista={marcarLesaoRevista}
+                  onAdicionarAoHistorico={adicionarLesaoAoHistorico}
                 />
               )}
             </>

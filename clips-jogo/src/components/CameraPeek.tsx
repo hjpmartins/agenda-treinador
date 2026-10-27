@@ -12,7 +12,10 @@ const EVERY_MS = 1500;
  * Não é vídeo: assim não aquece mais o telemóvel.
  */
 export function CameraPeek({ baseUrl, token, onClose }: { baseUrl: string; token: string; onClose: () => void }) {
-  const [n, setN] = useState(0);
+  // Hora do pedido no endereço: nunca se repete (com um contador que recomeçava em 0,
+  // o tablet voltava a mostrar imagens antigas que tinha guardado).
+  const [stamp, setStamp] = useState(() => Date.now());
+  const [shownAt, setShownAt] = useState<number | null>(null);
   /** Última imagem que carregou (fica à vista enquanto a seguinte carrega). */
   const [shown, setShown] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -20,12 +23,12 @@ export function CameraPeek({ baseUrl, token, onClose }: { baseUrl: string; token
 
   useEffect(() => {
     const t = setInterval(() => {
-      if (!loading.current) setN((x) => x + 1);
+      if (!loading.current) setStamp(Date.now());
     }, EVERY_MS);
     return () => clearInterval(t);
   }, []);
 
-  const next = `${baseUrl}/api/preview.jpg?token=${encodeURIComponent(token)}&n=${n}`;
+  const next = `${baseUrl}/api/preview.jpg?token=${encodeURIComponent(token)}&t=${stamp}`;
   useEffect(() => {
     loading.current = true;
   }, [next]);
@@ -49,6 +52,7 @@ export function CameraPeek({ baseUrl, token, onClose }: { baseUrl: string; token
               onLoad={() => {
                 loading.current = false;
                 setShown(next);
+                setShownAt(Date.now());
                 setError(null);
               }}
               onError={() => {
@@ -58,7 +62,14 @@ export function CameraPeek({ baseUrl, token, onClose }: { baseUrl: string; token
             />
             {!shown && !error ? <Text style={styles.muted}>A pedir imagem…</Text> : null}
           </View>
-          {error ? <Text style={styles.warn}>{error}</Text> : <Text style={styles.muted}>Atualiza sozinha. Não é vídeo: não aquece o telemóvel.</Text>}
+          {error ? (
+            <Text style={styles.warn}>{error}</Text>
+          ) : (
+            <Text style={styles.muted}>
+              {shownAt ? `Imagem das ${new Date(shownAt).toLocaleTimeString('pt-PT')} · ` : ''}Atualiza sozinha. Não é vídeo: não aquece o
+              telemóvel.
+            </Text>
+          )}
         </Pressable>
       </Pressable>
     </Modal>

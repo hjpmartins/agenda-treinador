@@ -304,7 +304,7 @@ class ClipEngineModule : Module() {
     }
 
     /** Partilhar vários vídeos de uma vez (ex.: todos os clips de uma jogadora pelo WhatsApp). */
-    AsyncFunction("shareFiles") { uris: List<String>, names: List<String>, text: String, title: String ->
+    AsyncFunction("shareFiles") { uris: List<String>, names: List<String>, text: String, title: String, mimeType: String ->
       val context = appContext.reactContext!!
       val authority = "${context.packageName}.clipengine.updates"
       // Com título: vai uma cópia com o título no nome do ficheiro (ex.: "Ressalto #7.mp4").
@@ -327,7 +327,7 @@ class ClipEngineModule : Module() {
       val send = android.content.Intent(
         if (contentUris.size == 1) android.content.Intent.ACTION_SEND else android.content.Intent.ACTION_SEND_MULTIPLE
       ).apply {
-        type = "video/mp4"
+        type = mimeType.ifBlank { "video/mp4" }
         if (contentUris.size == 1) putExtra(android.content.Intent.EXTRA_STREAM, contentUris[0])
         else putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, contentUris)
         if (text.isNotBlank()) {

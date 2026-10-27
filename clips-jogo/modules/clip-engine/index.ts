@@ -161,7 +161,14 @@ declare class ClipEngineNative extends NativeModule<Events> {
    * Partilhar vídeos (uris file://, dentro de recebidos/ ou exportados/). names[i] não vazio = o ficheiro vai
    * com esse nome (título do clip); text = texto da mensagem (ex.: legenda no WhatsApp).
    */
-  shareFiles(uris: string[], names: string[], text: string, title: string): Promise<void>;
+  shareFiles(
+    uris: string[],
+    names: string[],
+    text: string,
+    title: string,
+    /** 'video/mp4' (vídeo) ou 'application/octet-stream' (ficheiro: o WhatsApp não comprime). */
+    mimeType: string
+  ): Promise<void>;
 
   // Atualizações da app
   /** Caminho do APK desta versão se já foi descarregado, senão null. */

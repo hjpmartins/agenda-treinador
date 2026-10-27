@@ -1,8 +1,8 @@
-import { useSyncExternalStore } from 'react';
-import { Alert, Modal, StyleSheet, Text, View } from 'react-native';
+import { useState, useSyncExternalStore } from 'react';
+import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { addEngineListener, ClipEngine } from '../../modules/clip-engine';
 import { clipTitle, getNotes } from '../remote/notesStore';
-import { colors, space } from '../theme';
+import { colors, radius, space } from '../theme';
 import { Button, Card, ProgressBar } from './ui';
 
 /** Tempo que a imagem fica parada em cada desenho, no vídeo enviado. */
@@ -41,26 +41,33 @@ function exportOne(id: string, uri: string, quality: ExportQuality): Promise<str
 }
 
 /** Abre a partilha do Android (WhatsApp, YouTube, …) com os títulos como texto e nome dos ficheiros. */
-async function sendFiles(files: { uri: string; title: string }[], chooserTitle: string) {
+async function sendFiles(files: { uri: string; title: string }[], chooserTitle: string, asFile = false) {
   if (!ClipEngine) throw new Error('Indisponível neste dispositivo.');
   const text = files.length === 1 ? files[0].title : files.map((f, i) => `${i + 1}. ${f.title}`).join('\n');
   await ClipEngine.shareFiles(
     files.map((f) => f.uri),
     files.map((f) => f.title),
     text,
-    chooserTitle
+    chooserTitle,
+    // Como ficheiro, o WhatsApp manda-o como documento e não o comprime.
+    asFile ? 'application/octet-stream' : 'video/mp4'
   );
 }
 
-export async function shareWithDrawings(id: string, uri: string, title: string, quality: ExportQuality) {
+/**
+ * Vídeo editado (corte, desenhos, zoom) na qualidade máxima: o WhatsApp comprime à
+ * parte, por isso convém partir do melhor original possível.
+ */
+export async function shareWithDrawings(id: string, uri: string, title: string, asFile = false) {
+  const quality: ExportQuality = 1080;
   if (!ClipEngine) throw new Error('Indisponível neste dispositivo.');
   if (progress != null) return;
-  setProgress(0, quality === 1080 ? 'A preparar o vídeo em qualidade máxima…' : 'A preparar o vídeo com os desenhos…');
+  setProgress(0, 'A preparar o vídeo editado…');
   const sub = addEngineListener('onExportProgress', ({ progress: p }) => setProgress(p));
   try {
     const out = await exportOne(id, uri, quality);
     setProgress(null);
-    await sendFiles([{ uri: out, title }], title);
+    await sendFiles([{ uri: out, title }], title, asFile);
   } finally {
     sub?.remove();
     setProgress(null);
@@ -69,7 +76,7 @@ export async function shareWithDrawings(id: string, uri: string, title: string, 
 
 /**
  * Envia vários clips de uma vez (ex.: todos os de uma jogadora): os que têm corte
- * ou desenhos vão na versão com desenhos (720p, para o WhatsApp), os outros como estão.
+ * ou desenhos vão na versão editada (qualidade máxima), os outros como estão.
  */
 export async function shareMany(items: { id: string; uri: string; title: string }[], title: string) {
   if (!ClipEngine) throw new Error('Indisponível neste dispositivo.');
@@ -85,7 +92,7 @@ export async function shareMany(items: { id: string; uri: string; title: string 
     for (; index < total; index++) {
       const it = items[index];
       setProgress(index / total, `A preparar ${index + 1}/${total}…`);
-      out.push({ uri: hasEdits(it.id) ? await exportOne(it.id, it.uri, 720) : it.uri, title: clipTitle(it.id, it.title) });
+      out.push({ uri: hasEdits(it.id) ? await exportOne(it.id, it.uri, 1080) : it.uri, title: clipTitle(it.id, it.title) });
     }
     setProgress(null);
     await sendFiles(out, title);
@@ -96,20 +103,15 @@ export async function shareMany(items: { id: string; uri: string; title: string 
 }
 
 // Janela "Partilhar" (o Alert do Android só tem 3 botões).
-let asking: { id: string; uri: string; title: string } | null = null;
+let asking: { id: string; uri: string; title: string; edited: boolean } | null = null;
 function setAsking(a: typeof asking) {
   asking = a;
   listeners.forEach((l) => l());
 }
 
-/** Partilhar um clip: se tiver corte ou desenhos, pergunta qual versão enviar. */
+/** Partilhar um clip: escolher como vídeo ou como ficheiro (e, se foi editado, qual versão). */
 export function shareClip(id: string, uri: string, fallbackTitle: string) {
-  const title = clipTitle(id, fallbackTitle);
-  if (!hasEdits(id)) {
-    sendFiles([{ uri, title }], title).catch(fail);
-    return;
-  }
-  setAsking({ id, uri, title });
+  setAsking({ id, uri, title: clipTitle(id, fallbackTitle), edited: hasEdits(id) });
 }
 
 /** "corte, desenhos e zoom" — o que o vídeo editado leva. */
@@ -131,10 +133,16 @@ function ShareChoice() {
     },
     () => asking
   );
-  if (!a) return null;
-  const pick = (fn: () => Promise<void>) => {
+  return a ? <ShareCard key={a.id} a={a} /> : null;
+}
+
+function ShareCard({ a }: { a: NonNullable<typeof asking> }) {
+  const [version, setVersion] = useState<'edited' | 'original'>(a.edited ? 'edited' : 'original');
+  const send = (asFile: boolean) => {
     setAsking(null);
-    fn().catch(fail);
+    const task =
+      version === 'edited' ? shareWithDrawings(a.id, a.uri, a.title, asFile) : sendFiles([{ uri: a.uri, title: a.title }], a.title, asFile);
+    task.catch(fail);
   };
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => setAsking(null)} supportedOrientations={['landscape', 'portrait']}>
@@ -144,22 +152,27 @@ function ShareChoice() {
           <Text style={styles.muted} numberOfLines={2}>
             {a.title}
           </Text>
-          <Text style={styles.muted}>Vai com: {editsLabel(a.id)}</Text>
+          {a.edited ? (
+            <View style={styles.segmented}>
+              {(['edited', 'original'] as const).map((v) => (
+                <Pressable key={v} onPress={() => setVersion(v)} style={[styles.segment, version === v && styles.segmentOn]}>
+                  <Text style={[styles.segmentText, version === v && { color: '#fff' }]}>
+                    {v === 'edited' ? `Editado (${editsLabel(a.id)})` : 'Original'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           <Button
-            label="Editado · WhatsApp"
-            sublabel="720p, mais leve e rápido de enviar"
+            label="Enviar como vídeo"
+            sublabel="WhatsApp, YouTube, Galeria… No WhatsApp, toca em HD antes de enviar."
             variant="primary"
-            onPress={() => pick(() => shareWithDrawings(a.id, a.uri, a.title, 720))}
+            onPress={() => send(false)}
           />
           <Button
-            label="Editado · Qualidade máxima"
-            sublabel="1080p (se o clip for HD), para o YouTube ou guardar"
-            onPress={() => pick(() => shareWithDrawings(a.id, a.uri, a.title, 1080))}
-          />
-          <Button
-            label="Original"
-            sublabel="O clip inteiro, tal como foi gravado (sem corte, desenhos nem zoom)"
-            onPress={() => pick(() => sendFiles([{ uri: a.uri, title: a.title }], a.title))}
+            label="Enviar como ficheiro · qualidade total"
+            sublabel="No WhatsApp chega como documento e não perde qualidade (toca-se para ver)."
+            onPress={() => send(true)}
           />
           <Button label="Cancelar" variant="ghost" onPress={() => setAsking(null)} />
         </Card>
@@ -196,4 +209,8 @@ const styles = StyleSheet.create({
   card: { width: '100%', maxWidth: 420, gap: space(1.5) },
   title: { color: colors.text, fontSize: 18, fontWeight: '800' },
   muted: { color: colors.muted },
+  segmented: { flexDirection: 'row', backgroundColor: colors.surfaceHigh, borderRadius: radius.s, padding: 3, gap: 3 },
+  segment: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.s - 2, paddingHorizontal: 6 },
+  segmentOn: { backgroundColor: colors.accent },
+  segmentText: { color: colors.muted, fontWeight: '700', fontSize: 14, textAlign: 'center' },
 });

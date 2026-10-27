@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { X, Download, Share2, Loader2 } from "lucide-react";
 import { generateSequenceVideo } from "../../lib/videoExport";
 import { recordDiagramasVideo3D } from "../../lib/video3DExport";
+import { showToast } from "../../lib/toast";
 
 // No telemóvel, partilha o ficheiro diretamente (a app de destino recebe-o
 // logo com o tipo e o nome certos) em vez de descarregar para a pasta de
@@ -69,6 +70,7 @@ function PlayStudioModal({ diagramas, title, initialView = "2d", readOnly = fals
       } else {
         downloadBlob(blob, filename);
         setExportState(null);
+        showToast("Vídeo descarregado.");
       }
     } catch (e) {
       setExportState({ error: e.message || "Não foi possível gerar o vídeo." });

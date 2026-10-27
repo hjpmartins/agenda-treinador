@@ -27,6 +27,8 @@ import { CalendarView } from "./components/calendar/CalendarView";
 import { TeamsModal } from "./components/teams/TeamsModal";
 import { TransferModal, MovePlayerModal } from "./components/teams/TransferModals";
 import { ImportBackupConfirmModal } from "./components/common/Modal";
+import { ToastHost } from "./components/common/Toast";
+import { showToast } from "./lib/toast";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -448,6 +450,7 @@ export default function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    showToast("Relatório descarregado.");
   };
 
   const exportBackup = () => {
@@ -461,6 +464,7 @@ export default function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    showToast("Cópia de segurança descarregada.");
   };
 
   const handleImportFile = (file) => {
@@ -776,6 +780,7 @@ export default function App() {
           onConfirm={(targetTeamId) => movePlayerToTeam(moveTeamModal, targetTeamId)}
         />
       )}
+      <ToastHost />
     </div>
   );
 }

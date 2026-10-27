@@ -1,5 +1,6 @@
 import { FULL_VB, HALF_VB, ESTATISTICAS_CAMPOS, estatisticaNumero, somaEstatistica, getTipoTeste, habilidadeGroups } from "../data";
 import { escapeHtml, formatDateFull, formatDateShortYear, wavyCurvedPathD, defaultControlPoint, arrowHead, calcPresenca, playerChartData, hasWaypoints, arrowPathPoints, polylinePathD } from "../utils";
+import { showToast } from "../lib/toast";
 
 function svgHalfMarkingsStr(flipY, w, h) {
   const cx = w / 2;
@@ -194,6 +195,7 @@ function printSession(session, players, clubLogo) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  showToast(`${isGame ? "Jogo" : "Treino"} descarregado.`);
 }
 
 function buildJogoPrintContent(jogo, players, clubLogo) {
@@ -307,6 +309,7 @@ function printJogo(jogo, players, clubLogo) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  showToast("Jogo descarregado.");
 }
 
 function svgLineChartString(points, { width = 300, height = 130, color = "#EA5B13", unit = "" } = {}) {
@@ -699,6 +702,7 @@ function printPlayer(player, sessions, clubLogo) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  showToast("Ficha do jogador descarregada.");
 }
 
 export {

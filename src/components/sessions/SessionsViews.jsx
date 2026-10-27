@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Copy, Printer, Pencil, Trash2 } from "lucide-react";
 import { formatDateShort } from "../../utils";
 import { printSession } from "../../print";
-import { ViewHeader, EmptyState } from "../common/Modal";
+import { ViewHeader, EmptyState, Modal } from "../common/Modal";
 
 function SessionsView({ sessions, players, clubLogo, onAdd, onEdit, onDelete, onTransfer }) {
   const porRealizar = sessions.filter((s) => s.realizado !== true).sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -52,6 +53,15 @@ function SessionRow({ s, players, clubLogo, onEdit, onDelete, onTransfer }) {
   const exercicios = s.exercicios || [];
   const totalMin = exercicios.reduce((sum, e) => sum + (Number(e.duracao) || 0), 0);
   const naoRealizado = !isGame && s.realizado === false;
+  const [printChoice, setPrintChoice] = useState(false);
+  // Só vale a pena perguntar quando há mesmo diagramas com mais de um
+  // passo — se todos tiverem só um, "todos os passos" e "só o 1º" dão o
+  // mesmo ficheiro, não há porque incomodar com a escolha.
+  const hasMultiStepDiagram = !isGame && exercicios.some((e) => (e.diagramas || []).length > 1);
+  const handlePrintClick = () => {
+    if (hasMultiStepDiagram) setPrintChoice(true);
+    else printSession(s, players, clubLogo);
+  };
   return (
     <div className={`bg-[#1E242E] border rounded-lg p-4 flex items-start gap-4 group ${naoRealizado ? "border-[#D64545]/30 opacity-70" : "border-[#2E3644]"}`}>
       <div className="text-center shrink-0 w-14">
@@ -104,7 +114,7 @@ function SessionRow({ s, players, clubLogo, onEdit, onDelete, onTransfer }) {
             <Copy size={14} />
           </button>
         )}
-        <button onClick={() => printSession(s, players, clubLogo)} title="Descarregar / Imprimir" className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
+        <button onClick={handlePrintClick} title="Descarregar / Imprimir" className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
           <Printer size={14} />
         </button>
         <button onClick={onEdit} className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
@@ -117,7 +127,47 @@ function SessionRow({ s, players, clubLogo, onEdit, onDelete, onTransfer }) {
           <Trash2 size={14} />
         </button>
       </div>
+      {printChoice && (
+        <PrintStepsModal
+          onClose={() => setPrintChoice(false)}
+          onFirstOnly={() => {
+            printSession(s, players, clubLogo, { onlyFirstStep: true });
+            setPrintChoice(false);
+          }}
+          onAll={() => {
+            printSession(s, players, clubLogo);
+            setPrintChoice(false);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// Pergunta antes de descarregar um treino com exercícios de vários passos:
+// o ficheiro fica bem mais pequeno (e poupa papel ao imprimir) só com o
+// primeiro passo de cada diagrama.
+function PrintStepsModal({ onClose, onFirstOnly, onAll }) {
+  return (
+    <Modal onClose={onClose} title="Descarregar treino">
+      <p className="text-sm text-[#C7CDD8] mb-4">
+        Este treino tem exercícios com vários passos desenhados. Para poupar papel, podes descarregar só o primeiro passo de cada diagrama.
+      </p>
+      <div className="flex flex-col gap-2">
+        <button
+          onClick={onFirstOnly}
+          className="px-4 py-2.5 text-sm font-medium rounded-md bg-[#EA5B13] hover:bg-[#FF6B1A] text-[#14181F] transition-colors"
+        >
+          Só o 1º passo de cada diagrama
+        </button>
+        <button
+          onClick={onAll}
+          className="px-4 py-2.5 text-sm text-[#C7CDD8] border border-[#2E3644] rounded-md hover:border-[#5A6272] hover:text-[#F2EDE3] transition-colors"
+        >
+          Todos os passos
+        </button>
+      </div>
+    </Modal>
   );
 }
 

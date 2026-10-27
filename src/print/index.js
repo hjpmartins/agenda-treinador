@@ -87,7 +87,7 @@ function diagramToSvgString(diagram, width = 150) {
   return `<svg viewBox="0 0 ${vb.w} ${vb.h}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" style="background:#fff;border:1px solid #ddd;border-radius:4px;">${inner}</svg>`;
 }
 
-function buildSessionPrintContent(session, players, clubLogo) {
+function buildSessionPrintContent(session, players, clubLogo, { onlyFirstStep = false } = {}) {
   const isGame = session.type === "jogo";
   const exercicios = session.exercicios || [];
   const totalMin = exercicios.reduce((sum, e) => sum + (Number(e.duracao) || 0), 0);
@@ -101,25 +101,29 @@ function buildSessionPrintContent(session, players, clubLogo) {
     .join("");
 
   const exerciciosHtml = exercicios
-    .map(
-      (e, i) => `
+    .map((e, i) => {
+      // "Só o 1º passo": poupa papel em exercícios com vários diagramas —
+      // mostra só o ponto de partida da jogada, sem o "Passo X" (só há um).
+      const diagramas = onlyFirstStep ? (e.diagramas || []).slice(0, 1) : e.diagramas || [];
+      const showStepLabel = diagramas.length > 1;
+      return `
       <tr>
         <td style="text-align:center;font-weight:600;">${i + 1}</td>
         <td style="text-align:center;">${escapeHtml(e.duracao || "-")}'</td>
         <td>
           <div style="font-weight:600;">${escapeHtml(e.nome || "Exercício")}</div>
           ${e.descricao ? `<div style="white-space:pre-wrap;color:#444;margin-top:2px;">${escapeHtml(e.descricao)}</div>` : ""}
-          ${e.diagramas && e.diagramas.length > 0 ? `
+          ${diagramas.length > 0 ? `
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-            ${e.diagramas.map((d, idx) => `
+            ${diagramas.map((d, idx) => `
               <div style="text-align:center;">
                 ${diagramToSvgString(d, 150)}
-                <div style="font-size:10px;color:#999;margin-top:2px;">Passo ${idx + 1}</div>
+                ${showStepLabel ? `<div style="font-size:10px;color:#999;margin-top:2px;">Passo ${idx + 1}</div>` : ""}
               </div>`).join("")}
           </div>` : ""}
         </td>
-      </tr>`
-    )
+      </tr>`;
+    })
     .join("");
 
   const title = escapeHtml(session.title || (isGame ? `vs ${session.adversario || "?"}` : "Treino"));
@@ -185,15 +189,15 @@ function buildSessionPrintContent(session, players, clubLogo) {
 </html>`;
 }
 
-function printSession(session, players, clubLogo) {
-  const html = buildSessionPrintContent(session, players, clubLogo);
+function printSession(session, players, clubLogo, { onlyFirstStep = false } = {}) {
+  const html = buildSessionPrintContent(session, players, clubLogo, { onlyFirstStep });
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
   const isGame = session.type === "jogo";
   const namePart = (session.title || (isGame ? `vs-${session.adversario || "adversario"}` : "treino")).replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${session.date || "treino"}-${namePart}.html`;
+  a.download = `${session.date || "treino"}-${namePart}${onlyFirstStep ? "-1-passo" : ""}.html`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

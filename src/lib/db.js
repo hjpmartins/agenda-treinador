@@ -344,6 +344,14 @@ async function marcarLesaoRevista(id) {
 
 // ---------------- Carregar tudo de uma vez / importar cópia de segurança ----------------
 
+// Se o SQL do Espaço Atletas ainda não tiver sido corrido no Supabase, as
+// tabelas novas não existem e estas chamadas falham ("Could not find the
+// table ..."). Isso não pode arrastar o resto da app (jogadores, treinos,
+// ...) para um erro — falha-se em aberto, com listas vazias: o Espaço
+// Atletas fica vazio até o SQL ser corrido, mas o resto continua a
+// funcionar exatamente como antes desta funcionalidade existir.
+const safeList = (promise) => promise.catch(() => []);
+
 async function loadAll() {
   const [teams, players, sessions, library, publicLibrary, settings, avisos, perguntas, respostas, rsvps, lesoesReportadas] = await Promise.all([
     listTeams(),
@@ -352,11 +360,11 @@ async function loadAll() {
     listLibrary(),
     listPublicLibrary(),
     getSettings(),
-    listAvisos(),
-    listPerguntas(),
-    listRespostas(),
-    listRsvps(),
-    listLesoesReportadas(),
+    safeList(listAvisos()),
+    safeList(listPerguntas()),
+    safeList(listRespostas()),
+    safeList(listRsvps()),
+    safeList(listLesoesReportadas()),
   ]);
   return { teams, players, sessions, library, publicLibrary, avisos, perguntas, respostas, rsvps, lesoesReportadas, ...settings };
 }

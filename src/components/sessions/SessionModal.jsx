@@ -176,6 +176,7 @@ function SessionModal({ initial, library, players, onSaveToLibrary, onClose, onS
                         <button
                           type="button"
                           onClick={() => { if (window.confirm("Remover este exercício do treino?")) removeExercise(ex.id); }}
+                          title="Remover exercício"
                           className="p-1 text-[#5A6272] hover:text-[#D64545]"
                         >
                           <Trash2 size={13} />

@@ -117,11 +117,12 @@ function SessionRow({ s, players, clubLogo, onEdit, onDelete, onTransfer }) {
         <button onClick={handlePrintClick} title="Descarregar / Imprimir" className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
           <Printer size={14} />
         </button>
-        <button onClick={onEdit} className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
+        <button onClick={onEdit} title="Editar" className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
           <Pencil size={14} />
         </button>
         <button
           onClick={() => { if (window.confirm(`Apagar ${isGame ? "este jogo" : "este treino"}? Esta ação não pode ser desfeita.`)) onDelete(); }}
+          title="Apagar"
           className="p-1.5 rounded hover:bg-[#D64545]/20 text-[#8A93A3] hover:text-[#D64545]"
         >
           <Trash2 size={14} />

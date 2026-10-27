@@ -87,11 +87,12 @@ function PlayersView({ players, sessions, clubLogo, onAdd, onImportClick, onEdit
                     <button onClick={() => printPlayer(p, sessions, clubLogo)} title="Descarregar / Imprimir ficha" className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
                       <Printer size={14} />
                     </button>
-                    <button onClick={() => onEdit(p)} className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
+                    <button onClick={() => onEdit(p)} title="Editar" className="p-1.5 rounded hover:bg-white/10 text-[#8A93A3] hover:text-[#F2EDE3]">
                       <Pencil size={14} />
                     </button>
                     <button
                       onClick={() => { if (window.confirm(`Apagar ${p.nome || "esta jogadora"}? Esta ação não pode ser desfeita.`)) onDelete(p.id); }}
+                      title="Apagar"
                       className="p-1.5 rounded hover:bg-[#D64545]/20 text-[#8A93A3] hover:text-[#D64545]"
                     >
                       <Trash2 size={14} />

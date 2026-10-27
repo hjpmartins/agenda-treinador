@@ -1,15 +1,28 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
 import { ESTATISTICAS_CAMPOS, getTipoTeste, estatisticaNumero } from "../../data";
 import { formatDateFull, formatDateShortYear } from "../../utils";
 import { Modal, EmptyState } from "../common/Modal";
 
+// Arredonda a 1 casa decimal, sem o ".0" quando dá um número inteiro.
+function formatMedia(n) {
+  const r = Math.round(n * 10) / 10;
+  return Number.isInteger(r) ? String(r) : r.toFixed(1);
+}
+
 function EvolucaoChart({ title, unidade, data }) {
   if (data.length === 0) return null;
+  const media = data.length > 1 ? data.reduce((sum, d) => sum + d.valor, 0) / data.length : null;
   return (
     <div className="bg-[#14181F] border border-[#2E3644] rounded-md p-3">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-medium">{title}</span>
-        {unidade && <span className="text-[10px] text-[#5A6272]">{unidade}</span>}
+        {media !== null ? (
+          <span className="text-[10px] text-[#8A93A3]">
+            Média <b className="text-[#F2EDE3]">{formatMedia(media)}{unidade}</b>
+          </span>
+        ) : (
+          unidade && <span className="text-[10px] text-[#5A6272]">{unidade}</span>
+        )}
       </div>
       {data.length === 1 ? (
         <div className="text-[11px] text-[#8A93A3] py-4 text-center">
@@ -26,6 +39,7 @@ function EvolucaoChart({ title, unidade, data }) {
               labelStyle={{ color: "#F2EDE3" }}
               itemStyle={{ color: "#EA5B13" }}
             />
+            <ReferenceLine y={media} stroke="#8A93A3" strokeDasharray="4 3" strokeWidth={1} />
             <Line type="monotone" dataKey="valor" stroke="#EA5B13" strokeWidth={2} dot={{ r: 3, fill: "#EA5B13" }} />
           </LineChart>
         </ResponsiveContainer>

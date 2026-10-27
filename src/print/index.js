@@ -334,6 +334,7 @@ function svgLineChartString(points, { width = 300, height = 130, color = "#EA5B1
   const innerW = width - padding.left - padding.right;
   const innerH = height - padding.top - padding.bottom;
   const values = points.map((p) => p.valor);
+  const media = values.reduce((sum, v) => sum + v, 0) / values.length;
   let min = Math.min(...values);
   let max = Math.max(...values);
   if (min === max) {
@@ -353,12 +354,19 @@ function svgLineChartString(points, { width = 300, height = 130, color = "#EA5B1
   const xLabels = points
     .map((p, i) => (i % showEvery === 0 ? `<text x="${xAt(i).toFixed(1)}" y="${height - 5}" font-size="9" fill="#888" text-anchor="middle">${escapeHtml(p.dataLabel)}</text>` : ""))
     .join("");
+  // Linha tracejada na média, com o valor junto à margem direita — não no
+  // eixo, para não se confundir com as etiquetas de cada ponto.
+  const mediaY = yAt(media);
+  const mediaLabel = Number.isInteger(Math.round(media * 10) / 10) ? String(Math.round(media)) : media.toFixed(1);
+  const mediaLine = `<line x1="${padding.left}" y1="${mediaY.toFixed(1)}" x2="${width - padding.right}" y2="${mediaY.toFixed(1)}" stroke="#aaa" stroke-width="1" stroke-dasharray="3 2" />
+    <text x="${width - padding.right}" y="${(mediaY - 3).toFixed(1)}" font-size="8" fill="#888" text-anchor="end">média ${escapeHtml(mediaLabel)}${escapeHtml(unit)}</text>`;
 
   return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" style="background:#fff;">
     <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" stroke="#ddd" />
     <line x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="#ddd" />
     <text x="${padding.left - 4}" y="${padding.top + 4}" font-size="9" fill="#888" text-anchor="end">${escapeHtml(String(max))}${escapeHtml(unit)}</text>
     <text x="${padding.left - 4}" y="${height - padding.bottom}" font-size="9" fill="#888" text-anchor="end">${escapeHtml(String(min))}${escapeHtml(unit)}</text>
+    ${mediaLine}
     <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2" />
     ${dots}${valueLabels}${xLabels}
   </svg>`;

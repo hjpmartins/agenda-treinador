@@ -106,22 +106,31 @@ function buildSessionPrintContent(session, players, clubLogo, { onlyFirstStep = 
       // mostra só o ponto de partida da jogada, sem o "Passo X" (só há um).
       const diagramas = onlyFirstStep ? (e.diagramas || []).slice(0, 1) : e.diagramas || [];
       const showStepLabel = diagramas.length > 1;
+      const diagramasHtml = diagramas
+        .map(
+          (d, idx) => `
+              <div style="text-align:center;flex-shrink:0;">
+                ${diagramToSvgString(d, 150)}
+                ${showStepLabel ? `<div style="font-size:10px;color:#999;margin-top:2px;">Passo ${idx + 1}</div>` : ""}
+              </div>`
+        )
+        .join("");
+      const textHtml = `<div style="font-weight:600;">${escapeHtml(e.nome || "Exercício")}</div>${e.descricao ? `<div style="white-space:pre-wrap;color:#444;margin-top:2px;">${escapeHtml(e.descricao)}</div>` : ""}`;
+      // Um só diagrama: fica ao lado do texto (poupa altura, logo papel) em
+      // vez de por baixo — com vários diagramas o grid por baixo, a ocupar a
+      // largura toda, continua mais legível do que espremido ao lado.
+      const bodyHtml =
+        diagramas.length === 1
+          ? `<div style="display:flex;gap:12px;align-items:flex-start;">
+              <div style="flex:1;min-width:0;">${textHtml}</div>
+              <div>${diagramasHtml}</div>
+            </div>`
+          : `${textHtml}${diagramasHtml ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">${diagramasHtml}</div>` : ""}`;
       return `
       <tr>
         <td style="text-align:center;font-weight:600;">${i + 1}</td>
         <td style="text-align:center;">${escapeHtml(e.duracao || "-")}'</td>
-        <td>
-          <div style="font-weight:600;">${escapeHtml(e.nome || "Exercício")}</div>
-          ${e.descricao ? `<div style="white-space:pre-wrap;color:#444;margin-top:2px;">${escapeHtml(e.descricao)}</div>` : ""}
-          ${diagramas.length > 0 ? `
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-            ${diagramas.map((d, idx) => `
-              <div style="text-align:center;">
-                ${diagramToSvgString(d, 150)}
-                ${showStepLabel ? `<div style="font-size:10px;color:#999;margin-top:2px;">Passo ${idx + 1}</div>` : ""}
-              </div>`).join("")}
-          </div>` : ""}
-        </td>
+        <td>${bodyHtml}</td>
       </tr>`;
     })
     .join("");

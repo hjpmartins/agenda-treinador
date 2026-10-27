@@ -41,11 +41,15 @@ const TEAM_FIELDS = {
   temporadaAtual: "temporada_atual",
 };
 
-const AVISO_FIELDS = { equipaId: "team_id" };
-const PERGUNTA_FIELDS = { equipaId: "team_id" };
-const RESPOSTA_FIELDS = { perguntaId: "pergunta_id", playerId: "player_id" };
-const RSVP_FIELDS = { sessionId: "session_id", playerId: "player_id" };
-const LESAO_REPORTADA_FIELDS = { playerId: "player_id" };
+// createdAt/updatedAt têm de estar mapeados aqui — ao contrário de
+// teams/players/sessions, onde created_at nunca é lido em lado nenhum, o
+// Espaço Atletas mostra mesmo a data de cada aviso/resposta/lesão
+// reportada, por isso tem de chegar como createdAt (camelCase) à app.
+const AVISO_FIELDS = { equipaId: "team_id", createdAt: "created_at" };
+const PERGUNTA_FIELDS = { equipaId: "team_id", createdAt: "created_at" };
+const RESPOSTA_FIELDS = { perguntaId: "pergunta_id", playerId: "player_id", createdAt: "created_at", updatedAt: "updated_at" };
+const RSVP_FIELDS = { sessionId: "session_id", playerId: "player_id", createdAt: "created_at", updatedAt: "updated_at" };
+const LESAO_REPORTADA_FIELDS = { playerId: "player_id", createdAt: "created_at" };
 
 // Colunas do tipo "date" no Postgres não aceitam string vazia (só uma data
 // válida ou null) — ao contrário das colunas de texto, onde "" é normal.

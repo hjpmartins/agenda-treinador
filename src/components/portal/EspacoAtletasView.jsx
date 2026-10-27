@@ -185,7 +185,7 @@ function LesoesSection({ players, lesoesReportadas, onMarcarRevisto, onAdicionar
               <div key={l.id} className="border border-[#D64545]/30 rounded-md p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-sm font-medium">{p ? p.nome : "Jogadora"}</div>
-                  <div className="text-[11px] text-[#5A6272] shrink-0">{formatDateFull(l.createdAt.slice(0, 10))}</div>
+                  <div className="text-[11px] text-[#5A6272] shrink-0">{l.createdAt ? formatDateFull(l.createdAt.slice(0, 10)) : ""}</div>
                 </div>
                 <div className="text-sm text-[#C7CDD8] mt-1 whitespace-pre-wrap">{l.texto}</div>
                 <div className="flex gap-2 mt-2">

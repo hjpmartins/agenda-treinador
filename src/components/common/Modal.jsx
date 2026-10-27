@@ -36,10 +36,13 @@ function Field({ label, children, className = "" }) {
 }
 
 function Modal({ title, children, onClose, wide }) {
+  // Não fecha ao carregar fora nem ao deslizar (sem onClick aqui no fundo):
+  // nos formulários (treino, jogo, jogador, ...) um toque sem querer fora da
+  // janela, fácil de acontecer em telemóvel, apagava tudo o que já estava
+  // preenchido. Fecha-se sempre de forma explícita, pelo X ou por Cancelar.
   return (
-    <div className="fixed inset-0 bg-[#0A0C10]/95 flex items-center justify-center p-4 z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-[#0A0C10]/95 flex items-center justify-center p-4 z-50">
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{ fontFamily: "'Inter', sans-serif", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
         className={`bg-[#1E242E] border border-[#2E3644] rounded-lg w-full ${wide ? "max-w-2xl" : "max-w-md"}`}
       >

@@ -126,8 +126,8 @@ function AtletaPortalApp({ token }) {
 
   const hojeStr = todayStr();
   const perguntasPorResponder = perguntas.filter((q) => q.resposta == null);
-  const treinosFuturos = treinos.filter((s) => s.date >= hojeStr);
-  const treinosPassados = treinos.filter((s) => s.date < hojeStr);
+  // Só o próximo treino — os antigos não interessam às atletas aqui.
+  const proximoTreino = treinos.filter((s) => s.date >= hojeStr).sort((a, b) => (a.date < b.date ? -1 : 1))[0] || null;
 
   return (
     <div className="min-h-full w-full bg-[#14181F] text-[#F2EDE3]" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -177,62 +177,56 @@ function AtletaPortalApp({ token }) {
           )}
         </Card>
 
-        <Card title="Treinos" icon={CalendarDays}>
-          {treinos.length === 0 ? (
+        <Card title="Próximo treino" icon={CalendarDays}>
+          {!proximoTreino ? (
             <div className="text-sm text-[#5A6272]">Sem treinos agendados.</div>
           ) : (
-            <div className="space-y-4">
-              {[...treinosFuturos, ...treinosPassados].map((s) => (
-                <div key={s.id} className="border border-[#2E3644] rounded-md p-3">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <div style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-xs text-[#8A93A3]">{formatDateFull(s.date)}</div>
-                    {s.date >= hojeStr && (
-                      <div className="flex gap-1.5">
-                        <button
-                          disabled={busyId === s.id}
-                          onClick={() => confirmarRsvp(s.id, "vou")}
-                          className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border disabled:opacity-50 ${
-                            s.rsvp === "vou" ? "bg-[#4C9A6A]/20 border-[#4C9A6A] text-[#4C9A6A]" : "border-[#2E3644] text-[#8A93A3] hover:border-[#5A6272]"
-                          }`}
-                        >
-                          {s.rsvp === "vou" ? <CheckCircle2 size={12} /> : <Circle size={12} />} Vou
-                        </button>
-                        <button
-                          disabled={busyId === s.id}
-                          onClick={() => confirmarRsvp(s.id, "nao_vou")}
-                          className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border disabled:opacity-50 ${
-                            s.rsvp === "nao_vou" ? "bg-[#D64545]/20 border-[#D64545] text-[#D64545]" : "border-[#2E3644] text-[#8A93A3] hover:border-[#5A6272]"
-                          }`}
-                        >
-                          {s.rsvp === "nao_vou" ? <CheckCircle2 size={12} /> : <Circle size={12} />} Não vou
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-sm font-medium">{s.title || "Treino"}</div>
-                  {s.objetivo && <div className="text-xs text-[#8A93A3] mt-0.5">Objetivo: {s.objetivo}</div>}
-                  {s.observacoes && <div className="text-xs text-[#8A93A3] mt-1 whitespace-pre-wrap">{s.observacoes}</div>}
-                  {(s.exercicios || []).length > 0 && (
-                    <div className="mt-2.5 space-y-2.5">
-                      {s.exercicios.map((e, i) => (
-                        <div key={e.id || i} className="bg-[#14181F] border border-[#2E3644] rounded-md p-2.5">
-                          <div className="text-xs font-medium">
-                            {e.nome || "Exercício"} {e.duracao ? <span className="text-[#5A6272]">· {e.duracao}'</span> : null}
-                          </div>
-                          {e.descricao && <div className="text-xs text-[#8A93A3] mt-1 whitespace-pre-wrap">{e.descricao}</div>}
-                          {(e.diagramas || []).length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {e.diagramas.map((d, idx) => (
-                                <DiagramThumbnail key={idx} diagram={d} size={64} />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+            <div className="border border-[#2E3644] rounded-md p-3">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-xs text-[#8A93A3]">{formatDateFull(proximoTreino.date)}</div>
+                <div className="flex gap-1.5">
+                  <button
+                    disabled={busyId === proximoTreino.id}
+                    onClick={() => confirmarRsvp(proximoTreino.id, "vou")}
+                    className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border disabled:opacity-50 ${
+                      proximoTreino.rsvp === "vou" ? "bg-[#4C9A6A]/20 border-[#4C9A6A] text-[#4C9A6A]" : "border-[#2E3644] text-[#8A93A3] hover:border-[#5A6272]"
+                    }`}
+                  >
+                    {proximoTreino.rsvp === "vou" ? <CheckCircle2 size={12} /> : <Circle size={12} />} Vou
+                  </button>
+                  <button
+                    disabled={busyId === proximoTreino.id}
+                    onClick={() => confirmarRsvp(proximoTreino.id, "nao_vou")}
+                    className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border disabled:opacity-50 ${
+                      proximoTreino.rsvp === "nao_vou" ? "bg-[#D64545]/20 border-[#D64545] text-[#D64545]" : "border-[#2E3644] text-[#8A93A3] hover:border-[#5A6272]"
+                    }`}
+                  >
+                    {proximoTreino.rsvp === "nao_vou" ? <CheckCircle2 size={12} /> : <Circle size={12} />} Não vou
+                  </button>
                 </div>
-              ))}
+              </div>
+              <div className="text-sm font-medium">{proximoTreino.title || "Treino"}</div>
+              {proximoTreino.objetivo && <div className="text-xs text-[#8A93A3] mt-0.5">Objetivo: {proximoTreino.objetivo}</div>}
+              {proximoTreino.observacoes && <div className="text-xs text-[#8A93A3] mt-1 whitespace-pre-wrap">{proximoTreino.observacoes}</div>}
+              {(proximoTreino.exercicios || []).length > 0 && (
+                <div className="mt-2.5 space-y-2.5">
+                  {proximoTreino.exercicios.map((e, i) => (
+                    <div key={e.id || i} className="bg-[#14181F] border border-[#2E3644] rounded-md p-2.5">
+                      <div className="text-xs font-medium">
+                        {e.nome || "Exercício"} {e.duracao ? <span className="text-[#5A6272]">· {e.duracao}'</span> : null}
+                      </div>
+                      {e.descricao && <div className="text-xs text-[#8A93A3] mt-1 whitespace-pre-wrap">{e.descricao}</div>}
+                      {(e.diagramas || []).length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {e.diagramas.map((d, idx) => (
+                            <DiagramThumbnail key={idx} diagram={d} size={64} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </Card>

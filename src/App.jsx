@@ -356,6 +356,15 @@ export default function App() {
     }
   };
 
+  const saveTeamBanner = async (id, banner) => {
+    try {
+      const updated = await db.updateTeam(id, { banner });
+      setTeams(teams.map((t) => (t.id === id ? updated : t)));
+    } catch (e) {
+      setError(`Não foi possível guardar a foto da equipa (${e.message || e}).`);
+    }
+  };
+
   const deleteTeam = async (id) => {
     try {
       await db.deleteTeam(id); // a base de dados apaga em cascata os jogadores/treinos desta equipa
@@ -613,6 +622,7 @@ export default function App() {
                   sessions={seasonSessions}
                   onNavigate={setTab}
                   onGenerateReport={generateSeasonReport}
+                  onSaveBanner={(banner) => activeTeam && saveTeamBanner(activeTeam.id, banner)}
                 />
               )}
               {tab === "jogadores" && (

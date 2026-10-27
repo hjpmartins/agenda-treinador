@@ -10,6 +10,7 @@ create table if not exists teams (
   user_id uuid not null references auth.users(id) on delete cascade,
   nome text not null,
   temporada_atual text,
+  banner text,
   created_at timestamptz not null default now()
 );
 
@@ -195,3 +196,12 @@ create policy "utilizadores criam as suas definições"
   on app_settings for insert with check (auth.uid() = user_id);
 create policy "utilizadores editam as suas definições"
   on app_settings for update using (auth.uid() = user_id);
+
+-- ============================================================
+-- MIGRAÇÕES (para projetos criados antes de uma coluna existir)
+-- Corre isto se já tinhas a base de dados criada antes desta alteração —
+-- "if not exists" torna seguro correr outra vez sem dar erro.
+-- ============================================================
+
+-- Foto de capa de cada equipa (banner no topo do Início).
+alter table teams add column if not exists banner text;

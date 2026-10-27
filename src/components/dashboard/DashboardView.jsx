@@ -1,8 +1,11 @@
-import { Printer } from "lucide-react";
-import { todayStr, countTreinosRealizados, calcPresenca, diasParaAniversario, formatDateShort } from "../../utils";
-import { ViewHeader, EmptyState } from "../common/Modal";
+import { useState } from "react";
+import { Printer, Camera, Loader2, X } from "lucide-react";
+import { todayStr, countTreinosRealizados, calcPresenca, diasParaAniversario, formatDateShort, resizeImageFile } from "../../utils";
+import { EmptyState } from "../common/Modal";
 
-function DashboardView({ team, players, sessions, onNavigate, onGenerateReport }) {
+function DashboardView({ team, players, sessions, onNavigate, onGenerateReport, onSaveBanner }) {
+  const [bannerLoading, setBannerLoading] = useState(false);
+  const [bannerError, setBannerError] = useState(null);
   const hojeStr = todayStr();
   const treinosJogos = sessions.filter((s) => s.type === "treino" || s.type === "jogo");
 
@@ -25,9 +28,53 @@ function DashboardView({ team, players, sessions, onNavigate, onGenerateReport }
     .filter((x) => x.dias !== null && x.dias <= 30)
     .sort((a, b) => a.dias - b.dias);
 
+  const handleBannerChange = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setBannerLoading(true);
+    setBannerError(null);
+    try {
+      const dataUrl = await resizeImageFile(file, 1000, 0.82);
+      onSaveBanner(dataUrl);
+    } catch (err) {
+      setBannerError(err.message || "Não foi possível carregar a foto.");
+    } finally {
+      setBannerLoading(false);
+    }
+  };
+
   return (
     <div>
-      <ViewHeader title={`Olá! ${team ? `— ${team.nome}` : ""}`} subtitle={team && team.temporadaAtual ? `Época ${team.temporadaAtual}` : ""} />
+      <div
+        className="relative rounded-lg overflow-hidden mb-2 border border-[#2E3644] bg-[#1E242E]"
+        style={{ height: 160, backgroundImage: team?.banner ? `url(${team.banner})` : undefined, backgroundSize: "cover", backgroundPosition: "center" }}
+      >
+        {team?.banner && (
+          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(10,12,16,0.05) 0%, rgba(10,12,16,0.8) 100%)" }} />
+        )}
+        <div className="absolute bottom-0 left-0 p-4">
+          <h1 style={{ fontFamily: "'Oswald', sans-serif" }} className="text-2xl font-semibold uppercase tracking-wide text-[#F2EDE3]">
+            Olá! {team ? `— ${team.nome}` : ""}
+          </h1>
+          <div className="text-sm text-[#C7CDD8] mt-0.5">{team && team.temporadaAtual ? `Época ${team.temporadaAtual}` : ""}</div>
+        </div>
+        {team && (
+          <div className="absolute top-3 right-3 flex gap-1.5">
+            <label className="cursor-pointer flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-[#0A0C10]/60 hover:bg-[#0A0C10]/80 text-[#F2EDE3] backdrop-blur-sm transition-colors">
+              {bannerLoading ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
+              {team.banner ? "Alterar foto" : "Adicionar foto"}
+              <input type="file" accept="image/*" className="hidden" onChange={handleBannerChange} disabled={bannerLoading} />
+            </label>
+            {team.banner && (
+              <button onClick={() => onSaveBanner("")} title="Remover foto" className="p-1.5 rounded-md bg-[#0A0C10]/60 hover:bg-[#0A0C10]/80 text-[#F2EDE3] backdrop-blur-sm transition-colors">
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {bannerError && <div className="text-xs text-[#D64545] mb-3">{bannerError}</div>}
 
       <div className="grid grid-cols-3 gap-3 mb-5">
         <div className="bg-[#1E242E] border border-[#2E3644] rounded-lg p-3.5">

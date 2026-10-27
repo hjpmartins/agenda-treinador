@@ -8,7 +8,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { HALF_VB, FULL_VB } from "../../../data";
 import { uid, distPt, emptyDiagram, defaultControlPoint, resolveFinalDiagram, positionOnArrow, hasWaypoints} from "../../../utils";
 
-const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible", "handoff"]);
+const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible", "handoff", "ressalto"]);
 // Em touch (sem cursor a passar por cima antes de tocar, dedo bem mais
 // largo que um ponteiro de rato) é fácil tocar uns milímetros ao lado da
 // ficha pretendida — sobretudo com a bola mesmo em cima/ao lado da jogadora
@@ -40,7 +40,7 @@ function historyReducer(state, action) {
 }
 
 // Setas que aceitam pontos de mudança de direção.
-const WAYPOINT_TYPES = new Set(["drible", "corte", "bloqueio", "lancamento"]);
+const WAYPOINT_TYPES = new Set(["drible", "corte", "bloqueio", "lancamento", "ressalto"]);
 
 // Seta com o ponto de controlo por omissão preenchido (para a desenhar/medir
 // tal como aparece no ecrã).
@@ -58,9 +58,9 @@ function distToArrow(a, pt) {
   return best;
 }
 
-// Bloqueio, corte, drible e lançamento têm sempre 2 pegas por onde a linha
-// passa (curva em S). Setas antigas sem pontos mostram-nas a 1/3 e 2/3 do
-// caminho atual; ao arrastar uma, os dois pontos ficam gravados.
+// Bloqueio, corte, drible, lançamento e ressalto têm sempre 2 pegas por onde
+// a linha passa (curva em S). Setas antigas sem pontos mostram-nas a 1/3 e
+// 2/3 do caminho atual; ao arrastar uma, os dois pontos ficam gravados.
 function defaultWaypoints(a) {
   const full = withControl(a);
   return [positionOnArrow(full, 1 / 3), positionOnArrow(full, 2 / 3)];
@@ -82,7 +82,7 @@ function arrowHandles(a) {
 }
 
 // Para onde se desloca uma ficha neste passo (fim da sua seta de corte,
-// drible, bloqueio ou hand-off), ou null se fica parada.
+// drible, bloqueio, hand-off ou ressalto), ou null se fica parada.
 function movementEnd(diagram, tokenId) {
   let end = null;
   diagram.arrows.forEach((a) => {

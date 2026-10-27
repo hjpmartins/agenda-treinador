@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { MousePointer2, Undo2, Redo2, Trash2, Plus, Copy, Check } from "lucide-react";
-import { ARROW_TYPES } from "../../../data";
+import { STUDIO_ARROW_TYPES } from "../../../data";
 
 const TOKENS = [
   { type: "offense", label: "Ataque", swatch: "bg-[#EA5B13]" },
@@ -21,6 +21,7 @@ const HINTS = {
   bloqueio: "Arrasta da jogadora que bloqueia até ao sítio do bloqueio.",
   lancamento: "Arrasta da jogadora com bola até ao cesto: a seta encaixa sozinha no cesto (em 3D também podes apontar para o aro).",
   handoff: "Arrasta da jogadora com bola até à companheira que a recebe.",
+  ressalto: "Arrasta da jogadora até à bola solta — fica com ela a partir daí.",
 };
 
 const btn = "h-8 px-2.5 flex items-center gap-1.5 rounded-md text-xs transition-colors disabled:opacity-35 disabled:pointer-events-none";
@@ -50,7 +51,7 @@ function EditToolbar({ editor, viewMode, stepIndex }) {
           <button type="button" onClick={() => e.setMode("mover")} className={`${btn} ${e.mode === "mover" ? active : idle}`}>
             <MousePointer2 size={13} /> Mover
           </button>
-          {ARROW_TYPES.map((a) => (
+          {STUDIO_ARROW_TYPES.map((a) => (
             <button key={a.id} type="button" onClick={() => e.setMode(a.id)} title={a.desc} className={`${btn} ${e.mode === a.id ? active : idle}`}>
               {a.label}
             </button>

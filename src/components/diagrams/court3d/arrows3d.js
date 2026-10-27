@@ -262,7 +262,10 @@ function buildArrows(diagram, toWorld, { highlightId = null } = {}) {
       const l = Math.hypot(dx, dz) || 1;
       add(headGeometry(tipW, { x: dx / l, z: dz / l }, headSize, r.length), headMat);
     }
-    if (arrow.type === "handoff") {
+    if (arrow.type === "handoff" || arrow.type === "ressalto") {
+      // Hand-off: marcador a meio (a seta termina em cima de quem recebe,
+      // ficaria escondido). Ressalto: a seta também termina sempre em cima
+      // da bola solta — mesma razão, mesmo sítio.
       const mid = toWorld(positionOnArrow(arrow.control || hasWaypoints(arrow) ? arrow : { ...arrow, control }, 0.5));
       const ballMat = makeMaterial({ color: "#EA5B13" });
       add(discGeometry(mid, 4, r.length / 2), ballMat);

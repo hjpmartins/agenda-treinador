@@ -216,6 +216,9 @@ const ARROW_TYPES = [
   { id: "lancamento", label: "Lançamento", desc: "arco pontilhado até ao alvo" },
   { id: "handoff", label: "Hand-off", desc: "jogadora com bola aproxima-se e entrega à companheira — marcador de bola no fim" },
 ];
+// Só para o estúdio de jogadas (Biblioteca/Treinos) — não para o Quadro
+// Tático, que continua só com ARROW_TYPES, sem "Ressalto".
+const STUDIO_ARROW_TYPES = [...ARROW_TYPES, { id: "ressalto", label: "Ressalto", desc: "arrasta da jogadora até à bola solta — marcador de bola no fim" }];
 const HALF_VB = { w: 300, h: 320 };
 const FULL_VB = { w: 300, h: 560 };
 const COMPONENTES = ["Técnica individual", "Tática individual", "Tática coletiva"];
@@ -260,6 +263,7 @@ export {
   LIVE_STAT_BUTTONS,
   emptyLibraryItem,
   ARROW_TYPES,
+  STUDIO_ARROW_TYPES,
   HALF_VB,
   FULL_VB,
   COMPONENTES,

@@ -92,7 +92,7 @@ function drawArrow(ctx, a) {
 
   const { from, to } = a;
   const isShot = a.type === "lancamento";
-  const isHandoff = a.type === "handoff";
+  const isHandoff = a.type === "handoff" || a.type === "ressalto";
   const control = a.control || defaultControlPoint(a.type, from, to);
   const multi = hasWaypoints(a);
   const pts = multi ? arrowPathPoints(a) : null;
@@ -131,7 +131,8 @@ function drawArrow(ctx, a) {
     ctx.stroke();
   }
 
-  // Marcador de bola a meio da linha, só no hand-off (ver CourtPrimitives.jsx).
+  // Marcador de bola a meio da linha — hand-off e ressalto, que terminam
+  // sempre em cima de outra ficha (quem recebe / a bola solta).
   if (isHandoff) {
     ctx.fillStyle = "#EA5B13";
     ctx.strokeStyle = ARROW_COLOR;

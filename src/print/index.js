@@ -436,11 +436,18 @@ function buildPlayerPrintContent(player, sessions, clubLogo) {
       return `<tr><td>${formatDateFull(s.date)}</td><td>vs ${escapeHtml(s.adversario || "?")}</td>${ESTATISTICAS_CAMPOS.map((c) => `<td style="text-align:center;">${escapeHtml(somaEstatistica(c, [stats]))}</td>`).join("")}</tr>`;
     })
     .join("");
+  // Linha final com a soma de todos os jogos (mesma lógica dos totais da
+  // equipa na ficha do jogo, só que aqui somando os jogos de uma jogadora).
+  const estatisticasJogoTotalRow = jogosComEstatisticas.length
+    ? `<tr style="font-weight:700;border-top:2px solid #14181F;"><td colspan="2">Total (${jogosComEstatisticas.length} jogo${jogosComEstatisticas.length === 1 ? "" : "s"})</td>${ESTATISTICAS_CAMPOS.map(
+        (c) => `<td style="text-align:center;">${escapeHtml(somaEstatistica(c, jogosComEstatisticas.map((s) => s.estatisticas[player.id])))}</td>`
+      ).join("")}</tr>`
+    : "";
   const estatisticasJogoTableHtml = estatisticasJogoTableRows
     ? `<h2>Estatísticas por jogo</h2>
        <table class="list">
          <thead><tr><th>Data</th><th>Adversário</th>${ESTATISTICAS_CAMPOS.map((c) => `<th style="text-align:center;" title="${escapeHtml(c.nome)}">${c.label}</th>`).join("")}</tr></thead>
-         <tbody>${estatisticasJogoTableRows}</tbody>
+         <tbody>${estatisticasJogoTableRows}${estatisticasJogoTotalRow}</tbody>
        </table>`
     : "";
 

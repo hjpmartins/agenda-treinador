@@ -71,8 +71,11 @@ function svgArrowStr(arrow) {
       : `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`;
   const dash = arrow.type === "passe" || isShot ? 'stroke-dasharray="6 4"' : "";
   const tipFrom = multi ? arrowPathPoints(arrow).slice(-2)[0] : control;
+  const shotMark = arrow.missed
+    ? `<path d="M ${to.x - 3} ${to.y - 3} L ${to.x + 3} ${to.y + 3} M ${to.x - 3} ${to.y + 3} L ${to.x + 3} ${to.y - 3}" stroke="${color}" stroke-width="2"/>`
+    : `<circle cx="${to.x}" cy="${to.y}" r="2" fill="${color}"/>`;
   const tip = isShot
-    ? `<circle cx="${to.x}" cy="${to.y}" r="6" fill="none" stroke="${color}" stroke-width="2"/><circle cx="${to.x}" cy="${to.y}" r="2" fill="${color}"/>`
+    ? `<circle cx="${to.x}" cy="${to.y}" r="6" fill="none" stroke="${color}" stroke-width="2"/>${shotMark}`
     : `<path d="${arrowHead(tipFrom.x, tipFrom.y, to.x, to.y)}" stroke="${color}" stroke-width="2" fill="none"/>`;
   return `<path d="${d}" stroke="${color}" stroke-width="2" fill="none" ${dash}/>${tip}`;
 }

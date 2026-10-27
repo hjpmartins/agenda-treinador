@@ -140,7 +140,11 @@ function ArrowShape({ arrow, onMouseDown, selected }) {
       {isShot ? (
         <g transform={`translate(${to.x} ${to.y})`}>
           <circle r="6" fill="none" stroke={color} strokeWidth="2" />
-          <circle r="2" fill={color} />
+          {arrow.missed ? (
+            <path d="M -3 -3 L 3 3 M -3 3 L 3 -3" stroke={color} strokeWidth="2" />
+          ) : (
+            <circle r="2" fill={color} />
+          )}
         </g>
       ) : (
         <path d={arrowHead(tipFrom.x, tipFrom.y, to.x, to.y)} stroke={color} strokeWidth="2" fill="none" />

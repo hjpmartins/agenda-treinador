@@ -103,10 +103,22 @@ function sampleBall(diagram, ballTk, driver, positions, t, te, vb) {
           motionH = BALL_R + 14 + (RIM_H + 4 - BALL_R - 14) * u + apex * 4 * u * (1 - u) * 0.6;
         } else {
           const u = (t - k) / (1 - k);
-          x = rim.r.x;
-          y = rim.r.y;
-          motionH = RIM_H + 4 - (RIM_H + 4 - BALL_R) * u * u;
-          shotPhase = 1 - u;
+          if (driver.missed) {
+            // Falhado (há um ressalto na jogada): bate no aro e sai para
+            // fora em vez de cair pela rede — sem o clarão de cesto certeiro.
+            const dx = driver.from.x - rim.r.x;
+            const dy = driver.from.y - rim.r.y;
+            const l = Math.hypot(dx, dy) || 1;
+            const kick = 22;
+            x = rim.r.x + (dx / l) * kick * u;
+            y = rim.r.y + (dy / l) * kick * u;
+            motionH = BALL_R + Math.max(0, RIM_H - BALL_R) * Math.max(0, 1 - u * 1.6) + 10 * Math.sin(Math.PI * Math.min(1, u * 1.3));
+          } else {
+            x = rim.r.x;
+            y = rim.r.y;
+            motionH = RIM_H + 4 - (RIM_H + 4 - BALL_R) * u * u;
+            shotPhase = 1 - u;
+          }
         }
       } else {
         motionH = BALL_R + (30 + len * 0.2) * Math.sin(Math.PI * t);

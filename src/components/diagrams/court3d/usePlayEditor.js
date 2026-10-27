@@ -118,6 +118,30 @@ function syncPasses(list) {
   return changed ? out : list;
 }
 
+// Se a jogada tiver algum ressalto nalgum passo, é porque algum lançamento
+// falhou — um ressalto só faz sentido a seguir a um cesto falhado. Marca
+// todos os lançamentos da jogada inteira (não só do passo onde está o
+// ressalto: é a mesma jogada) como falhados, para o desenho e a animação da
+// bola deixarem de mostrar cesto certeiro. Corre depois de cada alteração,
+// tal como syncPasses, por isso acompanha ressaltos adicionados/apagados em
+// qualquer passo.
+function syncShots(list) {
+  const hasRessalto = list.some((d) => d.arrows.some((a) => a.type === "ressalto"));
+  let changed = false;
+  const out = list.map((d) => {
+    let stepChanged = false;
+    const arrows = d.arrows.map((a) => {
+      if (a.type !== "lancamento" || !!a.missed === hasRessalto) return a;
+      stepChanged = true;
+      return { ...a, missed: hasRessalto };
+    });
+    if (!stepChanged) return d;
+    changed = true;
+    return { ...d, arrows };
+  });
+  return changed ? out : list;
+}
+
 function snapAngle(from, raw) {
   const dist = Math.hypot(raw.x - from.x, raw.y - from.y);
   const step = Math.PI / 12;
@@ -156,7 +180,7 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
 
   const dragRef = useRef(null); // {kind: 'token'|'control', id}
 
-  const withSync = (u) => (list) => syncPasses(typeof u === "function" ? u(list) : u);
+  const withSync = (u) => (list) => syncShots(syncPasses(typeof u === "function" ? u(list) : u));
   const commit = useCallback((u) => dispatch({ type: "commit", updater: withSync(u) }), []);
   const replaceCurrent = useCallback((u) => dispatch({ type: "replaceCurrent", updater: withSync(u) }), []);
   const undo = useCallback(() => dispatch({ type: "undo" }), []);

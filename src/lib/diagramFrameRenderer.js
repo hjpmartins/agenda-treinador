@@ -115,10 +115,19 @@ function drawArrow(ctx, a) {
     ctx.beginPath();
     ctx.arc(to.x, to.y, 6, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.fillStyle = ARROW_COLOR;
-    ctx.beginPath();
-    ctx.arc(to.x, to.y, 2, 0, Math.PI * 2);
-    ctx.fill();
+    if (a.missed) {
+      ctx.beginPath();
+      ctx.moveTo(to.x - 3, to.y - 3);
+      ctx.lineTo(to.x + 3, to.y + 3);
+      ctx.moveTo(to.x - 3, to.y + 3);
+      ctx.lineTo(to.x + 3, to.y - 3);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = ARROW_COLOR;
+      ctx.beginPath();
+      ctx.arc(to.x, to.y, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   } else {
     const tipFrom = multi ? pts.slice(-2)[0] : control;
     const angle = Math.atan2(to.y - tipFrom.y, to.x - tipFrom.x);

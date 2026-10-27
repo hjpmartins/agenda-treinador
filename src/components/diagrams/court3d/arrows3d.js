@@ -254,7 +254,14 @@ function buildArrows(diagram, toWorld, { highlightId = null } = {}) {
     const tipW = toWorld(to);
     if (isShot) {
       add(ringGeometry(tipW, 6, 2, r.length), headMat);
-      add(discGeometry(tipW, 2.2, r.length), headMat);
+      if (arrow.missed) {
+        // Falhado: X em vez do ponto cheio (cesto certeiro).
+        const s = 3;
+        add(ribbonGeometry([{ x: tipW.x - s, z: tipW.z - s }, { x: tipW.x + s, z: tipW.z + s }], 1.6, r.length).geometry, headMat);
+        add(ribbonGeometry([{ x: tipW.x - s, z: tipW.z + s }, { x: tipW.x + s, z: tipW.z - s }], 1.6, r.length).geometry, headMat);
+      } else {
+        add(discGeometry(tipW, 2.2, r.length), headMat);
+      }
     } else {
       const c = toWorld(hasWaypoints(arrow) ? arrowPathPoints(arrow).slice(-3)[0] : control);
       const dx = tipW.x - c.x;

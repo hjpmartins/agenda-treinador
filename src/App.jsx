@@ -611,7 +611,6 @@ export default function App() {
                   team={activeTeam}
                   players={teamPlayers}
                   sessions={seasonSessions}
-                  library={library}
                   onNavigate={setTab}
                   onGenerateReport={generateSeasonReport}
                 />

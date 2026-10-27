@@ -1,9 +1,8 @@
 import { Printer } from "lucide-react";
-import { HABILIDADES } from "../../data";
 import { todayStr, countTreinosRealizados, calcPresenca, diasParaAniversario, formatDateShort } from "../../utils";
 import { ViewHeader, EmptyState } from "../common/Modal";
 
-function DashboardView({ team, players, sessions, library, onNavigate, onGenerateReport }) {
+function DashboardView({ team, players, sessions, onNavigate, onGenerateReport }) {
   const hojeStr = todayStr();
   const treinosJogos = sessions.filter((s) => s.type === "treino" || s.type === "jogo");
 
@@ -26,15 +25,11 @@ function DashboardView({ team, players, sessions, library, onNavigate, onGenerat
     .filter((x) => x.dias !== null && x.dias <= 30)
     .sort((a, b) => a.dias - b.dias);
 
-  const totalHabilidades = HABILIDADES.length;
-  const tocadas = new Set(library.map((ex) => ex.categoria).filter(Boolean)).size;
-  const pctPlano = totalHabilidades ? Math.round((tocadas / totalHabilidades) * 100) : 0;
-
   return (
     <div>
       <ViewHeader title={`Olá! ${team ? `— ${team.nome}` : ""}`} subtitle={team && team.temporadaAtual ? `Época ${team.temporadaAtual}` : ""} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-3 gap-3 mb-5">
         <div className="bg-[#1E242E] border border-[#2E3644] rounded-lg p-3.5">
           <div className="text-2xl font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>{players.length}</div>
           <div className="text-xs text-[#8A93A3]">Jogadoras/es</div>
@@ -46,10 +41,6 @@ function DashboardView({ team, players, sessions, library, onNavigate, onGenerat
         <div className="bg-[#1E242E] border border-[#2E3644] rounded-lg p-3.5">
           <div className="text-2xl font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>{jogosDaEpoca.length}</div>
           <div className="text-xs text-[#8A93A3]">Jogos</div>
-        </div>
-        <div className="bg-[#1E242E] border border-[#2E3644] rounded-lg p-3.5">
-          <div className="text-2xl font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>{pctPlano}%</div>
-          <div className="text-xs text-[#8A93A3]">Plano cumprido</div>
         </div>
       </div>
 
@@ -134,7 +125,7 @@ function DashboardView({ team, players, sessions, library, onNavigate, onGenerat
       <div className="mt-5 bg-[#1E242E] border border-[#2E3644] rounded-lg p-4 flex items-center justify-between flex-wrap gap-3">
         <div>
           <div style={{ fontFamily: "'Oswald', sans-serif" }} className="uppercase tracking-wide text-sm font-semibold">Relatório de fim de época</div>
-          <div className="text-xs text-[#8A93A3] mt-0.5">Resumo completo desta época — presenças, resultados, plano cumprido — pronto a descarregar.</div>
+          <div className="text-xs text-[#8A93A3] mt-0.5">Resumo completo desta época — presenças, resultados — pronto a descarregar.</div>
         </div>
         <button onClick={onGenerateReport} className="flex items-center gap-1.5 bg-[#EA5B13] hover:bg-[#FF6B1A] text-[#14181F] text-sm font-medium rounded-md px-3.5 py-2 shrink-0">
           <Printer size={15} /> Gerar relatório

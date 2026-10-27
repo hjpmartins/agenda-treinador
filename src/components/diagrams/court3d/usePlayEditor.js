@@ -9,7 +9,12 @@ import { HALF_VB, FULL_VB } from "../../../data";
 import { uid, distPt, emptyDiagram, defaultControlPoint, resolveFinalDiagram, positionOnArrow, hasWaypoints} from "../../../utils";
 
 const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible", "handoff"]);
-const SNAP_DIST = 14;
+// Em touch (sem cursor a passar por cima antes de tocar, dedo bem mais
+// largo que um ponteiro de rato) é fácil tocar uns milímetros ao lado da
+// ficha pretendida — sobretudo com a bola mesmo em cima/ao lado da jogadora
+// que a tem. Uma distância mais generosa do que faria falta num rato evita
+// falhar o alvo nesses casos.
+const SNAP_DIST = 20;
 const DRAWING_ID = "__a_desenhar";
 
 function historyReducer(state, action) {
@@ -257,6 +262,26 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     return best;
   };
 
+  // Dona de uma bola (inverso de ballOf): a jogadora mais próxima dela. Um
+  // corte/bloqueio/drible/hand-off é sempre a jogadora a mexer-se (a bola só
+  // a acompanha) — se o toque inicial, por imprecisão (normal em touch),
+  // acabar por apanhar a bola em vez da jogadora que a tem mesmo ao lado,
+  // mesmo assim é a jogadora que tem de ficar presa à seta, ou fica ela
+  // parada e só a bola se desloca.
+  const carrierOf = (ball) => {
+    let best = null;
+    let bestD = 24;
+    step.tokens.forEach((t) => {
+      if (t.type === "ball" || t.type === "cone") return;
+      const d = distPt(t, ball);
+      if (d < bestD) {
+        best = t;
+        bestD = d;
+      }
+    });
+    return best;
+  };
+
   const nearestToken = (pt) => {
     let best = null;
     let bestD = SNAP_DIST;
@@ -388,7 +413,10 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         }
       }
       const hoopPt = mode === "lancamento" && pendingFrom && !near ? snapToHoop(ev, pt) : null;
-      const from = near ? { x: near.x, y: near.y, tokenId: near.id } : { ...(hoopPt || pt), tokenId: null };
+      // Seta de deslocação (corte, bloqueio, drible, hand-off) apanhou a bola
+      // em vez da jogadora: usa antes quem a traz (ver carrierOf acima).
+      const moveNear = near && near.type === "ball" ? carrierOf(near) || near : near;
+      const from = moveNear ? { x: moveNear.x, y: moveNear.y, tokenId: moveNear.id } : { ...(hoopPt || pt), tokenId: null };
       setDrawing({ type: mode, from, to: { x: from.x, y: from.y, tokenId: null } });
       return;
     }

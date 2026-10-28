@@ -449,6 +449,15 @@ export default function App() {
     }
   };
 
+  const editarConvocatoria = async (id, patch) => {
+    try {
+      const updated = await db.updateConvocatoria(id, patch);
+      setConvocatorias(convocatorias.map((c) => (c.id === id ? updated : c)));
+    } catch (e) {
+      setError(`Não foi possível editar a convocatória (${e.message || e}).`);
+    }
+  };
+
   const deleteConvocatoria = async (id) => {
     try {
       await db.deleteConvocatoria(id);
@@ -860,6 +869,7 @@ export default function App() {
                   onMarcarMensagemRevista={marcarMensagemRevista}
                   convocatorias={teamConvocatorias}
                   onCreateConvocatoria={createConvocatoria}
+                  onEditarConvocatoria={editarConvocatoria}
                   onDeleteConvocatoria={deleteConvocatoria}
                 />
               )}

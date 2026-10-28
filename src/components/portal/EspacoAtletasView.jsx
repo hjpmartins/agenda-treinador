@@ -255,13 +255,13 @@ function RsvpSection({ players, sessions, rsvps }) {
   );
 }
 
-function ConvocatoriasSection({ players, convocatorias, onCreate, onDelete }) {
-  const [titulo, setTitulo] = useState("");
-  const [data, setData] = useState("");
-  const [hora, setHora] = useState("");
-  const [pontoEncontro, setPontoEncontro] = useState("");
-  const [refeicao, setRefeicao] = useState("");
-  const [jogadorasIds, setJogadorasIds] = useState([]);
+function ConvocatoriaForm({ players, initial, submitLabel, onSubmit, onCancel }) {
+  const [titulo, setTitulo] = useState(initial?.titulo || "");
+  const [data, setData] = useState(initial?.data || "");
+  const [hora, setHora] = useState(initial?.hora || "");
+  const [pontoEncontro, setPontoEncontro] = useState(initial?.pontoEncontro || "");
+  const [refeicao, setRefeicao] = useState(initial?.refeicao || "");
+  const [jogadorasIds, setJogadorasIds] = useState(initial?.jogadorasIds || []);
 
   const toggleJogadora = (id) => setJogadorasIds((list) => (list.includes(id) ? list.filter((j) => j !== id) : [...list, id]));
   const selecionarTodas = () => setJogadorasIds(players.map((p) => p.id));
@@ -272,7 +272,7 @@ function ConvocatoriasSection({ players, convocatorias, onCreate, onDelete }) {
   const submit = (e) => {
     e.preventDefault();
     if (!podeSubmeter) return;
-    onCreate({ titulo: titulo.trim(), data, hora, pontoEncontro: pontoEncontro.trim(), refeicao: refeicao.trim(), jogadorasIds });
+    onSubmit({ titulo: titulo.trim(), data, hora, pontoEncontro: pontoEncontro.trim(), refeicao: refeicao.trim(), jogadorasIds });
     setTitulo("");
     setData("");
     setHora("");
@@ -282,77 +282,117 @@ function ConvocatoriasSection({ players, convocatorias, onCreate, onDelete }) {
   };
 
   return (
-    <SectionCard title="Convocatória para o jogo" icon={ClipboardList}>
-      <form onSubmit={submit} className="flex flex-col gap-2 mb-4 pb-4 border-b border-[#2E3644]">
-        <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex: Jogo vs Benfica — Jornada 5" className={inputCls} />
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Data">
-            <input type="date" value={data} onChange={(e) => setData(e.target.value)} className={inputCls} />
-          </Field>
-          <Field label="Hora">
-            <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} className={inputCls} />
-          </Field>
-        </div>
-        <Field label="Ponto de encontro">
-          <input value={pontoEncontro} onChange={(e) => setPontoEncontro(e.target.value)} placeholder="Ex: Pavilhão, 14h30" className={inputCls} />
+    <form onSubmit={submit} className="flex flex-col gap-2">
+      <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex: Jogo vs Benfica — Jornada 5" className={inputCls} />
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Data">
+          <input type="date" value={data} onChange={(e) => setData(e.target.value)} className={inputCls} />
         </Field>
-        <Field label="Refeição (opcional)">
-          <input value={refeicao} onChange={(e) => setRefeicao(e.target.value)} placeholder="Ex: levar lanche, há refeição no local..." className={inputCls} />
+        <Field label="Hora">
+          <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} className={inputCls} />
         </Field>
-        <Field label="Jogadoras convocadas">
-          {players.length === 0 ? (
-            <div className="text-xs text-[#5A6272]">Sem jogadoras no plantel.</div>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-1.5 mb-1.5">
-                {players.map((p) => {
-                  const selecionada = jogadorasIds.includes(p.id);
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => toggleJogadora(p.id)}
-                      className={`text-xs px-2.5 py-1 rounded-md border ${
-                        selecionada ? "bg-[#EA5B13]/15 border-[#EA5B13] text-[#EA5B13]" : "border-[#2E3644] text-[#8A93A3] hover:border-[#5A6272]"
-                      }`}
-                    >
-                      {p.nome}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex gap-3 text-[11px]">
-                <button type="button" onClick={selecionarTodas} className="text-[#EA5B13] hover:text-[#FF6B1A]">Selecionar todas</button>
-                <button type="button" onClick={limparSelecao} className="text-[#8A93A3] hover:text-[#F2EDE3]">Limpar seleção</button>
-              </div>
-            </>
-          )}
-        </Field>
+      </div>
+      <Field label="Ponto de encontro">
+        <input value={pontoEncontro} onChange={(e) => setPontoEncontro(e.target.value)} placeholder="Ex: Pavilhão, 14h30" className={inputCls} />
+      </Field>
+      <Field label="Refeição (opcional)">
+        <input value={refeicao} onChange={(e) => setRefeicao(e.target.value)} placeholder="Ex: levar lanche, há refeição no local..." className={inputCls} />
+      </Field>
+      <Field label="Jogadoras convocadas">
+        {players.length === 0 ? (
+          <div className="text-xs text-[#5A6272]">Sem jogadoras no plantel.</div>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-1.5 mb-1.5">
+              {players.map((p) => {
+                const selecionada = jogadorasIds.includes(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => toggleJogadora(p.id)}
+                    className={`text-xs px-2.5 py-1 rounded-md border ${
+                      selecionada ? "bg-[#EA5B13]/15 border-[#EA5B13] text-[#EA5B13]" : "border-[#2E3644] text-[#8A93A3] hover:border-[#5A6272]"
+                    }`}
+                  >
+                    {p.nome}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-3 text-[11px]">
+              <button type="button" onClick={selecionarTodas} className="text-[#EA5B13] hover:text-[#FF6B1A]">Selecionar todas</button>
+              <button type="button" onClick={limparSelecao} className="text-[#8A93A3] hover:text-[#F2EDE3]">Limpar seleção</button>
+            </div>
+          </>
+        )}
+      </Field>
+      <div className="flex gap-2">
         <button type="submit" disabled={!podeSubmeter} className="self-start flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md bg-[#EA5B13] hover:bg-[#FF6B1A] disabled:opacity-40 text-[#14181F] font-medium">
-          <Plus size={14} /> Publicar convocatória
+          <Plus size={14} /> {submitLabel}
         </button>
-      </form>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="text-sm px-3 py-1.5 rounded-md text-[#8A93A3] hover:text-[#F2EDE3]">
+            Cancelar
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
+
+function ConvocatoriasSection({ players, convocatorias, onCreate, onEditar, onDelete }) {
+  const [editingId, setEditingId] = useState(null);
+
+  return (
+    <SectionCard title="Convocatória para o jogo" icon={ClipboardList}>
+      <div className="mb-4 pb-4 border-b border-[#2E3644]">
+        <ConvocatoriaForm players={players} submitLabel="Publicar convocatória" onSubmit={onCreate} />
+      </div>
       {convocatorias.length === 0 ? (
         <EmptyState text="Ainda não publicaste nenhuma convocatória." small />
       ) : (
         <div className="space-y-2">
-          {convocatorias.map((c) => (
-            <div key={c.id} className="flex items-start justify-between gap-2 border border-[#2E3644] rounded-md p-2.5">
-              <div className="min-w-0">
-                <div className="text-sm font-medium">{c.titulo}</div>
-                <div className="text-xs text-[#8A93A3] mt-0.5">
-                  {[c.data ? formatDateFull(c.data) : null, c.hora || null, c.pontoEncontro || null].filter(Boolean).join(" · ")}
+          {convocatorias.map((c) => {
+            if (editingId === c.id) {
+              return (
+                <div key={c.id} className="border border-[#EA5B13]/40 rounded-md p-3">
+                  <ConvocatoriaForm
+                    players={players}
+                    initial={c}
+                    submitLabel="Guardar"
+                    onCancel={() => setEditingId(null)}
+                    onSubmit={(patch) => {
+                      onEditar(c.id, patch);
+                      setEditingId(null);
+                    }}
+                  />
                 </div>
-                {c.refeicao && <div className="text-xs text-[#8A93A3] mt-0.5">Refeição: {c.refeicao}</div>}
-                <div className="text-[11px] text-[#5A6272] mt-1">
-                  Convocadas: {(c.jogadorasIds || []).map((id) => players.find((p) => p.id === id)?.nome || "?").join(", ")}
+              );
+            }
+            return (
+              <div key={c.id} className="flex items-start justify-between gap-2 border border-[#2E3644] rounded-md p-2.5">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">{c.titulo}</div>
+                  <div className="text-xs text-[#8A93A3] mt-0.5">
+                    {[c.data ? formatDateFull(c.data) : null, c.hora || null, c.pontoEncontro || null].filter(Boolean).join(" · ")}
+                  </div>
+                  {c.refeicao && <div className="text-xs text-[#8A93A3] mt-0.5">Refeição: {c.refeicao}</div>}
+                  <div className="text-[11px] text-[#5A6272] mt-1">
+                    Convocadas: {(c.jogadorasIds || []).map((id) => players.find((p) => p.id === id)?.nome || "?").join(", ")}
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={() => setEditingId(c.id)} title="Editar convocatória" className="text-[11px] px-2 py-1 rounded border border-[#2E3644] text-[#8A93A3] hover:text-[#F2EDE3] hover:border-[#5A6272]">
+                    Editar
+                  </button>
+                  <button onClick={() => { if (window.confirm("Apagar esta convocatória?")) onDelete(c.id); }} title="Apagar" className="p-1 rounded hover:bg-[#D64545]/20 text-[#8A93A3] hover:text-[#D64545]">
+                    <Trash2 size={13} />
+                  </button>
                 </div>
               </div>
-              <button onClick={() => { if (window.confirm("Apagar esta convocatória?")) onDelete(c.id); }} title="Apagar" className="p-1 rounded hover:bg-[#D64545]/20 text-[#8A93A3] hover:text-[#D64545] shrink-0">
-                <Trash2 size={13} />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </SectionCard>
@@ -442,6 +482,7 @@ function EspacoAtletasView({
   onMarcarMensagemRevista,
   convocatorias,
   onCreateConvocatoria,
+  onEditarConvocatoria,
   onDeleteConvocatoria,
 }) {
   return (
@@ -456,7 +497,7 @@ function EspacoAtletasView({
         <AvisosSection avisos={avisos} onCreate={onCreateAviso} onDelete={onDeleteAviso} />
         <PerguntasSection players={players} perguntas={perguntas} respostas={respostas} onCreate={onCreatePergunta} onFechar={onFecharPergunta} onEditar={onEditarPergunta} onDelete={onDeletePergunta} />
         <RsvpSection players={players} sessions={sessions} rsvps={rsvps} />
-        <ConvocatoriasSection players={players} convocatorias={convocatorias} onCreate={onCreateConvocatoria} onDelete={onDeleteConvocatoria} />
+        <ConvocatoriasSection players={players} convocatorias={convocatorias} onCreate={onCreateConvocatoria} onEditar={onEditarConvocatoria} onDelete={onDeleteConvocatoria} />
         <LesoesSection players={players} lesoesReportadas={lesoesReportadas} onMarcarRevisto={onMarcarLesaoRevista} onAdicionarAoHistorico={onAdicionarAoHistorico} />
         <MensagensSection players={players} mensagens={mensagens} onMarcarRevisto={onMarcarMensagemRevista} />
       </div>

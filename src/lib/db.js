@@ -376,6 +376,12 @@ async function createConvocatoria(convocatoria) {
   return fromDb(CONVOCATORIA_FIELDS, data);
 }
 
+async function updateConvocatoria(id, patch) {
+  const { data, error } = await supabase.from("convocatorias").update(toDb(CONVOCATORIA_FIELDS, patch)).eq("id", id).select().single();
+  if (error) throw error;
+  return fromDb(CONVOCATORIA_FIELDS, data);
+}
+
 async function deleteConvocatoria(id) {
   const { error } = await supabase.from("convocatorias").delete().eq("id", id);
   if (error) throw error;
@@ -490,5 +496,6 @@ export {
   marcarMensagemRevista,
   listConvocatorias,
   createConvocatoria,
+  updateConvocatoria,
   deleteConvocatoria,
 };

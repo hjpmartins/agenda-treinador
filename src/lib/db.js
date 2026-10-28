@@ -50,6 +50,7 @@ const PERGUNTA_FIELDS = { equipaId: "team_id", createdAt: "created_at" };
 const RESPOSTA_FIELDS = { perguntaId: "pergunta_id", playerId: "player_id", createdAt: "created_at", updatedAt: "updated_at" };
 const RSVP_FIELDS = { sessionId: "session_id", playerId: "player_id", createdAt: "created_at", updatedAt: "updated_at" };
 const LESAO_REPORTADA_FIELDS = { playerId: "player_id", createdAt: "created_at" };
+const MENSAGEM_FIELDS = { playerId: "player_id", createdAt: "created_at" };
 
 // Colunas do tipo "date" no Postgres não aceitam string vazia (só uma data
 // válida ou null) — ao contrário das colunas de texto, onde "" é normal.
@@ -346,6 +347,17 @@ async function marcarLesaoRevista(id) {
   if (error) throw error;
 }
 
+async function listMensagens() {
+  const { data, error } = await supabase.from("mensagens_atletas").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return data.map((row) => fromDb(MENSAGEM_FIELDS, row));
+}
+
+async function marcarMensagemRevista(id) {
+  const { error } = await supabase.from("mensagens_atletas").update({ estado: "revisto" }).eq("id", id);
+  if (error) throw error;
+}
+
 // ---------------- Carregar tudo de uma vez / importar cópia de segurança ----------------
 
 // Se o SQL do Espaço Atletas ainda não tiver sido corrido no Supabase, as
@@ -357,7 +369,7 @@ async function marcarLesaoRevista(id) {
 const safeList = (promise) => promise.catch(() => []);
 
 async function loadAll() {
-  const [teams, players, sessions, library, publicLibrary, settings, avisos, perguntas, respostas, rsvps, lesoesReportadas] = await Promise.all([
+  const [teams, players, sessions, library, publicLibrary, settings, avisos, perguntas, respostas, rsvps, lesoesReportadas, mensagens] = await Promise.all([
     listTeams(),
     listPlayers(),
     listSessions(),
@@ -369,8 +381,9 @@ async function loadAll() {
     safeList(listRespostas()),
     safeList(listRsvps()),
     safeList(listLesoesReportadas()),
+    safeList(listMensagens()),
   ]);
-  return { teams, players, sessions, library, publicLibrary, avisos, perguntas, respostas, rsvps, lesoesReportadas, ...settings };
+  return { teams, players, sessions, library, publicLibrary, avisos, perguntas, respostas, rsvps, lesoesReportadas, mensagens, ...settings };
 }
 
 // Substitui TODOS os dados do utilizador pelos de uma cópia de segurança importada.
@@ -449,4 +462,6 @@ export {
   listRsvps,
   listLesoesReportadas,
   marcarLesaoRevista,
+  listMensagens,
+  marcarMensagemRevista,
 };

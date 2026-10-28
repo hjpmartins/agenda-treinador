@@ -32,6 +32,7 @@ async function getTreinos(token) {
     observacoes: s.observacoes,
     realizado: s.realizado,
     rsvp: s.rsvp,
+    rsvpMotivo: s.rsvp_motivo,
   }));
 }
 
@@ -46,8 +47,8 @@ async function setResposta(token, perguntaId, resposta) {
   if (error) throw error;
 }
 
-async function setRsvp(token, sessionId, status) {
-  const { error } = await supabase.rpc("portal_set_rsvp", { p_token: token, p_session_id: sessionId, p_status: status });
+async function setRsvp(token, sessionId, status, motivo = "") {
+  const { error } = await supabase.rpc("portal_set_rsvp", { p_token: token, p_session_id: sessionId, p_status: status, p_motivo: motivo });
   if (error) throw error;
 }
 
@@ -56,4 +57,9 @@ async function reportarLesao(token, texto) {
   if (error) throw error;
 }
 
-export { getDados, getAvisos, getTreinos, getPerguntas, setResposta, setRsvp, reportarLesao };
+async function enviarMensagem(token, texto) {
+  const { error } = await supabase.rpc("portal_send_mensagem", { p_token: token, p_texto: texto });
+  if (error) throw error;
+}
+
+export { getDados, getAvisos, getTreinos, getPerguntas, setResposta, setRsvp, reportarLesao, enviarMensagem };

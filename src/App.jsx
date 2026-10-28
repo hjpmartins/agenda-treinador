@@ -49,6 +49,7 @@ export default function App() {
   const [respostas, setRespostas] = useState([]);
   const [rsvps, setRsvps] = useState([]);
   const [lesoesReportadas, setLesoesReportadas] = useState([]);
+  const [mensagens, setMensagens] = useState([]);
   const [clubLogo, setClubLogo] = useState("");
   const [activeTeamId, setActiveTeamId] = useState(null);
   const [viewingTemporada, setViewingTemporada] = useState(null);
@@ -107,6 +108,7 @@ export default function App() {
       setRespostas([]);
       setRsvps([]);
       setLesoesReportadas([]);
+      setMensagens([]);
       setClubLogo("");
       setActiveTeamId(null);
       setViewingTemporada(null);
@@ -140,6 +142,7 @@ export default function App() {
         setRespostas(result.respostas || []);
         setRsvps(result.rsvps || []);
         setLesoesReportadas(result.lesoesReportadas || []);
+        setMensagens(result.mensagens || []);
         setClubLogo(result.clubLogo || "");
         setActiveTeamId(resolvedActiveTeamId);
         setViewingTemporada((loadedTeams.find((t) => t.id === resolvedActiveTeamId) || loadedTeams[0]).temporadaAtual);
@@ -416,6 +419,15 @@ export default function App() {
     }
   };
 
+  const marcarMensagemRevista = async (id) => {
+    try {
+      await db.marcarMensagemRevista(id);
+      setMensagens(mensagens.map((m) => (m.id === id ? { ...m, estado: "revisto" } : m)));
+    } catch (e) {
+      setError(`Não foi possível marcar a mensagem como revista (${e.message || e}).`);
+    }
+  };
+
   const addTeam = async (nome) => {
     try {
       const newTeam = await db.createTeam({ nome: nome.trim() || "Nova equipa", temporadaAtual: computeTemporadaAtual() });
@@ -643,7 +655,9 @@ export default function App() {
   const teamRespostas = respostas.filter((r) => teamPlayerIds.has(r.playerId));
   const teamRsvps = rsvps.filter((r) => teamPlayerIds.has(r.playerId));
   const teamLesoesReportadas = lesoesReportadas.filter((l) => teamPlayerIds.has(l.playerId));
-  const atletasPendentesCount = teamLesoesReportadas.filter((l) => l.estado === "pendente").length;
+  const teamMensagens = mensagens.filter((m) => teamPlayerIds.has(m.playerId));
+  const atletasPendentesCount =
+    teamLesoesReportadas.filter((l) => l.estado === "pendente").length + teamMensagens.filter((m) => m.estado === "pendente").length;
   const temporadasDisponiveis = Array.from(new Set(teamSessions.map((s) => s.temporada).filter(Boolean))).sort().reverse();
   const currentViewingTemporada = viewingTemporada || (activeTeam && activeTeam.temporadaAtual);
   if (currentViewingTemporada && !temporadasDisponiveis.includes(currentViewingTemporada)) {
@@ -810,6 +824,8 @@ export default function App() {
                   lesoesReportadas={teamLesoesReportadas}
                   onMarcarLesaoRevista={marcarLesaoRevista}
                   onAdicionarAoHistorico={adicionarLesaoAoHistorico}
+                  mensagens={teamMensagens}
+                  onMarcarMensagemRevista={marcarMensagemRevista}
                 />
               )}
               </ErrorBoundary>

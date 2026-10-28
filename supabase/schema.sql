@@ -277,6 +277,8 @@ create table if not exists presencas_rsvp (
   session_id uuid not null references sessions(id) on delete cascade,
   player_id uuid not null references players(id) on delete cascade,
   status text not null check (status in ('vou', 'nao_vou')),
+  -- Motivo de "não vou" (pedido à atleta quando responde que não vai).
+  motivo text default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (session_id, player_id)
@@ -308,6 +310,27 @@ create policy "treinador marca as lesões reportadas como revistas"
     exists (select 1 from players p where p.id = player_id and p.user_id = auth.uid())
   );
 
+-- Mensagem livre de uma atleta para o treinador (não é sobre lesão/estado
+-- — é a caixa de "quero dizer-te uma coisa").
+create table if not exists mensagens_atletas (
+  id uuid primary key default gen_random_uuid(),
+  player_id uuid not null references players(id) on delete cascade,
+  texto text not null default '',
+  estado text not null default 'pendente' check (estado in ('pendente', 'revisto')),
+  created_at timestamptz not null default now()
+);
+
+alter table mensagens_atletas enable row level security;
+
+create policy "treinador vê as mensagens das suas atletas"
+  on mensagens_atletas for select using (
+    exists (select 1 from players p where p.id = player_id and p.user_id = auth.uid())
+  );
+create policy "treinador marca as mensagens como revistas"
+  on mensagens_atletas for update using (
+    exists (select 1 from players p where p.id = player_id and p.user_id = auth.uid())
+  );
+
 -- ------------------------------------------------------------
 -- Funções do portal (acesso da atleta, sem conta, só com o token).
 -- "security definer" + "grant ... to anon": a função corre com
@@ -336,13 +359,17 @@ language sql security definer set search_path = public as $$
 $$;
 grant execute on function portal_get_avisos(uuid) to anon;
 
+-- O "returns table" muda de forma (acrescenta rsvp_motivo) — tem de se
+-- apagar a versão antiga antes, o Postgres não deixa mudar isto em cima.
+drop function if exists portal_get_treinos(uuid);
+
 create or replace function portal_get_treinos(p_token uuid)
 returns table (
   id uuid, date date, title text, objetivo text, exercicios jsonb,
-  observacoes text, realizado boolean, rsvp text
+  observacoes text, realizado boolean, rsvp text, rsvp_motivo text
 )
 language sql security definer set search_path = public as $$
-  select s.id, s.date, s.title, s.objetivo, s.exercicios, s.observacoes, s.realizado, r.status
+  select s.id, s.date, s.title, s.objetivo, s.exercicios, s.observacoes, s.realizado, r.status, r.motivo
   from sessions s
   join players p on p.team_id = s.team_id
   left join presencas_rsvp r on r.session_id = s.id and r.player_id = p.id
@@ -386,7 +413,11 @@ end;
 $$;
 grant execute on function portal_set_resposta(uuid, uuid, text) to anon;
 
-create or replace function portal_set_rsvp(p_token uuid, p_session_id uuid, p_status text)
+-- Assinatura antiga (sem motivo) — remove-se antes de recriar com o
+-- parâmetro novo, para não ficar com as duas versões em simultâneo.
+drop function if exists portal_set_rsvp(uuid, uuid, text);
+
+create or replace function portal_set_rsvp(p_token uuid, p_session_id uuid, p_status text, p_motivo text default '')
 returns void
 language plpgsql security definer set search_path = public as $$
 declare
@@ -400,12 +431,27 @@ begin
   if not exists (select 1 from sessions s where s.id = p_session_id and s.team_id = v_team_id) then
     raise exception 'treino não encontrado';
   end if;
-  insert into presencas_rsvp (session_id, player_id, status)
-  values (p_session_id, v_player_id, p_status)
-  on conflict (session_id, player_id) do update set status = excluded.status, updated_at = now();
+  insert into presencas_rsvp (session_id, player_id, status, motivo)
+  values (p_session_id, v_player_id, p_status, coalesce(p_motivo, ''))
+  on conflict (session_id, player_id) do update set status = excluded.status, motivo = excluded.motivo, updated_at = now();
 end;
 $$;
-grant execute on function portal_set_rsvp(uuid, uuid, text) to anon;
+grant execute on function portal_set_rsvp(uuid, uuid, text, text) to anon;
+
+create or replace function portal_send_mensagem(p_token uuid, p_texto text)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_player_id uuid;
+begin
+  select p.id into v_player_id from players p where p.portal_token = p_token;
+  if v_player_id is null then
+    raise exception 'token inválido';
+  end if;
+  insert into mensagens_atletas (player_id, texto) values (v_player_id, p_texto);
+end;
+$$;
+grant execute on function portal_send_mensagem(uuid, text) to anon;
 
 create or replace function portal_report_lesao(p_token uuid, p_texto text)
 returns void
@@ -445,3 +491,76 @@ alter table players add column if not exists portal_token uuid unique default ge
 -- logo antes desta secção de migrações). Não coles o ficheiro inteiro —
 -- as políticas das tabelas que já tens (teams, players, sessions, ...)
 -- dariam erro de "já existe" se as corresses outra vez.
+
+-- Motivo da falta, mensagens livres das atletas, e o novo formato do
+-- RSVP/treinos (se já tinhas corrido o bloco do Espaço Atletas antes
+-- desta versão) — este bloco é seguro correr mais do que uma vez.
+alter table presencas_rsvp add column if not exists motivo text default '';
+
+create table if not exists mensagens_atletas (
+  id uuid primary key default gen_random_uuid(),
+  player_id uuid not null references players(id) on delete cascade,
+  texto text not null default '',
+  estado text not null default 'pendente' check (estado in ('pendente', 'revisto')),
+  created_at timestamptz not null default now()
+);
+alter table mensagens_atletas enable row level security;
+drop policy if exists "treinador vê as mensagens das suas atletas" on mensagens_atletas;
+create policy "treinador vê as mensagens das suas atletas"
+  on mensagens_atletas for select using (
+    exists (select 1 from players p where p.id = player_id and p.user_id = auth.uid())
+  );
+drop policy if exists "treinador marca as mensagens como revistas" on mensagens_atletas;
+create policy "treinador marca as mensagens como revistas"
+  on mensagens_atletas for update using (
+    exists (select 1 from players p where p.id = player_id and p.user_id = auth.uid())
+  );
+
+drop function if exists portal_get_treinos(uuid);
+create function portal_get_treinos(p_token uuid)
+returns table (
+  id uuid, date date, title text, objetivo text, exercicios jsonb,
+  observacoes text, realizado boolean, rsvp text, rsvp_motivo text
+)
+language sql security definer set search_path = public as $$
+  select s.id, s.date, s.title, s.objetivo, s.exercicios, s.observacoes, s.realizado, r.status, r.motivo
+  from sessions s
+  join players p on p.team_id = s.team_id
+  left join presencas_rsvp r on r.session_id = s.id and r.player_id = p.id
+  where p.portal_token = p_token and s.type = 'treino' and s.date >= (current_date - interval '7 days')
+  order by s.date asc;
+$$;
+grant execute on function portal_get_treinos(uuid) to anon;
+
+drop function if exists portal_set_rsvp(uuid, uuid, text);
+create function portal_set_rsvp(p_token uuid, p_session_id uuid, p_status text, p_motivo text default '')
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_player_id uuid;
+  v_team_id uuid;
+begin
+  select p.id, p.team_id into v_player_id, v_team_id from players p where p.portal_token = p_token;
+  if v_player_id is null then raise exception 'token inválido'; end if;
+  if not exists (select 1 from sessions s where s.id = p_session_id and s.team_id = v_team_id) then
+    raise exception 'treino não encontrado';
+  end if;
+  insert into presencas_rsvp (session_id, player_id, status, motivo)
+  values (p_session_id, v_player_id, p_status, coalesce(p_motivo, ''))
+  on conflict (session_id, player_id) do update set status = excluded.status, motivo = excluded.motivo, updated_at = now();
+end;
+$$;
+grant execute on function portal_set_rsvp(uuid, uuid, text, text) to anon;
+
+create or replace function portal_send_mensagem(p_token uuid, p_texto text)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_player_id uuid;
+begin
+  select p.id into v_player_id from players p where p.portal_token = p_token;
+  if v_player_id is null then raise exception 'token inválido'; end if;
+  insert into mensagens_atletas (player_id, texto) values (v_player_id, p_texto);
+end;
+$$;
+grant execute on function portal_send_mensagem(uuid, text) to anon;

@@ -5,9 +5,10 @@
 // antes de qualquer lógica do treinador correr.
 
 import { useEffect, useState } from "react";
-import { Loader2, Megaphone, CalendarDays, HeartPulse, CheckCircle2, Circle } from "lucide-react";
+import { Loader2, Megaphone, CalendarDays, HeartPulse, MessageCircle, CheckCircle2, Circle, Play } from "lucide-react";
 import * as portalDb from "../../lib/portalDb";
 import { DiagramThumbnail } from "../diagrams/CourtPrimitives";
+import { PlayStudioModal } from "../diagrams/PlayStudioModal";
 import { todayStr, formatDateFull } from "../../utils";
 
 function Shell({ children }) {
@@ -38,7 +39,12 @@ function AtletaPortalApp({ token }) {
   const [perguntas, setPerguntas] = useState([]);
   const [lesaoTexto, setLesaoTexto] = useState("");
   const [lesaoEnviada, setLesaoEnviada] = useState(false);
+  const [mensagemTexto, setMensagemTexto] = useState("");
+  const [mensagemEnviada, setMensagemEnviada] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [motivoAbertoFor, setMotivoAbertoFor] = useState(null); // id do treino cujo motivo de falta está a ser editado
+  const [motivoTexto, setMotivoTexto] = useState("");
+  const [jogadaAVer, setJogadaAVer] = useState(null); // exercício (com diagramas) a reproduzir no estúdio
 
   useEffect(() => {
     let cancelled = false;
@@ -77,13 +83,38 @@ function AtletaPortalApp({ token }) {
     }
   };
 
-  const confirmarRsvp = async (sessionId, status) => {
+  const confirmarRsvp = async (sessionId, status, motivo = "") => {
     setBusyId(sessionId);
     try {
-      await portalDb.setRsvp(token, sessionId, status);
-      setTreinos((list) => list.map((s) => (s.id === sessionId ? { ...s, rsvp: status } : s)));
+      await portalDb.setRsvp(token, sessionId, status, motivo);
+      setTreinos((list) => list.map((s) => (s.id === sessionId ? { ...s, rsvp: status, rsvpMotivo: motivo } : s)));
+      setMotivoAbertoFor(null);
     } catch {
       // ignora — o botão mantém-se por confirmar
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // "Não vou" pede sempre o motivo antes de gravar — um segundo toque (já com
+  // o campo aberto) é que confirma de facto.
+  const clicarNaoVou = (treino) => {
+    if (motivoAbertoFor === treino.id) return;
+    setMotivoTexto(treino.rsvpMotivo || "");
+    setMotivoAbertoFor(treino.id);
+  };
+
+  const enviarMensagem = async (e) => {
+    e.preventDefault();
+    if (!mensagemTexto.trim()) return;
+    setBusyId("mensagem");
+    try {
+      await portalDb.enviarMensagem(token, mensagemTexto.trim());
+      setMensagemTexto("");
+      setMensagemEnviada(true);
+      setTimeout(() => setMensagemEnviada(false), 4000);
+    } catch {
+      // deixa o texto no formulário para a atleta tentar outra vez
     } finally {
       setBusyId(null);
     }
@@ -196,7 +227,7 @@ function AtletaPortalApp({ token }) {
                   </button>
                   <button
                     disabled={busyId === proximoTreino.id}
-                    onClick={() => confirmarRsvp(proximoTreino.id, "nao_vou")}
+                    onClick={() => clicarNaoVou(proximoTreino)}
                     className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border disabled:opacity-50 ${
                       proximoTreino.rsvp === "nao_vou" ? "bg-[#D64545]/20 border-[#D64545] text-[#D64545]" : "border-[#2E3644] text-[#8A93A3] hover:border-[#5A6272]"
                     }`}
@@ -205,6 +236,34 @@ function AtletaPortalApp({ token }) {
                   </button>
                 </div>
               </div>
+              {motivoAbertoFor === proximoTreino.id && (
+                <div className="border border-[#D64545]/40 bg-[#D64545]/5 rounded-md p-2.5 mb-2">
+                  <div className="text-xs text-[#C7CDD8] mb-1.5">Qual o motivo de não ires?</div>
+                  <textarea
+                    autoFocus
+                    value={motivoTexto}
+                    onChange={(e) => setMotivoTexto(e.target.value)}
+                    placeholder="Ex: estou doente, tenho um exame..."
+                    className="w-full bg-[#14181F] border border-[#2E3644] rounded-md px-2.5 py-2 text-sm text-[#F2EDE3] resize-none focus:outline-none focus:border-[#D64545]"
+                    style={{ minHeight: 50 }}
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      disabled={busyId === proximoTreino.id}
+                      onClick={() => confirmarRsvp(proximoTreino.id, "nao_vou", motivoTexto.trim())}
+                      className="text-xs px-3 py-1.5 rounded-md bg-[#D64545] hover:bg-[#e05a5a] text-[#14181F] font-medium disabled:opacity-50"
+                    >
+                      Confirmar
+                    </button>
+                    <button onClick={() => setMotivoAbertoFor(null)} className="text-xs px-3 py-1.5 rounded-md text-[#8A93A3] hover:text-[#F2EDE3]">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+              {proximoTreino.rsvp === "nao_vou" && proximoTreino.rsvpMotivo && motivoAbertoFor !== proximoTreino.id && (
+                <div className="text-xs text-[#8A93A3] mb-2">Motivo: {proximoTreino.rsvpMotivo}</div>
+              )}
               <div className="text-sm font-medium">{proximoTreino.title || "Treino"}</div>
               {proximoTreino.objetivo && <div className="text-xs text-[#8A93A3] mt-0.5">Objetivo: {proximoTreino.objetivo}</div>}
               {proximoTreino.observacoes && <div className="text-xs text-[#8A93A3] mt-1 whitespace-pre-wrap">{proximoTreino.observacoes}</div>}
@@ -217,11 +276,21 @@ function AtletaPortalApp({ token }) {
                       </div>
                       {e.descricao && <div className="text-xs text-[#8A93A3] mt-1 whitespace-pre-wrap">{e.descricao}</div>}
                       {(e.diagramas || []).length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {e.diagramas.map((d, idx) => (
-                            <DiagramThumbnail key={idx} diagram={d} size={64} />
-                          ))}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setJogadaAVer(e)}
+                          className="flex items-center gap-2 mt-2 group"
+                          title="Ver a jogada em 3D"
+                        >
+                          <div className="flex flex-wrap gap-2">
+                            {e.diagramas.map((d, idx) => (
+                              <DiagramThumbnail key={idx} diagram={d} size={64} />
+                            ))}
+                          </div>
+                          <span className="flex items-center gap-1 text-[11px] text-[#EA5B13] group-hover:text-[#FF6B1A] shrink-0">
+                            <Play size={12} fill="currentColor" /> Ver jogada
+                          </span>
+                        </button>
                       )}
                     </div>
                   ))}
@@ -255,7 +324,35 @@ function AtletaPortalApp({ token }) {
             </form>
           )}
         </Card>
+
+        <Card title="Mensagem para o treinador" icon={MessageCircle}>
+          {mensagemEnviada ? (
+            <div className="flex items-center gap-2 text-sm text-[#4C9A6A]">
+              <CheckCircle2 size={15} /> Enviada — o treinador vai ver.
+            </div>
+          ) : (
+            <form onSubmit={enviarMensagem}>
+              <textarea
+                value={mensagemTexto}
+                onChange={(e) => setMensagemTexto(e.target.value)}
+                placeholder="Escreve aqui o que quiseres dizer ao treinador..."
+                className="w-full bg-[#14181F] border border-[#2E3644] rounded-md px-3 py-2 text-sm text-[#F2EDE3] resize-none focus:outline-none focus:border-[#EA5B13]"
+                style={{ minHeight: 70 }}
+              />
+              <button
+                type="submit"
+                disabled={!mensagemTexto.trim() || busyId === "mensagem"}
+                className="mt-2 px-3.5 py-2 text-sm font-medium rounded-md bg-[#EA5B13] hover:bg-[#FF6B1A] disabled:opacity-40 text-[#14181F]"
+              >
+                Enviar
+              </button>
+            </form>
+          )}
+        </Card>
       </div>
+      {jogadaAVer && (
+        <PlayStudioModal diagramas={jogadaAVer.diagramas} title={jogadaAVer.nome} readOnly onClose={() => setJogadaAVer(null)} />
+      )}
     </div>
   );
 }

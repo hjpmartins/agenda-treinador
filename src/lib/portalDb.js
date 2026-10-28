@@ -36,6 +36,20 @@ async function getTreinos(token) {
   }));
 }
 
+async function getConvocatorias(token) {
+  const { data, error } = await supabase.rpc("portal_get_convocatorias", { p_token: token });
+  if (error) throw error;
+  return (data || []).map((c) => ({
+    id: c.id,
+    titulo: c.titulo,
+    data: c.data,
+    hora: c.hora,
+    pontoEncontro: c.ponto_encontro,
+    refeicao: c.refeicao,
+    createdAt: c.created_at,
+  }));
+}
+
 async function getPerguntas(token) {
   const { data, error } = await supabase.rpc("portal_get_perguntas", { p_token: token });
   if (error) throw error;
@@ -62,4 +76,4 @@ async function enviarMensagem(token, texto) {
   if (error) throw error;
 }
 
-export { getDados, getAvisos, getTreinos, getPerguntas, setResposta, setRsvp, reportarLesao, enviarMensagem };
+export { getDados, getAvisos, getTreinos, getConvocatorias, getPerguntas, setResposta, setRsvp, reportarLesao, enviarMensagem };

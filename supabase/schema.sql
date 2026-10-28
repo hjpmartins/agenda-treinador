@@ -331,6 +331,35 @@ create policy "treinador marca as mensagens como revistas"
     exists (select 1 from players p where p.id = player_id and p.user_id = auth.uid())
   );
 
+-- Convocatória para um jogo em concreto, dirigida só às jogadoras
+-- selecionadas (diferente da "Convocatória — participação por período"
+-- da ficha de jogo, que é o relatório oficial para a federação).
+create table if not exists convocatorias (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  team_id uuid not null references teams(id) on delete cascade,
+  titulo text not null default '',
+  data date,
+  hora text default '',
+  ponto_encontro text default '',
+  refeicao text default '',
+  jogadoras_ids jsonb not null default '[]',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists convocatorias_team_id_idx on convocatorias(team_id);
+
+alter table convocatorias enable row level security;
+
+create policy "treinador vê as suas convocatórias"
+  on convocatorias for select using (auth.uid() = user_id);
+create policy "treinador cria convocatórias"
+  on convocatorias for insert with check (auth.uid() = user_id);
+create policy "treinador edita as suas convocatórias"
+  on convocatorias for update using (auth.uid() = user_id);
+create policy "treinador apaga as suas convocatórias"
+  on convocatorias for delete using (auth.uid() = user_id);
+
 -- ------------------------------------------------------------
 -- Funções do portal (acesso da atleta, sem conta, só com o token).
 -- "security definer" + "grant ... to anon": a função corre com
@@ -358,6 +387,22 @@ language sql security definer set search_path = public as $$
   order by a.created_at desc;
 $$;
 grant execute on function portal_get_avisos(uuid) to anon;
+
+-- Só as convocatórias de jogos ainda não passados, e só as que incluem a
+-- própria atleta (o resto do plantel não precisa de ver uma convocatória
+-- que não é para elas).
+create or replace function portal_get_convocatorias(p_token uuid)
+returns table (id uuid, titulo text, data date, hora text, ponto_encontro text, refeicao text, created_at timestamptz)
+language sql security definer set search_path = public as $$
+  select c.id, c.titulo, c.data, c.hora, c.ponto_encontro, c.refeicao, c.created_at
+  from convocatorias c
+  join players p on p.team_id = c.team_id
+  where p.portal_token = p_token
+    and c.jogadoras_ids ? p.id::text
+    and (c.data is null or c.data >= current_date)
+  order by c.data asc nulls last, c.created_at desc;
+$$;
+grant execute on function portal_get_convocatorias(uuid) to anon;
 
 -- O "returns table" muda de forma (acrescenta rsvp_motivo) — tem de se
 -- apagar a versão antiga antes, o Postgres não deixa mudar isto em cima.
@@ -564,3 +609,46 @@ begin
 end;
 $$;
 grant execute on function portal_send_mensagem(uuid, text) to anon;
+
+-- Convocatória de jogo (título, data, hora, ponto de encontro, refeição e
+-- quais jogadoras do plantel são convocadas) — tabela nova, não existia
+-- antes desta versão.
+create table if not exists convocatorias (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  team_id uuid not null references teams(id) on delete cascade,
+  titulo text not null default '',
+  data date,
+  hora text default '',
+  ponto_encontro text default '',
+  refeicao text default '',
+  jogadoras_ids jsonb not null default '[]',
+  created_at timestamptz not null default now()
+);
+create index if not exists convocatorias_team_id_idx on convocatorias(team_id);
+alter table convocatorias enable row level security;
+drop policy if exists "treinador vê as suas convocatórias" on convocatorias;
+create policy "treinador vê as suas convocatórias"
+  on convocatorias for select using (auth.uid() = user_id);
+drop policy if exists "treinador cria convocatórias" on convocatorias;
+create policy "treinador cria convocatórias"
+  on convocatorias for insert with check (auth.uid() = user_id);
+drop policy if exists "treinador edita as suas convocatórias" on convocatorias;
+create policy "treinador edita as suas convocatórias"
+  on convocatorias for update using (auth.uid() = user_id);
+drop policy if exists "treinador apaga as suas convocatórias" on convocatorias;
+create policy "treinador apaga as suas convocatórias"
+  on convocatorias for delete using (auth.uid() = user_id);
+
+create or replace function portal_get_convocatorias(p_token uuid)
+returns table (id uuid, titulo text, data date, hora text, ponto_encontro text, refeicao text, created_at timestamptz)
+language sql security definer set search_path = public as $$
+  select c.id, c.titulo, c.data, c.hora, c.ponto_encontro, c.refeicao, c.created_at
+  from convocatorias c
+  join players p on p.team_id = c.team_id
+  where p.portal_token = p_token
+    and c.jogadoras_ids ? p.id::text
+    and (c.data is null or c.data >= current_date)
+  order by c.data asc nulls last, c.created_at desc;
+$$;
+grant execute on function portal_get_convocatorias(uuid) to anon;

@@ -50,6 +50,7 @@ export default function App() {
   const [rsvps, setRsvps] = useState([]);
   const [lesoesReportadas, setLesoesReportadas] = useState([]);
   const [mensagens, setMensagens] = useState([]);
+  const [convocatorias, setConvocatorias] = useState([]);
   const [clubLogo, setClubLogo] = useState("");
   const [activeTeamId, setActiveTeamId] = useState(null);
   const [viewingTemporada, setViewingTemporada] = useState(null);
@@ -109,6 +110,7 @@ export default function App() {
       setRsvps([]);
       setLesoesReportadas([]);
       setMensagens([]);
+      setConvocatorias([]);
       setClubLogo("");
       setActiveTeamId(null);
       setViewingTemporada(null);
@@ -143,6 +145,7 @@ export default function App() {
         setRsvps(result.rsvps || []);
         setLesoesReportadas(result.lesoesReportadas || []);
         setMensagens(result.mensagens || []);
+        setConvocatorias(result.convocatorias || []);
         setClubLogo(result.clubLogo || "");
         setActiveTeamId(resolvedActiveTeamId);
         setViewingTemporada((loadedTeams.find((t) => t.id === resolvedActiveTeamId) || loadedTeams[0]).temporadaAtual);
@@ -437,6 +440,24 @@ export default function App() {
     }
   };
 
+  const createConvocatoria = async (convocatoria) => {
+    try {
+      const created = await db.createConvocatoria({ ...convocatoria, equipaId: activeTeamId });
+      setConvocatorias([...convocatorias, created]);
+    } catch (e) {
+      setError(`Não foi possível publicar a convocatória (${e.message || e}).`);
+    }
+  };
+
+  const deleteConvocatoria = async (id) => {
+    try {
+      await db.deleteConvocatoria(id);
+      setConvocatorias(convocatorias.filter((c) => c.id !== id));
+    } catch (e) {
+      setError(`Não foi possível apagar a convocatória (${e.message || e}).`);
+    }
+  };
+
   const addTeam = async (nome) => {
     try {
       const newTeam = await db.createTeam({ nome: nome.trim() || "Nova equipa", temporadaAtual: computeTemporadaAtual() });
@@ -665,6 +686,7 @@ export default function App() {
   const teamRsvps = rsvps.filter((r) => teamPlayerIds.has(r.playerId));
   const teamLesoesReportadas = lesoesReportadas.filter((l) => teamPlayerIds.has(l.playerId));
   const teamMensagens = mensagens.filter((m) => teamPlayerIds.has(m.playerId));
+  const teamConvocatorias = convocatorias.filter((c) => c.equipaId === activeTeamId);
   const atletasPendentesCount =
     teamLesoesReportadas.filter((l) => l.estado === "pendente").length + teamMensagens.filter((m) => m.estado === "pendente").length;
   const temporadasDisponiveis = Array.from(new Set(teamSessions.map((s) => s.temporada).filter(Boolean))).sort().reverse();
@@ -836,6 +858,9 @@ export default function App() {
                   onAdicionarAoHistorico={adicionarLesaoAoHistorico}
                   mensagens={teamMensagens}
                   onMarcarMensagemRevista={marcarMensagemRevista}
+                  convocatorias={teamConvocatorias}
+                  onCreateConvocatoria={createConvocatoria}
+                  onDeleteConvocatoria={deleteConvocatoria}
                 />
               )}
               </ErrorBoundary>

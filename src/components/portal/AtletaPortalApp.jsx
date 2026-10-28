@@ -5,7 +5,7 @@
 // antes de qualquer lógica do treinador correr.
 
 import { useEffect, useState } from "react";
-import { Loader2, Megaphone, CalendarDays, HeartPulse, MessageCircle, CheckCircle2, Circle, Play } from "lucide-react";
+import { Loader2, Megaphone, CalendarDays, HeartPulse, MessageCircle, CheckCircle2, Circle, Play, ClipboardList } from "lucide-react";
 import * as portalDb from "../../lib/portalDb";
 import { DiagramThumbnail } from "../diagrams/CourtPrimitives";
 import { PlayStudioModal } from "../diagrams/PlayStudioModal";
@@ -37,6 +37,7 @@ function AtletaPortalApp({ token }) {
   const [avisos, setAvisos] = useState([]);
   const [treinos, setTreinos] = useState([]);
   const [perguntas, setPerguntas] = useState([]);
+  const [convocatorias, setConvocatorias] = useState([]);
   const [lesaoTexto, setLesaoTexto] = useState("");
   const [lesaoEnviada, setLesaoEnviada] = useState(false);
   const [mensagemTexto, setMensagemTexto] = useState("");
@@ -55,12 +56,18 @@ function AtletaPortalApp({ token }) {
           if (!cancelled) setState("invalid");
           return;
         }
-        const [av, tr, pg] = await Promise.all([portalDb.getAvisos(token), portalDb.getTreinos(token), portalDb.getPerguntas(token)]);
+        const [av, tr, pg, cv] = await Promise.all([
+          portalDb.getAvisos(token),
+          portalDb.getTreinos(token),
+          portalDb.getPerguntas(token),
+          portalDb.getConvocatorias(token),
+        ]);
         if (cancelled) return;
         setDados(d);
         setAvisos(av);
         setTreinos(tr);
         setPerguntas(pg);
+        setConvocatorias(cv);
         setState("ready");
       } catch {
         if (!cancelled) setState("invalid");
@@ -187,6 +194,23 @@ function AtletaPortalApp({ token }) {
                       </button>
                     ))}
                   </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {convocatorias.length > 0 && (
+          <Card title="Convocatória" icon={ClipboardList}>
+            <div className="space-y-3">
+              {convocatorias.map((c) => (
+                <div key={c.id} className="border border-[#EA5B13]/40 bg-[#EA5B13]/5 rounded-md p-3">
+                  <div className="text-sm font-medium">{c.titulo}</div>
+                  <div className="text-xs text-[#C7CDD8] mt-1">
+                    {[c.data ? formatDateFull(c.data) : null, c.hora || null].filter(Boolean).join(" · ")}
+                  </div>
+                  {c.pontoEncontro && <div className="text-xs text-[#8A93A3] mt-1">Ponto de encontro: {c.pontoEncontro}</div>}
+                  {c.refeicao && <div className="text-xs text-[#8A93A3] mt-1">Refeição: {c.refeicao}</div>}
                 </div>
               ))}
             </div>

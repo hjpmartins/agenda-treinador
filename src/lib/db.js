@@ -51,10 +51,11 @@ const RESPOSTA_FIELDS = { perguntaId: "pergunta_id", playerId: "player_id", crea
 const RSVP_FIELDS = { sessionId: "session_id", playerId: "player_id", createdAt: "created_at", updatedAt: "updated_at" };
 const LESAO_REPORTADA_FIELDS = { playerId: "player_id", createdAt: "created_at" };
 const MENSAGEM_FIELDS = { playerId: "player_id", createdAt: "created_at" };
+const CONVOCATORIA_FIELDS = { equipaId: "team_id", pontoEncontro: "ponto_encontro", jogadorasIds: "jogadoras_ids", createdAt: "created_at" };
 
 // Colunas do tipo "date" no Postgres não aceitam string vazia (só uma data
 // válida ou null) — ao contrário das colunas de texto, onde "" é normal.
-const DATE_FIELDS = ["nascimento", "date"];
+const DATE_FIELDS = ["nascimento", "date", "data"];
 
 function toDb(fieldMap, obj) {
   const row = {};
@@ -358,6 +359,28 @@ async function marcarMensagemRevista(id) {
   if (error) throw error;
 }
 
+async function listConvocatorias() {
+  const { data, error } = await supabase.from("convocatorias").select("*").order("data", { ascending: true });
+  if (error) throw error;
+  return data.map((row) => fromDb(CONVOCATORIA_FIELDS, row));
+}
+
+async function createConvocatoria(convocatoria) {
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from("convocatorias")
+    .insert({ ...toDb(CONVOCATORIA_FIELDS, convocatoria), user_id: userId })
+    .select()
+    .single();
+  if (error) throw error;
+  return fromDb(CONVOCATORIA_FIELDS, data);
+}
+
+async function deleteConvocatoria(id) {
+  const { error } = await supabase.from("convocatorias").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ---------------- Carregar tudo de uma vez / importar cópia de segurança ----------------
 
 // Se o SQL do Espaço Atletas ainda não tiver sido corrido no Supabase, as
@@ -369,7 +392,7 @@ async function marcarMensagemRevista(id) {
 const safeList = (promise) => promise.catch(() => []);
 
 async function loadAll() {
-  const [teams, players, sessions, library, publicLibrary, settings, avisos, perguntas, respostas, rsvps, lesoesReportadas, mensagens] = await Promise.all([
+  const [teams, players, sessions, library, publicLibrary, settings, avisos, perguntas, respostas, rsvps, lesoesReportadas, mensagens, convocatorias] = await Promise.all([
     listTeams(),
     listPlayers(),
     listSessions(),
@@ -382,8 +405,9 @@ async function loadAll() {
     safeList(listRsvps()),
     safeList(listLesoesReportadas()),
     safeList(listMensagens()),
+    safeList(listConvocatorias()),
   ]);
-  return { teams, players, sessions, library, publicLibrary, avisos, perguntas, respostas, rsvps, lesoesReportadas, mensagens, ...settings };
+  return { teams, players, sessions, library, publicLibrary, avisos, perguntas, respostas, rsvps, lesoesReportadas, mensagens, convocatorias, ...settings };
 }
 
 // Substitui TODOS os dados do utilizador pelos de uma cópia de segurança importada.
@@ -464,4 +488,7 @@ export {
   marcarLesaoRevista,
   listMensagens,
   marcarMensagemRevista,
+  listConvocatorias,
+  createConvocatoria,
+  deleteConvocatoria,
 };

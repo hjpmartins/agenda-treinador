@@ -23,9 +23,9 @@ function Shell({ children }) {
 function Card({ title, icon: Icon, children }) {
   return (
     <div className="bg-[#1E242E] border border-[#2E3644] rounded-lg p-4 mb-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Icon size={15} className="text-[#EA5B13]" />
-        <span style={{ fontFamily: "'Oswald', sans-serif" }} className="uppercase tracking-wide text-sm font-semibold">{title}</span>
+      <div className="flex items-center gap-2 mb-3 pb-2 border-b-2 border-[#EA5B13]">
+        <Icon size={17} className="text-[#EA5B13]" />
+        <span style={{ fontFamily: "'Oswald', sans-serif" }} className="uppercase tracking-wide text-base font-bold text-[#F2EDE3]">{title}</span>
       </div>
       {children}
     </div>

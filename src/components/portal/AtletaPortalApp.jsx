@@ -5,10 +5,11 @@
 // antes de qualquer lógica do treinador correr.
 
 import { useEffect, useState } from "react";
-import { Loader2, Megaphone, CalendarDays, HeartPulse, MessageCircle, CheckCircle2, Circle, Play, ClipboardList } from "lucide-react";
+import { Loader2, Megaphone, CalendarDays, HeartPulse, MessageCircle, CheckCircle2, Circle, Play, ClipboardList, TrendingUp } from "lucide-react";
 import * as portalDb from "../../lib/portalDb";
 import { DiagramThumbnail } from "../diagrams/CourtPrimitives";
 import { PlayStudioModal } from "../diagrams/PlayStudioModal";
+import { EvolucaoAtletaModal } from "./EvolucaoAtletaModal";
 import { todayStr, formatDateFull } from "../../utils";
 
 function Shell({ children }) {
@@ -38,6 +39,8 @@ function AtletaPortalApp({ token }) {
   const [treinos, setTreinos] = useState([]);
   const [perguntas, setPerguntas] = useState([]);
   const [convocatorias, setConvocatorias] = useState([]);
+  const [evolucao, setEvolucao] = useState({ avaliacoes: [], testesFisicos: [], jogos: [] });
+  const [showEvolucao, setShowEvolucao] = useState(false);
   const [lesaoTexto, setLesaoTexto] = useState("");
   const [lesaoEnviada, setLesaoEnviada] = useState(false);
   const [mensagemTexto, setMensagemTexto] = useState("");
@@ -56,11 +59,12 @@ function AtletaPortalApp({ token }) {
           if (!cancelled) setState("invalid");
           return;
         }
-        const [av, tr, pg, cv] = await Promise.all([
+        const [av, tr, pg, cv, ev] = await Promise.all([
           portalDb.getAvisos(token),
           portalDb.getTreinos(token),
           portalDb.getPerguntas(token),
           portalDb.getConvocatorias(token),
+          portalDb.getEvolucao(token),
         ]);
         if (cancelled) return;
         setDados(d);
@@ -68,6 +72,7 @@ function AtletaPortalApp({ token }) {
         setTreinos(tr);
         setPerguntas(pg);
         setConvocatorias(cv);
+        setEvolucao(ev);
         setState("ready");
       } catch {
         if (!cancelled) setState("invalid");
@@ -166,6 +171,7 @@ function AtletaPortalApp({ token }) {
   const perguntasPorResponder = perguntas.filter((q) => q.resposta == null);
   // Só o próximo treino — os antigos não interessam às atletas aqui.
   const proximoTreino = treinos.filter((s) => s.date >= hojeStr).sort((a, b) => (a.date < b.date ? -1 : 1))[0] || null;
+  const temDadosEvolucao = evolucao.avaliacoes.length > 0 || evolucao.testesFisicos.length > 0 || evolucao.jogos.length > 0;
 
   return (
     <div className="min-h-full w-full bg-[#14181F] text-[#F2EDE3]" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -175,6 +181,16 @@ function AtletaPortalApp({ token }) {
           <h1 style={{ fontFamily: "'Oswald', sans-serif" }} className="text-2xl font-semibold uppercase tracking-wide">Olá, {dados.nome}</h1>
           <div className="text-sm text-[#8A93A3]">{dados.equipaNome}</div>
         </div>
+
+        {temDadosEvolucao && (
+          <button
+            type="button"
+            onClick={() => setShowEvolucao(true)}
+            className="w-full flex items-center justify-center gap-1.5 text-sm font-medium px-3.5 py-2.5 rounded-md bg-[#EA5B13] hover:bg-[#FF6B1A] text-[#14181F] transition-colors mb-4"
+          >
+            <TrendingUp size={15} /> Ver a minha evolução
+          </button>
+        )}
 
         {perguntasPorResponder.length > 0 && (
           <Card title="Por responder" icon={Megaphone}>
@@ -376,6 +392,15 @@ function AtletaPortalApp({ token }) {
       </div>
       {jogadaAVer && (
         <PlayStudioModal diagramas={jogadaAVer.diagramas} title={jogadaAVer.nome} readOnly onClose={() => setJogadaAVer(null)} />
+      )}
+      {showEvolucao && (
+        <EvolucaoAtletaModal
+          nome={dados.nome}
+          avaliacoes={evolucao.avaliacoes}
+          testesFisicos={evolucao.testesFisicos}
+          jogos={evolucao.jogos}
+          onClose={() => setShowEvolucao(false)}
+        />
       )}
     </div>
   );

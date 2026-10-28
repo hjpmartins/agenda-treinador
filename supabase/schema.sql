@@ -377,6 +377,28 @@ language sql security definer set search_path = public as $$
 $$;
 grant execute on function portal_get_dados(uuid) to anon;
 
+-- Dados para os gráficos de evolução (altura/peso/envergadura, testes
+-- físicos e estatísticas de jogo) — a mesma informação que o treinador vê
+-- no botão "Ver evolução" da ficha, só que já filtrada para esta atleta.
+create or replace function portal_get_evolucao(p_token uuid)
+returns table (avaliacoes jsonb, testes_fisicos jsonb, jogos jsonb)
+language sql security definer set search_path = public as $$
+  select
+    p.avaliacoes,
+    p.testes_fisicos,
+    coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('date', s.date, 'adversario', s.adversario, 'estatisticas', s.estatisticas -> p.id::text) order by s.date)
+        from sessions s
+        where s.team_id = p.team_id and s.type = 'jogo' and s.estatisticas ? p.id::text
+      ),
+      '[]'::jsonb
+    ) as jogos
+  from players p
+  where p.portal_token = p_token;
+$$;
+grant execute on function portal_get_evolucao(uuid) to anon;
+
 create or replace function portal_get_avisos(p_token uuid)
 returns setof avisos
 language sql security definer set search_path = public as $$
@@ -652,3 +674,24 @@ language sql security definer set search_path = public as $$
   order by c.data asc nulls last, c.created_at desc;
 $$;
 grant execute on function portal_get_convocatorias(uuid) to anon;
+
+-- Evolução (altura/peso/envergadura, testes físicos e estatísticas de
+-- jogo) no portal da atleta — função nova, não existia antes desta versão.
+create or replace function portal_get_evolucao(p_token uuid)
+returns table (avaliacoes jsonb, testes_fisicos jsonb, jogos jsonb)
+language sql security definer set search_path = public as $$
+  select
+    p.avaliacoes,
+    p.testes_fisicos,
+    coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('date', s.date, 'adversario', s.adversario, 'estatisticas', s.estatisticas -> p.id::text) order by s.date)
+        from sessions s
+        where s.team_id = p.team_id and s.type = 'jogo' and s.estatisticas ? p.id::text
+      ),
+      '[]'::jsonb
+    ) as jogos
+  from players p
+  where p.portal_token = p_token;
+$$;
+grant execute on function portal_get_evolucao(uuid) to anon;

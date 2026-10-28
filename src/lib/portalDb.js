@@ -50,6 +50,14 @@ async function getConvocatorias(token) {
   }));
 }
 
+async function getEvolucao(token) {
+  const { data, error } = await supabase.rpc("portal_get_evolucao", { p_token: token });
+  if (error) throw error;
+  const row = data && data[0];
+  if (!row) return { avaliacoes: [], testesFisicos: [], jogos: [] };
+  return { avaliacoes: row.avaliacoes || [], testesFisicos: row.testes_fisicos || [], jogos: row.jogos || [] };
+}
+
 async function getPerguntas(token) {
   const { data, error } = await supabase.rpc("portal_get_perguntas", { p_token: token });
   if (error) throw error;
@@ -76,4 +84,4 @@ async function enviarMensagem(token, texto) {
   if (error) throw error;
 }
 
-export { getDados, getAvisos, getTreinos, getConvocatorias, getPerguntas, setResposta, setRsvp, reportarLesao, enviarMensagem };
+export { getDados, getAvisos, getTreinos, getConvocatorias, getEvolucao, getPerguntas, setResposta, setRsvp, reportarLesao, enviarMensagem };

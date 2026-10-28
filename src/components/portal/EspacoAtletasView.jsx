@@ -63,13 +63,65 @@ function AvisosSection({ avisos, onCreate, onDelete }) {
   );
 }
 
-function PerguntasSection({ players, perguntas, respostas, onCreate, onFechar, onDelete }) {
-  const [texto, setTexto] = useState("");
-  const [opcoes, setOpcoes] = useState(["Sim", "Não"]);
-
+function OpcoesEditor({ opcoes, setOpcoes }) {
   const alterarOpcao = (i, value) => setOpcoes((list) => list.map((o, idx) => (idx === i ? value : o)));
   const removerOpcao = (i) => setOpcoes((list) => list.filter((_, idx) => idx !== i));
   const adicionarOpcao = () => setOpcoes((list) => [...list, ""]);
+
+  return (
+    <Field label="Opções de resposta (como nas sondagens do WhatsApp)">
+      <div className="flex flex-col gap-1.5">
+        {opcoes.map((op, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <input value={op} onChange={(e) => alterarOpcao(i, e.target.value)} placeholder={`Opção ${i + 1}`} className={inputCls} />
+            {opcoes.length > 2 && (
+              <button type="button" onClick={() => removerOpcao(i)} title="Remover opção" className="p-1.5 rounded hover:bg-[#D64545]/20 text-[#8A93A3] hover:text-[#D64545] shrink-0">
+                <Trash2 size={13} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      <button type="button" onClick={adicionarOpcao} className="flex items-center gap-1 text-xs mt-1.5 text-[#EA5B13] hover:text-[#FF6B1A]">
+        <Plus size={12} /> Adicionar opção
+      </button>
+    </Field>
+  );
+}
+
+function PerguntaEditForm({ pergunta, onSave, onCancel }) {
+  const [texto, setTexto] = useState(pergunta.texto);
+  const [opcoes, setOpcoes] = useState(pergunta.opcoes.length ? pergunta.opcoes : [""]);
+
+  const opcoesValidas = opcoes.map((o) => o.trim()).filter(Boolean);
+  const podeSubmeter = texto.trim() && opcoesValidas.length >= 2;
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!podeSubmeter) return;
+    onSave({ texto: texto.trim(), opcoes: opcoesValidas });
+  };
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-2">
+      <input value={texto} onChange={(e) => setTexto(e.target.value)} className={inputCls} />
+      <OpcoesEditor opcoes={opcoes} setOpcoes={setOpcoes} />
+      <div className="flex gap-2">
+        <button type="submit" disabled={!podeSubmeter} className="text-xs px-3 py-1.5 rounded-md bg-[#EA5B13] hover:bg-[#FF6B1A] disabled:opacity-40 text-[#14181F] font-medium">
+          Guardar
+        </button>
+        <button type="button" onClick={onCancel} className="text-xs px-3 py-1.5 rounded-md text-[#8A93A3] hover:text-[#F2EDE3]">
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function PerguntasSection({ players, perguntas, respostas, onCreate, onFechar, onEditar, onDelete }) {
+  const [texto, setTexto] = useState("");
+  const [opcoes, setOpcoes] = useState(["Sim", "Não"]);
+  const [editingId, setEditingId] = useState(null);
 
   const opcoesValidas = opcoes.map((o) => o.trim()).filter(Boolean);
   const podeSubmeter = texto.trim() && opcoesValidas.length >= 2;
@@ -86,23 +138,7 @@ function PerguntasSection({ players, perguntas, respostas, onCreate, onFechar, o
     <SectionCard title="Perguntas" icon={HelpCircle}>
       <form onSubmit={submit} className="flex flex-col gap-2 mb-4 pb-4 border-b border-[#2E3644]">
         <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ex: Treino extra sexta-feira às 16h?" className={inputCls} />
-        <Field label="Opções de resposta (como nas sondagens do WhatsApp)">
-          <div className="flex flex-col gap-1.5">
-            {opcoes.map((op, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                <input value={op} onChange={(e) => alterarOpcao(i, e.target.value)} placeholder={`Opção ${i + 1}`} className={inputCls} />
-                {opcoes.length > 2 && (
-                  <button type="button" onClick={() => removerOpcao(i)} title="Remover opção" className="p-1.5 rounded hover:bg-[#D64545]/20 text-[#8A93A3] hover:text-[#D64545] shrink-0">
-                    <Trash2 size={13} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-          <button type="button" onClick={adicionarOpcao} className="flex items-center gap-1 text-xs mt-1.5 text-[#EA5B13] hover:text-[#FF6B1A]">
-            <Plus size={12} /> Adicionar opção
-          </button>
-        </Field>
+        <OpcoesEditor opcoes={opcoes} setOpcoes={setOpcoes} />
         <button type="submit" disabled={!podeSubmeter} className="self-start flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md bg-[#EA5B13] hover:bg-[#FF6B1A] disabled:opacity-40 text-[#14181F] font-medium">
           <Plus size={14} /> Lançar pergunta
         </button>
@@ -115,11 +151,28 @@ function PerguntasSection({ players, perguntas, respostas, onCreate, onFechar, o
             const respostasDaPergunta = respostas.filter((r) => r.perguntaId === q.id);
             const respondidoIds = new Set(respostasDaPergunta.map((r) => r.playerId));
             const porResponder = players.filter((p) => !respondidoIds.has(p.id));
+            if (editingId === q.id) {
+              return (
+                <div key={q.id} className="border border-[#EA5B13]/40 rounded-md p-3">
+                  <PerguntaEditForm
+                    pergunta={q}
+                    onCancel={() => setEditingId(null)}
+                    onSave={(patch) => {
+                      onEditar(q.id, patch);
+                      setEditingId(null);
+                    }}
+                  />
+                </div>
+              );
+            }
             return (
               <div key={q.id} className="border border-[#2E3644] rounded-md p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="text-sm font-medium">{q.texto}</div>
                   <div className="flex gap-1 shrink-0">
+                    <button onClick={() => setEditingId(q.id)} title="Editar pergunta" className="text-[11px] px-2 py-1 rounded border border-[#2E3644] text-[#8A93A3] hover:text-[#F2EDE3] hover:border-[#5A6272]">
+                      Editar
+                    </button>
                     {q.ativa && (
                       <button onClick={() => onFechar(q.id)} title="Fechar pergunta (deixa de aparecer no Espaço Atletas)" className="text-[11px] px-2 py-1 rounded border border-[#2E3644] text-[#8A93A3] hover:text-[#F2EDE3] hover:border-[#5A6272]">
                         Fechar
@@ -275,6 +328,7 @@ function EspacoAtletasView({
   respostas,
   onCreatePergunta,
   onFecharPergunta,
+  onEditarPergunta,
   onDeletePergunta,
   rsvps,
   lesoesReportadas,
@@ -293,7 +347,7 @@ function EspacoAtletasView({
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <AvisosSection avisos={avisos} onCreate={onCreateAviso} onDelete={onDeleteAviso} />
-        <PerguntasSection players={players} perguntas={perguntas} respostas={respostas} onCreate={onCreatePergunta} onFechar={onFecharPergunta} onDelete={onDeletePergunta} />
+        <PerguntasSection players={players} perguntas={perguntas} respostas={respostas} onCreate={onCreatePergunta} onFechar={onFecharPergunta} onEditar={onEditarPergunta} onDelete={onDeletePergunta} />
         <RsvpSection players={players} sessions={sessions} rsvps={rsvps} />
         <LesoesSection players={players} lesoesReportadas={lesoesReportadas} onMarcarRevisto={onMarcarLesaoRevista} onAdicionarAoHistorico={onAdicionarAoHistorico} />
         <MensagensSection players={players} mensagens={mensagens} onMarcarRevisto={onMarcarMensagemRevista} />

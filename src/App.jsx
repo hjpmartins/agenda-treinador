@@ -384,6 +384,15 @@ export default function App() {
     }
   };
 
+  const editarPergunta = async (id, patch) => {
+    try {
+      const updated = await db.updatePergunta(id, patch);
+      setPerguntas(perguntas.map((q) => (q.id === id ? updated : q)));
+    } catch (e) {
+      setError(`Não foi possível editar a pergunta (${e.message || e}).`);
+    }
+  };
+
   const deletePergunta = async (id) => {
     try {
       await db.deletePergunta(id);
@@ -819,6 +828,7 @@ export default function App() {
                   respostas={teamRespostas}
                   onCreatePergunta={createPergunta}
                   onFecharPergunta={fecharPergunta}
+                  onEditarPergunta={editarPergunta}
                   onDeletePergunta={deletePergunta}
                   rsvps={teamRsvps}
                   lesoesReportadas={teamLesoesReportadas}

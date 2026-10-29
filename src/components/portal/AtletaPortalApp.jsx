@@ -5,7 +5,7 @@
 // antes de qualquer lógica do treinador correr.
 
 import { useEffect, useState } from "react";
-import { Loader2, Megaphone, CalendarDays, HeartPulse, MessageCircle, CheckCircle2, Circle, Play, ClipboardList, TrendingUp } from "lucide-react";
+import { Loader2, Megaphone, CalendarDays, HeartPulse, MessageCircle, CheckCircle2, Circle, Play, ClipboardList, TrendingUp, Smartphone } from "lucide-react";
 import * as portalDb from "../../lib/portalDb";
 import { DiagramThumbnail } from "../diagrams/CourtPrimitives";
 import { PlayStudioModal } from "../diagrams/PlayStudioModal";
@@ -388,6 +388,18 @@ function AtletaPortalApp({ token }) {
               </button>
             </form>
           )}
+        </Card>
+
+        <Card title="Guardar este link no telemóvel" icon={Smartphone}>
+          <div className="text-xs text-[#8A93A3] space-y-1.5">
+            <p>
+              Se abriste este link através do WhatsApp (ou de outra app), toca primeiro em <b className="text-[#F2EDE3]">⋯</b> ou no ícone de partilha e escolhe{" "}
+              <b className="text-[#F2EDE3]">"Abrir no Safari"</b>.
+            </p>
+            <p>
+              Só depois, já no Safari, toca em Partilhar e escolhe <b className="text-[#F2EDE3]">"Adicionar ao Ecrã Principal"</b>. A fazer isto a partir do WhatsApp, o atalho não fica bem.
+            </p>
+          </div>
         </Card>
       </div>
       {jogadaAVer && (

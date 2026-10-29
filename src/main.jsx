@@ -14,9 +14,11 @@ const atletaMatch = window.location.pathname.match(/^\/atleta\/([0-9a-f-]{36})\/
 // O manifest.webmanifest da app tem start_url "/" — se uma atleta usar
 // "Adicionar ao ecrã principal" nesta página, o atalho abriria sempre a
 // app do treinador (o start_url do manifest, não a página onde a atleta
-// estava). Troca-se o manifest por um gerado na hora, com start_url/scope
-// presos a este link exato, e o título/nome por "Espaço Atletas", antes de
-// o telemóvel poder propor a instalação.
+// estava). Troca-se o manifest por um devolvido pela função de servidor
+// api/atleta-manifest.js, com start_url/scope presos a este link exato —
+// tem de ser um URL http real (não um blob: gerado no browser): no Safari
+// do iPhone um blob: não é lido corretamente ao instalar o atalho, e o
+// manifest antigo (start_url "/") acaba por ser usado na mesma.
 if (atletaMatch) {
   document.title = "Espaço Atletas";
   const appleTitle = document.createElement("meta");
@@ -28,20 +30,8 @@ if (atletaMatch) {
   appleCapable.setAttribute("content", "yes");
   document.head.appendChild(appleCapable);
 
-  const manifest = {
-    name: "Espaço Atletas",
-    short_name: "Atletas",
-    description: "O teu espaço pessoal: avisos, treinos, convocatórias e evolução.",
-    start_url: window.location.pathname,
-    scope: window.location.pathname,
-    display: "standalone",
-    background_color: "#14181F",
-    theme_color: "#14181F",
-    icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }],
-  };
-  const manifestBlob = new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" });
   const manifestLink = document.querySelector('link[rel="manifest"]');
-  if (manifestLink) manifestLink.setAttribute("href", URL.createObjectURL(manifestBlob));
+  if (manifestLink) manifestLink.setAttribute("href", `/api/atleta-manifest?token=${atletaMatch[1]}`);
 }
 
 createRoot(document.getElementById("root")).render(

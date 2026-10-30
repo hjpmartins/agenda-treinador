@@ -38,6 +38,45 @@ function drawCone(ctx, x, y) {
   ctx.stroke();
 }
 
+function drawConeAlto(ctx, x, y) {
+  ctx.fillStyle = "#F2C744";
+  ctx.strokeStyle = "#14181F";
+  ctx.lineWidth = 1;
+  const w = 5;
+  const h = 20;
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2, y - h / 2, w, h, w / 2);
+  ctx.fill();
+  ctx.stroke();
+}
+
+function drawCirculo(ctx, x, y) {
+  ctx.strokeStyle = "#4FB0C6";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(x, y, 9, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function drawQuadrado(ctx, x, y) {
+  ctx.strokeStyle = "#4FB0C6";
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(x - 8, y - 8, 16, 16);
+}
+
+function drawEscada(ctx, x, y) {
+  ctx.strokeStyle = "#4FB0C6";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x - 22, y - 7, 44, 14);
+  ctx.lineWidth = 1.5;
+  [-14.5, -7, 0, 7, 14.5].forEach((rx) => {
+    ctx.beginPath();
+    ctx.moveTo(x + rx, y - 7);
+    ctx.lineTo(x + rx, y + 7);
+    ctx.stroke();
+  });
+}
+
 // Tampo das fichas (jogadora/defesa/treinador) desenhado numa textura à parte
 // (courtCanvas.js) e colado aqui em cima, já no sítio certo — mesma imagem
 // usada na vista 3D, só que achatada sobre o campo em vez de num cilindro.
@@ -62,6 +101,10 @@ function drawTokenTop(ctx, cache, token) {
 function drawToken(ctx, cache, token) {
   if (token.type === "ball") return drawBall(ctx, token.x, token.y);
   if (token.type === "cone") return drawCone(ctx, token.x, token.y);
+  if (token.type === "cone_alto") return drawConeAlto(ctx, token.x, token.y);
+  if (token.type === "circulo") return drawCirculo(ctx, token.x, token.y);
+  if (token.type === "quadrado") return drawQuadrado(ctx, token.x, token.y);
+  if (token.type === "escada") return drawEscada(ctx, token.x, token.y);
   drawTokenTop(ctx, cache, token);
 }
 

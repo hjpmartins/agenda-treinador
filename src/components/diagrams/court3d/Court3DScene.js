@@ -30,6 +30,9 @@ const COLORS = {
   red: "#D64545",
 };
 
+// Material de treino: fichas de posição sem "frente", não rodam com a câmara.
+const STATIC_PROP_TYPES = new Set(["cone", "cone_alto", "circulo", "quadrado", "escada"]);
+
 const SLAB_T = 6; // espessura do "estrado" do campo
 const STEP_SECONDS = 1.3; // igual ao leitor 2D (1300 ms)
 const PAUSE_SECONDS = 0.45;
@@ -180,6 +183,69 @@ function createTokenMesh(token) {
     [cone, base, stripe].forEach((m) => {
       m.castShadow = true;
       g.add(m);
+    });
+    return { object: g, topMat: null };
+  }
+  if (type === "cone_alto") {
+    const g = new THREE.Group();
+    const yellow = new THREE.MeshStandardMaterial({ color: "#F2C744", roughness: 0.5 });
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 34, 16), yellow);
+    pole.position.y = 17;
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 1.4, 20), yellow);
+    base.position.y = 0.7;
+    const stripe = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.75, 2, 16), new THREE.MeshStandardMaterial({ color: "#F2EDE3", roughness: 0.4 }));
+    stripe.position.y = 22;
+    [pole, base, stripe].forEach((m) => {
+      m.castShadow = true;
+      g.add(m);
+    });
+    return { object: g, topMat: null };
+  }
+  if (type === "circulo" || type === "quadrado") {
+    const g = new THREE.Group();
+    const teal = new THREE.MeshStandardMaterial({ color: "#4FB0C6", roughness: 0.6, emissive: "#4FB0C6", emissiveIntensity: 0.15 });
+    const geo =
+      type === "circulo"
+        ? new THREE.RingGeometry(8, 9.6, 36)
+        : (() => {
+            const shape = new THREE.Shape();
+            const o = 9.6,
+              i = 8;
+            shape.moveTo(-o, -o);
+            shape.lineTo(o, -o);
+            shape.lineTo(o, o);
+            shape.lineTo(-o, o);
+            shape.lineTo(-o, -o);
+            const hole = new THREE.Path();
+            hole.moveTo(-i, -i);
+            hole.lineTo(i, -i);
+            hole.lineTo(i, i);
+            hole.lineTo(-i, i);
+            hole.lineTo(-i, -i);
+            shape.holes.push(hole);
+            return new THREE.ShapeGeometry(shape);
+          })();
+    const mesh = new THREE.Mesh(geo, teal);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.3;
+    g.add(mesh);
+    return { object: g, topMat: null };
+  }
+  if (type === "escada") {
+    const g = new THREE.Group();
+    const teal = new THREE.MeshStandardMaterial({ color: "#4FB0C6", roughness: 0.6 });
+    const rail = (z) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(44, 0.8, 1.6), teal);
+      m.position.set(0, 0.4, z);
+      m.castShadow = true;
+      return m;
+    };
+    g.add(rail(-7), rail(7));
+    [-14.5, -7, 0, 7, 14.5].forEach((rx) => {
+      const rung = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.8, 14), teal);
+      rung.position.set(rx, 0.4, 0);
+      rung.castShadow = true;
+      g.add(rung);
     });
     return { object: g, topMat: null };
   }
@@ -1061,7 +1127,7 @@ class Court3DScene {
       obj.position.set(p.x, 0, p.z);
       // A tampa do cilindro tem o "cima" da textura ao longo de +x; o tampo
       // do treinador (plano deitado) tem-no ao longo de -z.
-      obj.rotation.y = tk.type === "cone" ? 0 : tk.type === "treinador" ? yaw : yaw + Math.PI / 2;
+      obj.rotation.y = STATIC_PROP_TYPES.has(tk.type) ? 0 : tk.type === "treinador" ? yaw : yaw + Math.PI / 2;
       obj.visible = true;
       seen.add(tk.id);
     });

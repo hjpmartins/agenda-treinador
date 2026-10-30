@@ -37,6 +37,21 @@ function svgTokenStr(token) {
   if (type === "cone") {
     return `<g transform="translate(${x} ${y})"><path d="M 0 -9 L 8 8 L -8 8 Z" fill="#E0A800" stroke="#14181F" stroke-width="1" stroke-linejoin="round"/></g>`;
   }
+  if (type === "cone_alto") {
+    return `<g transform="translate(${x} ${y})"><rect x="-2.5" y="-10" width="5" height="20" rx="2.5" fill="#E0A800" stroke="#14181F" stroke-width="1"/></g>`;
+  }
+  if (type === "circulo") {
+    return `<g transform="translate(${x} ${y})"><circle r="9" fill="none" stroke="#2E96AD" stroke-width="2.5"/></g>`;
+  }
+  if (type === "quadrado") {
+    return `<g transform="translate(${x} ${y})"><rect x="-8" y="-8" width="16" height="16" fill="none" stroke="#2E96AD" stroke-width="2.5"/></g>`;
+  }
+  if (type === "escada") {
+    const rungs = [-14.5, -7, 0, 7, 14.5]
+      .map((rx) => `<line x1="${rx}" y1="-7" x2="${rx}" y2="7" stroke="#2E96AD" stroke-width="1.5"/>`)
+      .join("");
+    return `<g transform="translate(${x} ${y})"><rect x="-22" y="-7" width="44" height="14" fill="none" stroke="#2E96AD" stroke-width="2"/>${rungs}</g>`;
+  }
   if (type === "treinador") {
     return `<g transform="translate(${x} ${y})"><rect x="-10" y="-10" width="20" height="20" rx="3" fill="#fff" stroke="#14181F" stroke-width="1.5"/><text text-anchor="middle" dy="4" font-size="11" fill="#14181F" font-family="Arial" font-weight="700">T</text></g>`;
   }

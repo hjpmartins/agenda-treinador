@@ -73,6 +73,38 @@ function TokenShape({ token, onMouseDown, selected }) {
       </g>
     );
   }
+  if (type === "cone_alto") {
+    return (
+      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
+        <rect x="-2.5" y="-10" width="5" height="20" rx="2.5" fill="#F2C744" stroke={selected ? "#F2EDE3" : "#14181F"} strokeWidth={selected ? 2 : 1} />
+      </g>
+    );
+  }
+  if (type === "circulo") {
+    return (
+      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
+        <circle r="9" fill="none" stroke={selected ? "#F2EDE3" : "#4FB0C6"} strokeWidth="2.5" />
+      </g>
+    );
+  }
+  if (type === "quadrado") {
+    return (
+      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
+        <rect x="-8" y="-8" width="16" height="16" fill="none" stroke={selected ? "#F2EDE3" : "#4FB0C6"} strokeWidth="2.5" />
+      </g>
+    );
+  }
+  if (type === "escada") {
+    const stroke = selected ? "#F2EDE3" : "#4FB0C6";
+    return (
+      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
+        <rect x="-22" y="-7" width="44" height="14" fill="none" stroke={stroke} strokeWidth="2" />
+        {[-14.5, -7, 0, 7, 14.5].map((rx) => (
+          <line key={rx} x1={rx} y1="-7" x2={rx} y2="7" stroke={stroke} strokeWidth="1.5" />
+        ))}
+      </g>
+    );
+  }
   if (type === "treinador") {
     return (
       <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>

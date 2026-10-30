@@ -7,6 +7,10 @@ const TOKENS = [
   { type: "defense", label: "Defesa", swatch: "border-2 border-dashed border-[#D64545]" },
   { type: "ball", label: "Bola", swatch: "bg-[#E2581A] w-2.5 h-2.5" },
   { type: "cone", label: "Cone", swatch: "bg-[#F2C744] [clip-path:polygon(50%_0,100%_100%,0_100%)]" },
+  { type: "cone_alto", label: "Cone alto", swatch: "bg-[#F2C744] [clip-path:polygon(40%_0,60%_0,60%_100%,40%_100%)]" },
+  { type: "circulo", label: "Círculo", swatch: "border-2 border-[#4FB0C6]" },
+  { type: "quadrado", label: "Quadrado", swatch: "border-2 border-[#4FB0C6] rounded-[2px]" },
+  { type: "escada", label: "Escada", swatch: "border-2 border-[#4FB0C6] rounded-[1px] w-4" },
   { type: "treinador", label: "Treinador", swatch: "bg-[#F2EDE3] rounded-[2px]" },
 ];
 

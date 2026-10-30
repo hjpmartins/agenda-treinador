@@ -13,6 +13,9 @@ const BALL_R = 5.5;
 const PUCK_H = 4.5;
 const PUCK_R = 9; // raio das fichas das jogadoras (o 2D usa 12; aqui um pouco menores)
 const RIM_H = 61; // 3,05 m com o campo de 15 m = 300 unidades.
+// Material de treino: não tem o modelo "puck" genérico, por isso não entra
+// no cálculo de altura da bola quando passa por cima de uma ficha.
+const STATIC_PROP_TYPES = new Set(["cone", "cone_alto", "circulo", "quadrado", "escada"]);
 
 // Cestos em coordenadas do diagrama (mesma posição do ponto em HalfMarkings).
 function rimPositions(court, vb) {
@@ -132,7 +135,7 @@ function sampleBall(diagram, ballTk, driver, positions, t, te, vb) {
   // sobrepostas) em vez de atravessá-la.
   let restH = BALL_R;
   diagram.tokens.forEach((tk) => {
-    if (tk.type === "ball" || tk.type === "cone") return;
+    if (tk.type === "ball" || STATIC_PROP_TYPES.has(tk.type)) return;
     const p = positions[tk.id];
     const d = Math.hypot(p.x - x, p.y - y);
     restH = Math.max(restH, BALL_R + PUCK_H * smoothstep(PUCK_R + BALL_R * 0.6, PUCK_R * 0.6, d));

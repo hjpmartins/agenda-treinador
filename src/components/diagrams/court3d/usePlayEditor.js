@@ -9,6 +9,9 @@ import { HALF_VB, FULL_VB } from "../../../data";
 import { uid, distPt, emptyDiagram, defaultControlPoint, resolveFinalDiagram, positionOnArrow, hasWaypoints} from "../../../utils";
 
 const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible", "handoff", "ressalto"]);
+// Material de treino (cones, marcadores, escada de agilidade): fichas de
+// posição, nunca alvo de passe/drible nem portadoras de bola.
+const STATIC_PROP_TYPES = new Set(["cone", "cone_alto", "circulo", "quadrado", "escada"]);
 // Em touch (sem cursor a passar por cima antes de tocar, dedo bem mais
 // largo que um ponteiro de rato) é fácil tocar uns milímetros ao lado da
 // ficha pretendida — sobretudo com a bola mesmo em cima/ao lado da jogadora
@@ -254,7 +257,7 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     let best = null;
     let bestD = SNAP_DIST + 4;
     step.tokens.forEach((t) => {
-      if (t.type === "ball" || t.type === "cone" || t.id === ballId) return;
+      if (t.type === "ball" || STATIC_PROP_TYPES.has(t.type) || t.id === ballId) return;
       const end = movementEnd(step, t.id) || { x: t.x, y: t.y };
       const d = Math.min(distPt(t, pt), distPt(end, pt));
       if (d < bestD) {
@@ -296,7 +299,7 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
     let best = null;
     let bestD = 24;
     step.tokens.forEach((t) => {
-      if (t.type === "ball" || t.type === "cone") return;
+      if (t.type === "ball" || STATIC_PROP_TYPES.has(t.type)) return;
       const d = distPt(t, ball);
       if (d < bestD) {
         best = t;

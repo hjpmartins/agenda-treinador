@@ -81,26 +81,29 @@ function TokenShape({ token, onMouseDown, selected }) {
     );
   }
   if (type === "circulo") {
+    const scale = token.size || 1;
     return (
-      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
-        <circle r="9" fill="none" stroke={selected ? "#F2EDE3" : "#4FB0C6"} strokeWidth="2.5" />
+      <g transform={`translate(${x} ${y}) scale(${scale})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
+        <circle r="9" fill="none" stroke={selected ? "#F2EDE3" : "#4FB0C6"} strokeWidth={2.5 / scale} />
       </g>
     );
   }
   if (type === "quadrado") {
+    const scale = token.size || 1;
     return (
-      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
-        <rect x="-8" y="-8" width="16" height="16" fill="none" stroke={selected ? "#F2EDE3" : "#4FB0C6"} strokeWidth="2.5" />
+      <g transform={`translate(${x} ${y}) scale(${scale})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
+        <rect x="-8" y="-8" width="16" height="16" fill="none" stroke={selected ? "#F2EDE3" : "#4FB0C6"} strokeWidth={2.5 / scale} />
       </g>
     );
   }
   if (type === "escada") {
     const stroke = selected ? "#F2EDE3" : "#4FB0C6";
+    const scale = token.size || 1;
     return (
-      <g transform={`translate(${x} ${y})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
-        <rect x="-22" y="-7" width="44" height="14" fill="none" stroke={stroke} strokeWidth="2" />
+      <g transform={`translate(${x} ${y}) scale(${scale})`} onMouseDown={onMouseDown} onTouchStart={onMouseDown} style={{ cursor: "grab" }}>
+        <rect x="-22" y="-7" width="44" height="14" fill="none" stroke={stroke} strokeWidth={2 / scale} />
         {[-14.5, -7, 0, 7, 14.5].map((rx) => (
-          <line key={rx} x1={rx} y1="-7" x2={rx} y2="7" stroke={stroke} strokeWidth="1.5" />
+          <line key={rx} x1={rx} y1="-7" x2={rx} y2="7" stroke={stroke} strokeWidth={1.5 / scale} />
         ))}
       </g>
     );

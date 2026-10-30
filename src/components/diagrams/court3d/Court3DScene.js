@@ -32,6 +32,10 @@ const COLORS = {
 
 // Material de treino: fichas de posição sem "frente", não rodam com a câmara.
 const STATIC_PROP_TYPES = new Set(["cone", "cone_alto", "circulo", "quadrado", "escada"]);
+// Tamanho ajustável (token.size, pega de redimensionar — ver usePlayEditor.js):
+// escalado em tempo real a cada frame, não faz parte da geometria base, para
+// não ter de reconstruir a malha a cada arrasto.
+const RESIZABLE_TYPES = new Set(["circulo", "quadrado", "escada"]);
 
 const SLAB_T = 6; // espessura do "estrado" do campo
 const STEP_SECONDS = 1.3; // igual ao leitor 2D (1300 ms)
@@ -1128,6 +1132,10 @@ class Court3DScene {
       // A tampa do cilindro tem o "cima" da textura ao longo de +x; o tampo
       // do treinador (plano deitado) tem-no ao longo de -z.
       obj.rotation.y = STATIC_PROP_TYPES.has(tk.type) ? 0 : tk.type === "treinador" ? yaw : yaw + Math.PI / 2;
+      if (RESIZABLE_TYPES.has(tk.type)) {
+        const s = tk.size || 1;
+        obj.scale.set(s, 1, s);
+      }
       obj.visible = true;
       seen.add(tk.id);
     });

@@ -12,6 +12,13 @@ const CURVABLE_TYPES = new Set(["passe", "corte", "lancamento", "drible", "hando
 // Material de treino (cones, marcadores, escada de agilidade): fichas de
 // posição, nunca alvo de passe/drible nem portadoras de bola.
 const STATIC_PROP_TYPES = new Set(["cone", "cone_alto", "circulo", "quadrado", "escada"]);
+// Círculo, quadrado e escada têm tamanho ajustável (token.size, 1 = tamanho
+// de origem) — a pega de redimensionar fica a esta distância do centro
+// quando size = 1 (ver o mesmo raio/metade-do-lado em CourtPrimitives.jsx,
+// Court3DScene.js, diagramFrameRenderer.js e print/index.js).
+const RESIZABLE_BASE = { circulo: 9, quadrado: 8, escada: 22 };
+const MIN_SIZE = 0.4;
+const MAX_SIZE = 3;
 // Em touch (sem cursor a passar por cima antes de tocar, dedo bem mais
 // largo que um ponteiro de rato) é fácil tocar uns milímetros ao lado da
 // ficha pretendida — sobretudo com a bola mesmo em cima/ao lado da jogadora
@@ -82,6 +89,14 @@ function arrowHandles(a) {
     return [{ kind: "control", x: c.x, y: c.y }];
   }
   return [];
+}
+
+// Pega de redimensionar da ficha selecionada (círculo/quadrado/escada):
+// um ponto a leste do centro, à distância que corresponde ao tamanho atual.
+function tokenHandles(t) {
+  const base = t && RESIZABLE_BASE[t.type];
+  if (!base) return [];
+  return [{ kind: "resize", x: t.x + base * (t.size || 1), y: t.y }];
 }
 
 // Para onde se desloca uma ficha neste passo (fim da sua seta de corte,
@@ -220,9 +235,10 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
   }, [steps, drawing, idx, sceneRef, editable]);
 
   const selectedArrow = step.arrows.find((a) => a.id === selectedId);
+  const selectedToken = step.tokens.find((t) => t.id === selectedId);
   // As pegas da seta selecionada aparecem em qualquer ação (logo depois de
   // desenhar a seta, por exemplo), não só em "Mover".
-  const handles = enabled && !drawing ? arrowHandles(selectedArrow) : [];
+  const handles = enabled && !drawing ? [...arrowHandles(selectedArrow), ...tokenHandles(selectedToken)] : [];
   const handlesKey = JSON.stringify(handles);
 
   useEffect(() => {
@@ -392,6 +408,7 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         if (h) {
           commit((l) => l);
           if (h.kind === "control") dragRef.current = { kind: "control", id: selectedId };
+          else if (h.kind === "resize") dragRef.current = { kind: "resize", id: selectedId };
           else {
             // Seta sem pontos gravados: grava os dois de omissão antes de arrastar.
             updateArrow(selectedId, (a) => (hasWaypoints(a) ? a : { ...a, waypoints: defaultWaypoints(a), control: undefined }), true);
@@ -456,6 +473,13 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         replaceCurrent(updateStep((d) => ({ ...d, tokens: d.tokens.map((t) => (t.id === drag.id ? { ...t, x, y } : t)) })));
       } else if (drag?.kind === "control") {
         updateArrow(drag.id, (a) => ({ ...a, control: pt }), true);
+      } else if (drag?.kind === "resize") {
+        const tk = step.tokens.find((t) => t.id === drag.id);
+        const base = tk && RESIZABLE_BASE[tk.type];
+        if (base) {
+          const size = Math.max(MIN_SIZE, Math.min(MAX_SIZE, distPt(tk, pt) / base));
+          replaceCurrent(updateStep((d) => ({ ...d, tokens: d.tokens.map((t) => (t.id === drag.id ? { ...t, size } : t)) })));
+        }
       } else if (drag?.kind === "wp") {
         updateArrow(drag.id, (a) => ({ ...a, waypoints: a.waypoints.map((w, i) => (i === drag.index ? { x: pt.x, y: pt.y } : w)) }), true);
       } else if (drawing) {

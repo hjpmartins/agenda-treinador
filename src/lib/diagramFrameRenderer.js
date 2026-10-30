@@ -50,29 +50,29 @@ function drawConeAlto(ctx, x, y) {
   ctx.stroke();
 }
 
-function drawCirculo(ctx, x, y) {
+function drawCirculo(ctx, x, y, size = 1) {
   ctx.strokeStyle = "#4FB0C6";
   ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.arc(x, y, 9, 0, Math.PI * 2);
+  ctx.arc(x, y, 9 * size, 0, Math.PI * 2);
   ctx.stroke();
 }
 
-function drawQuadrado(ctx, x, y) {
+function drawQuadrado(ctx, x, y, size = 1) {
   ctx.strokeStyle = "#4FB0C6";
   ctx.lineWidth = 2.5;
-  ctx.strokeRect(x - 8, y - 8, 16, 16);
+  ctx.strokeRect(x - 8 * size, y - 8 * size, 16 * size, 16 * size);
 }
 
-function drawEscada(ctx, x, y) {
+function drawEscada(ctx, x, y, size = 1) {
   ctx.strokeStyle = "#4FB0C6";
   ctx.lineWidth = 2;
-  ctx.strokeRect(x - 22, y - 7, 44, 14);
+  ctx.strokeRect(x - 22 * size, y - 7 * size, 44 * size, 14 * size);
   ctx.lineWidth = 1.5;
   [-14.5, -7, 0, 7, 14.5].forEach((rx) => {
     ctx.beginPath();
-    ctx.moveTo(x + rx, y - 7);
-    ctx.lineTo(x + rx, y + 7);
+    ctx.moveTo(x + rx * size, y - 7 * size);
+    ctx.lineTo(x + rx * size, y + 7 * size);
     ctx.stroke();
   });
 }
@@ -102,9 +102,9 @@ function drawToken(ctx, cache, token) {
   if (token.type === "ball") return drawBall(ctx, token.x, token.y);
   if (token.type === "cone") return drawCone(ctx, token.x, token.y);
   if (token.type === "cone_alto") return drawConeAlto(ctx, token.x, token.y);
-  if (token.type === "circulo") return drawCirculo(ctx, token.x, token.y);
-  if (token.type === "quadrado") return drawQuadrado(ctx, token.x, token.y);
-  if (token.type === "escada") return drawEscada(ctx, token.x, token.y);
+  if (token.type === "circulo") return drawCirculo(ctx, token.x, token.y, token.size || 1);
+  if (token.type === "quadrado") return drawQuadrado(ctx, token.x, token.y, token.size || 1);
+  if (token.type === "escada") return drawEscada(ctx, token.x, token.y, token.size || 1);
   drawTokenTop(ctx, cache, token);
 }
 

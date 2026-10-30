@@ -1,3 +1,7 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/atleta/:token", "destination": "/api/atleta-page?token=:token" },
+    { "source": "/atleta/:token/", "destination": "/api/atleta-page?token=:token" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

@@ -11,28 +11,12 @@ import "./index.css";
 // treinador a correr. Qualquer outro caminho continua a app normal.
 const atletaMatch = window.location.pathname.match(/^\/atleta\/([0-9a-f-]{36})\/?$/i);
 
-// O manifest.webmanifest da app tem start_url "/" — se uma atleta usar
-// "Adicionar ao ecrã principal" nesta página, o atalho abriria sempre a
-// app do treinador (o start_url do manifest, não a página onde a atleta
-// estava). Troca-se o manifest por um devolvido pela função de servidor
-// api/atleta-manifest.js, com start_url/scope presos a este link exato —
-// tem de ser um URL http real (não um blob: gerado no browser): no Safari
-// do iPhone um blob: não é lido corretamente ao instalar o atalho, e o
-// manifest antigo (start_url "/") acaba por ser usado na mesma.
-if (atletaMatch) {
-  document.title = "Espaço Atletas";
-  const appleTitle = document.createElement("meta");
-  appleTitle.setAttribute("name", "apple-mobile-web-app-title");
-  appleTitle.setAttribute("content", "Espaço Atletas");
-  document.head.appendChild(appleTitle);
-  const appleCapable = document.createElement("meta");
-  appleCapable.setAttribute("name", "apple-mobile-web-app-capable");
-  appleCapable.setAttribute("content", "yes");
-  document.head.appendChild(appleCapable);
-
-  const manifestLink = document.querySelector('link[rel="manifest"]');
-  if (manifestLink) manifestLink.setAttribute("href", `/api/atleta-manifest?token=${atletaMatch[1]}`);
-}
+// O <title> e o <link rel="manifest"> certos para esta rota (presos ao
+// link exato da atleta, para "Adicionar ao Ecrã Principal" no iPhone
+// funcionar bem) já vêm no próprio HTML servido por api/atleta-page.js —
+// ver vercel.json. Trocar isto aqui por JavaScript (tentado antes) não
+// chega: o iOS lê o HTML tal como veio do servidor, sem esperar que o
+// JavaScript da página corra.
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

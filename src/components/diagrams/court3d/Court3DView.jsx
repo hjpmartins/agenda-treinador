@@ -17,6 +17,7 @@ import {
 import { Court3DScene } from "./Court3DScene";
 import { usePlayEditor } from "./usePlayEditor";
 import { EditToolbar } from "./EditToolbar";
+import { ScrollRow } from "./ScrollRow";
 
 const SPEEDS = [0.5, 1, 1.5, 2];
 
@@ -27,7 +28,7 @@ function IconBtn({ onClick, title, active, children, className = "" }) {
       onClick={onClick}
       title={title}
       aria-label={title}
-      className={`w-9 h-9 flex items-center justify-center rounded-md border backdrop-blur-md transition-colors ${
+      className={`w-9 h-9 shrink-0 [scroll-snap-align:start] flex items-center justify-center rounded-md border backdrop-blur-md transition-colors ${
         active
           ? "bg-[#EA5B13] border-[#EA5B13] text-[#14181F]"
           : "bg-[#1E242E]/80 border-[#2E3644] text-[#F2EDE3] hover:border-[#EA5B13] hover:text-[#FF6B1A]"
@@ -158,21 +159,21 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
       {/* Título + passos + câmara: linha própria, fora do campo (não é um
           overlay por cima do canvas) — tal como a reprodução, para o campo
           inteiro ficar livre para arrastar fichas, sem o encolher. */}
-      <div className="shrink-0 px-3 py-2 flex items-center justify-between gap-3 flex-wrap border-b border-[#2E3644] bg-[#1E242E]">
-        <div className="min-w-0">
+      <div className="shrink-0 px-3 py-2 flex items-center gap-3 border-b border-[#2E3644] bg-[#1E242E]">
+        <div className="min-w-0 shrink-0">
           {title && (
-            <div style={{ fontFamily: "'Oswald', sans-serif" }} className="uppercase tracking-wider text-sm text-[#F2EDE3] truncate">
+            <div style={{ fontFamily: "'Oswald', sans-serif" }} className="uppercase tracking-wider text-sm text-[#F2EDE3] truncate max-w-[30vw]">
               {title}
             </div>
           )}
           <div className="flex items-center gap-2 mt-0.5">
-            <span style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-[11px] text-[#8A93A3]">
+            <span style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-[11px] text-[#8A93A3] whitespace-nowrap">
               PASSO <span className="text-[#F2EDE3]">{st.stepIndex + 1}</span>/{st.stepCount}
             </span>
           </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-1.5">
-          <div className="flex rounded-md border border-[#2E3644] bg-[#14181F] p-0.5" style={{ fontFamily: "'Oswald', sans-serif" }}>
+        <ScrollRow className="gap-1.5 flex-1 min-w-0">
+          <div className="flex rounded-md border border-[#2E3644] bg-[#14181F] p-0.5 shrink-0 [scroll-snap-align:start]" style={{ fontFamily: "'Oswald', sans-serif" }}>
             {["2d", "3d"].map((m) => (
               <button
                 key={m}
@@ -207,7 +208,7 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
           <IconBtn onClick={toggleFullscreen} title={fullscreen ? "Sair de ecrã inteiro" : "Ecrã inteiro"}>
             {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </IconBtn>
-        </div>
+        </ScrollRow>
       </div>
 
       <div className="relative flex-1 min-h-[200px]">

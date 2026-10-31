@@ -1,5 +1,4 @@
 import { Directory, File, Paths } from 'expo-file-system';
-import { sessionsToPrune } from '../lib/retention';
 
 /** Um clip que já está guardado no tablet. */
 export type ReceivedClip = {
@@ -97,18 +96,8 @@ export function destinationFor(sessionId: string, clipId: string): File {
 }
 
 export function addReceived(clip: ReceivedClip) {
-  const all = [...listReceived().filter((c) => c.id !== clip.id), clip];
-  // Ficam só os últimos jogos: os mais antigos são apagados quando chega um clip de um jogo novo.
-  const prune = new Set(sessionsToPrune(all));
-  for (const sessionId of prune) {
-    try {
-      const d = sessionDirFor(sessionId);
-      if (d.exists) d.delete();
-    } catch {
-      // ignora
-    }
-  }
-  save(all.filter((c) => !prune.has(c.sessionId)));
+  // Os jogos ficam até o treinador os apagar.
+  save([...listReceived().filter((c) => c.id !== clip.id), clip]);
 }
 
 export function deleteReceived(id: string) {
@@ -121,13 +110,33 @@ export function deleteReceived(id: string) {
       // já não existe
     }
   }
+  rememberDeleted([id]);
+  save(listReceived().filter((c) => c.id !== id));
+}
+
+/** Não voltar a copiar estes clips do telemóvel. */
+function rememberDeleted(ids: string[]) {
   const d = deleted();
-  d.add(id);
+  ids.forEach((id) => d.add(id));
   try {
     ensureDir();
-    deletedFile().write(JSON.stringify([...d].slice(-500)));
+    deletedFile().write(JSON.stringify([...d].slice(-5000)));
   } catch {
     // não é crítico
   }
-  save(listReceived().filter((c) => c.id !== id));
+}
+
+/** Apaga do tablet todos os clips de um jogo. */
+export function deleteReceivedSession(sessionId: string) {
+  const ids = listReceived()
+    .filter((c) => c.sessionId === sessionId)
+    .map((c) => c.id);
+  try {
+    const dir = sessionDirFor(sessionId);
+    if (dir.exists) dir.delete();
+  } catch {
+    // ignora
+  }
+  rememberDeleted(ids);
+  save(listReceived().filter((c) => c.sessionId !== sessionId));
 }

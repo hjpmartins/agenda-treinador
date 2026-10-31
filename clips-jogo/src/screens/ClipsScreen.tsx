@@ -10,11 +10,11 @@ import { MotivePicker } from '../components/MotivePicker';
 import { toneBackground, ToneToggle } from '../components/Tone';
 import { ClipTitle, TitleEditor } from '../components/TitleEditor';
 import { groupByMotive, groupByPlayer, playerLabel, type Player } from '../lib/annotations';
-import { KEEP_GAMES, nextToPrune } from '../lib/retention';
 import { absorbBarTags, allNotes, getMotives, getNotes, getRoster, setNotes, useNotesVersion } from '../remote/notesStore';
 import { Button, Card } from '../components/ui';
 import {
   deleteReceived,
+  deleteReceivedSession,
   listReceived,
   subscribeReceived,
   type ReceivedClip,
@@ -65,11 +65,6 @@ export function ClipsScreen({ onBack }: Props) {
     setSelected(null);
     shareMany(items, `Clips (${items.length})`).catch((e) => Alert.alert('Erro', e instanceof Error ? e.message : String(e)));
   };
-  const phoneNextToPrune = nextToPrune(
-    (sessions ?? [])
-      .filter((x) => x.status !== 'recording' && x.status !== 'finalizing')
-      .map((x) => ({ sessionId: x.id, createdAtMs: x.startedAtMs }))
-  );
   useEffect(() => subscribeReceived(setReceived), []);
   // Motivos escolhidos na barra flutuante que ainda não foram registados.
   useEffect(() => absorbBarTags(), []);
@@ -167,13 +162,19 @@ export function ClipsScreen({ onBack }: Props) {
                     { text: 'Apagar', style: 'destructive', onPress: () => deleteReceived(c.id) },
                   ])
                 }
+                onDeleteGame={(sessionId, count) =>
+                  Alert.alert('Apagar este jogo do tablet?', `Apaga os ${count} clips deste jogo do tablet (o que está no telemóvel não muda).`, [
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Apagar jogo', style: 'destructive', onPress: () => deleteReceivedSession(sessionId) },
+                  ])
+                }
               />
             ) : null
           }
           keyExtractor={(s) => s.id}
           ListFooterComponent={
             <Text style={[styles.muted, { textAlign: 'center' }]}>
-              Ficam guardados os últimos {KEEP_GAMES} jogos. Para guardar um vídeo, usa Galeria ou Partilhar.
+              Os jogos ficam guardados até os apagares. Para guardar um vídeo fora da app, usa Galeria ou Partilhar.
             </Text>
           }
           contentContainerStyle={{ gap: space(2), paddingBottom: space(4) }}
@@ -191,7 +192,6 @@ export function ClipsScreen({ onBack }: Props) {
                 ) : null}
               </View>
 
-              {phoneNextToPrune === s.id ? <PruneWarning /> : null}
 
               {s.status === 'interrupted' ? (
                 <View style={styles.warnBox}>
@@ -313,6 +313,7 @@ function ReceivedSection({
   onPlayers,
   onTitle,
   onDelete,
+  onDeleteGame,
 }: {
   clips: ReceivedClip[];
   /** Clips marcados para enviar (null = fora do modo Selecionar). */
@@ -324,11 +325,11 @@ function ReceivedSection({
   onPlayers: (c: ReceivedClip) => void;
   onTitle: (c: ReceivedClip) => void;
   onDelete: (c: ReceivedClip) => void;
+  onDeleteGame: (sessionId: string, count: number) => void;
 }) {
   useNotesVersion();
   const notes = allNotes();
   const toItem = (c: ReceivedClip): AnalysisItem => ({ id: c.id, uri: c.uri, title: c.name });
-  const willPrune = nextToPrune(clips);
   /** Clips de uma jogadora: de um jogo (scope = "jogo de 14/10 21:30") ou de todos os jogos guardados. */
   const [forPlayer, setForPlayer] = useState<{ player: Player; clips: ReceivedClip[]; scope: string } | null>(null);
   const byPlayer = groupByPlayer(
@@ -394,12 +395,13 @@ function ReceivedSection({
                   />
                 );
               })()
-            ) : null}
+            ) : (
+              <Button label="Apagar jogo" variant="ghost" onPress={() => onDeleteGame(sessionId, list.length)} />
+            )}
           </View>
           <Text style={[styles.muted, { marginBottom: space(1) }]}>
             Do {list[0].phone} · {list.length} clip{list.length === 1 ? '' : 's'}
           </Text>
-          {willPrune === sessionId ? <PruneWarning /> : null}
           {groupByMotive(list, notes, getMotives()).length > 0 ? (
             <View style={styles.motiveRow}>
               <Text style={styles.muted}>Ver seguidos:</Text>
@@ -540,16 +542,6 @@ function PlayerClipsModal({
         </Pressable>
       </Pressable>
     </Modal>
-  );
-}
-
-function PruneWarning() {
-  return (
-    <View style={styles.warnBox}>
-      <Text style={styles.warnText}>
-        Será apagado no próximo jogo (ficam só os últimos {KEEP_GAMES}). Guarda na Galeria ou partilha o que quiseres manter.
-      </Text>
-    </View>
   );
 }
 

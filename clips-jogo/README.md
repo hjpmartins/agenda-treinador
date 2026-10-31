@@ -128,9 +128,9 @@ Se o telemóvel não estiver no ecrã Gravar, o tablet diz "Abre o ecrã Gravar 
 - Só dentro da app (telemóvel: `Android/data/pt.clipsjogo.app/files/sessions/`; tablet: memória interna da app).
   Não aparecem na Galeria nem vão para a nuvem.
 - Para guardar um vídeo: **Galeria** (copia para a galeria do aparelho) ou **Partilhar** (WhatsApp, YouTube, Drive…).
-- **Ficam só os últimos 3 jogos**, no telemóvel e no tablet: no fim de cada gravação (telemóvel) ou quando chega o
-  primeiro clip de um jogo novo (tablet), o mais antigo é apagado. Em "Ver gravações e clips", o jogo que vai ser apagado
-  a seguir mostra o aviso **"Será apagado no próximo jogo"**.
+- **Os jogos ficam guardados até os apagares** (sem limite): no telemóvel, "Apagar" em cada gravação; no tablet,
+  **"Apagar jogo"** em cada jogo recebido (ou ✕ num clip). Vai apagando os que já não precisas: um jogo em 1080p ocupa
+  vários GB no telemóvel. Durante a gravação, o Comando avisa quando o espaço no telemóvel começa a faltar.
 - Desinstalar a app ou "Limpar dados" apaga tudo; as atualizações não apagam nada.
 
 ### Som

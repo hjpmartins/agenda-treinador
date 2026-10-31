@@ -152,7 +152,10 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
       {/* Vinheta: escurece os cantos e puxa o olhar para o campo. */}
       <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(5,7,10,0.65) 100%)" }} />
 
-      {/* Topo: título + passos */}
+      {/* Topo: título + passos + câmara — tudo junto, para não ter um bloco de
+          botões a meio do campo (ali é onde se arrasta as fichas: um bloco a
+          meia-altura ou colado ao fundo tapava sítios do campo que, no
+          telemóvel, ficavam impossíveis de tocar para lá colocar algo). */}
       <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-3 pointer-events-none">
         <div className="pointer-events-auto min-w-0">
           {title && (
@@ -166,7 +169,7 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
             </span>
           </div>
         </div>
-        <div className="flex gap-1.5 pointer-events-auto">
+        <div className="flex flex-wrap justify-end gap-1.5 pointer-events-auto max-w-[60%]">
           <div className="flex rounded-md border border-[#2E3644] bg-[#1E242E]/80 backdrop-blur-md p-0.5" style={{ fontFamily: "'Oswald', sans-serif" }}>
             {["2d", "3d"].map((m) => (
               <button
@@ -181,36 +184,35 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
               </button>
             ))}
           </div>
+          <IconBtn onClick={() => s?.rotateBy(Math.PI / 4)} title="Rodar para a esquerda (Q)">
+            <RotateCcw size={16} />
+          </IconBtn>
+          <IconBtn onClick={() => s?.rotateBy(-Math.PI / 4)} title="Rodar para a direita (E)">
+            <RotateCw size={16} />
+          </IconBtn>
+          <IconBtn onClick={() => s?.zoomBy(0.8)} title="Aproximar">
+            <ZoomIn size={16} />
+          </IconBtn>
+          <IconBtn onClick={() => s?.zoomBy(1.25)} title="Afastar">
+            <ZoomOut size={16} />
+          </IconBtn>
+          <IconBtn onClick={() => s?.frame()} title="Enquadrar (F)">
+            <Scan size={16} />
+          </IconBtn>
+          <IconBtn onClick={() => s?.setAutoRotate(!st.autoRotate)} title="Rotação automática" active={st.autoRotate}>
+            <Orbit size={16} />
+          </IconBtn>
           <IconBtn onClick={toggleFullscreen} title={fullscreen ? "Sair de ecrã inteiro" : "Ecrã inteiro"}>
             {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </IconBtn>
         </div>
       </div>
-
-      {/* Lateral: câmara */}
-      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1.5">
-        <IconBtn onClick={() => s?.rotateBy(Math.PI / 4)} title="Rodar para a esquerda (Q)">
-          <RotateCcw size={16} />
-        </IconBtn>
-        <IconBtn onClick={() => s?.rotateBy(-Math.PI / 4)} title="Rodar para a direita (E)">
-          <RotateCw size={16} />
-        </IconBtn>
-        <IconBtn onClick={() => s?.zoomBy(0.8)} title="Aproximar">
-          <ZoomIn size={16} />
-        </IconBtn>
-        <IconBtn onClick={() => s?.zoomBy(1.25)} title="Afastar">
-          <ZoomOut size={16} />
-        </IconBtn>
-        <IconBtn onClick={() => s?.frame()} title="Enquadrar (F)">
-          <Scan size={16} />
-        </IconBtn>
-        <IconBtn onClick={() => s?.setAutoRotate(!st.autoRotate)} title="Rotação automática" active={st.autoRotate}>
-          <Orbit size={16} />
-        </IconBtn>
       </div>
 
-      {/* Fundo: reprodução + inclinação */}
-      <div className="absolute left-3 right-3 bottom-3 flex flex-col gap-2">
+      {/* Reprodução + inclinação: fora do campo (não é mais um overlay por
+          cima do canvas) — fica sempre por baixo, nunca a tapar onde se
+          arrasta as fichas. */}
+      <div className="shrink-0 px-3 py-2 flex flex-col gap-2 border-t border-[#2E3644] bg-[#1E242E]">
         <div className="flex gap-1">
           {Array.from({ length: st.stepCount }).map((_, i) => {
             const fill = i < st.stepIndex ? 1 : i === st.stepIndex ? st.stepProgress : 0;
@@ -270,7 +272,6 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
             />
           </label>
         </div>
-      </div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MousePointer2, Undo2, Redo2, Trash2, Plus, Copy, Check } from "lucide-react";
 import { STUDIO_ARROW_TYPES } from "../../../data";
 
@@ -28,22 +28,47 @@ const HINTS = {
   ressalto: "Arrasta da jogadora até à bola solta — fica com ela a partir daí.",
 };
 
-const btn = "h-8 px-2.5 flex items-center gap-1.5 rounded-md text-xs transition-colors disabled:opacity-35 disabled:pointer-events-none shrink-0";
+const btn = "h-8 px-2.5 flex items-center gap-1.5 rounded-md text-xs transition-colors disabled:opacity-35 disabled:pointer-events-none shrink-0 [scroll-snap-align:start]";
 const idle = "border border-[#2E3644] text-[#C7CDD8] hover:border-[#5A6272] hover:text-[#F2EDE3]";
 const active = "bg-[#EA5B13] text-[#14181F] border border-[#EA5B13]";
 // Scroll horizontal em vez de quebrar linha: no telemóvel, uma barra com
 // muitos botões a embrulhar em 3-4 linhas empurra o campo (onde se arrasta
 // as fichas) quase todo para fora do ecrã. Um scroll lateral mantém a barra
-// sempre com a mesma altura.
-const scrollRow = "flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+// sempre com a mesma altura. "scroll-snap" para nunca parar a meio de um
+// botão (fica com ar de corte/bug em vez de "desliza para veres mais") e um
+// desvanecido na borda direita para ficar claro que há mais à frente.
+const scrollRow = "flex items-center gap-1 overflow-x-auto flex-1 min-w-0 [scroll-snap-type:x_proximity] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+const fade = "linear-gradient(to right, black calc(100% - 18px), transparent 100%)";
 
 function Group({ label, children }) {
+  const ref = useRef(null);
+  // Desvanecido na borda direita só quando há mesmo mais botões a seguir —
+  // caso contrário o último botão ficava com ar cortado sem motivo.
+  const [hasMore, setHasMore] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setHasMore(el.scrollWidth - el.scrollLeft - el.clientWidth > 4);
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", check);
+      ro.disconnect();
+    };
+  }, [children]);
+
   return (
-    <div className="flex items-center gap-1 min-w-0">
+    <div className="flex items-center gap-1 min-w-0 flex-1">
       <span style={{ fontFamily: "'Oswald', sans-serif" }} className="text-[10px] tracking-[0.14em] uppercase text-[#5A6272] mr-1 shrink-0">
         {label}
       </span>
-      <div className={scrollRow} style={{ WebkitOverflowScrolling: "touch" }}>
+      <div
+        ref={ref}
+        className={scrollRow}
+        style={hasMore ? { WebkitOverflowScrolling: "touch", WebkitMaskImage: fade, maskImage: fade } : { WebkitOverflowScrolling: "touch" }}
+      >
         {children}
       </div>
     </div>
@@ -56,8 +81,8 @@ function EditToolbar({ editor, viewMode, stepIndex }) {
 
   const e = editor;
   return (
-    <div className="flex flex-col gap-2 px-3 py-2.5 bg-[#1E242E] border-b border-[#2E3644]">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-2 px-3 py-2.5 bg-[#1E242E] border-b border-[#2E3644] w-full min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
         <Group label="Ação">
           <button type="button" onClick={() => e.setMode("mover")} className={`${btn} ${e.mode === "mover" ? active : idle}`}>
             <MousePointer2 size={13} /> Mover
@@ -89,7 +114,7 @@ function EditToolbar({ editor, viewMode, stepIndex }) {
         ))}
       </Group>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0">
         <Group label={`Passo ${stepIndex + 1}/${e.steps.length}`}>
           <button type="button" onClick={e.addStep} title="Novo passo a partir das posições finais deste" className={`${btn} ${idle}`}>
             <Plus size={13} /> Novo passo

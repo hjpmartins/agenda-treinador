@@ -146,31 +146,33 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
       className={`flex flex-col overflow-hidden rounded-lg bg-[#0B0E13] outline-none select-none ${className}`}
       style={style}
     >
+      {/* Em paisagem no telemóvel (pouca altura), a barra de edição + as
+          linhas de título/câmara e reprodução já não cabem todas ao lado do
+          campo sem o espremer a nada — por isso este bloco passa a poder
+          deslizar na vertical, e o campo tem sempre, no mínimo, 200px de
+          altura garantidos (nunca desaparece, mesmo que o resto tenha de
+          ficar fora de vista até se deslizar até lá). */}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
       {editable && <EditToolbar editor={editor} viewMode={st.viewMode} stepIndex={st.stepIndex} />}
-      <div className="relative flex-1 min-h-0">
-      <div ref={mountRef} className="absolute inset-0" />
-      {/* Vinheta: escurece os cantos e puxa o olhar para o campo. */}
-      <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(5,7,10,0.65) 100%)" }} />
 
-      {/* Topo: título + passos + câmara — tudo junto, para não ter um bloco de
-          botões a meio do campo (ali é onde se arrasta as fichas: um bloco a
-          meia-altura ou colado ao fundo tapava sítios do campo que, no
-          telemóvel, ficavam impossíveis de tocar para lá colocar algo). */}
-      <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-3 pointer-events-none">
-        <div className="pointer-events-auto min-w-0">
+      {/* Título + passos + câmara: linha própria, fora do campo (não é um
+          overlay por cima do canvas) — tal como a reprodução, para o campo
+          inteiro ficar livre para arrastar fichas, sem o encolher. */}
+      <div className="shrink-0 px-3 py-2 flex items-center justify-between gap-3 flex-wrap border-b border-[#2E3644] bg-[#1E242E]">
+        <div className="min-w-0">
           {title && (
-            <div style={{ fontFamily: "'Oswald', sans-serif" }} className="uppercase tracking-wider text-sm text-[#F2EDE3] truncate drop-shadow">
+            <div style={{ fontFamily: "'Oswald', sans-serif" }} className="uppercase tracking-wider text-sm text-[#F2EDE3] truncate">
               {title}
             </div>
           )}
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-0.5">
             <span style={{ fontFamily: "'IBM Plex Mono', monospace" }} className="text-[11px] text-[#8A93A3]">
               PASSO <span className="text-[#F2EDE3]">{st.stepIndex + 1}</span>/{st.stepCount}
             </span>
           </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-1.5 pointer-events-auto max-w-[60%]">
-          <div className="flex rounded-md border border-[#2E3644] bg-[#1E242E]/80 backdrop-blur-md p-0.5" style={{ fontFamily: "'Oswald', sans-serif" }}>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <div className="flex rounded-md border border-[#2E3644] bg-[#14181F] p-0.5" style={{ fontFamily: "'Oswald', sans-serif" }}>
             {["2d", "3d"].map((m) => (
               <button
                 key={m}
@@ -207,6 +209,11 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
           </IconBtn>
         </div>
       </div>
+
+      <div className="relative flex-1 min-h-[200px]">
+      <div ref={mountRef} className="absolute inset-0" />
+      {/* Vinheta: escurece os cantos e puxa o olhar para o campo. */}
+      <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(5,7,10,0.65) 100%)" }} />
       </div>
 
       {/* Reprodução + inclinação: fora do campo (não é mais um overlay por
@@ -272,6 +279,7 @@ function Court3DView({ diagramas, title, autoPlay = false, bloom = true, onReady
             />
           </label>
         </div>
+      </div>
       </div>
     </div>
   );

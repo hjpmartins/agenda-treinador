@@ -18,6 +18,15 @@ function setProgress(p: number | null, text?: string) {
   listeners.forEach((l) => l());
 }
 
+/** Barra de progresso (ex.: a importar um vídeo), mostrada pelo <ExportOverlay/>. */
+export function showProgress(p: number, text: string) {
+  setProgress(p, text);
+}
+
+export function hideProgress() {
+  setProgress(null);
+}
+
 export function hasEdits(id: string): boolean {
   const n = getNotes(id);
   return !!n.trim || !!n.crop || (n.moments?.length ?? 0) > 0;

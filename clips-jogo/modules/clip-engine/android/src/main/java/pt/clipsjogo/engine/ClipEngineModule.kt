@@ -55,7 +55,7 @@ class ClipEngineModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ClipEngine")
 
-    Events("onStateChange", "onClipUpdate", "onFinalizeProgress", "onError", "onUpdateProgress", "onExportProgress")
+    Events("onStateChange", "onClipUpdate", "onFinalizeProgress", "onError", "onUpdateProgress", "onExportProgress", "onImportProgress")
 
     OnCreate {
       ClipEngine.init(appContext.reactContext!!)
@@ -301,6 +301,111 @@ class ClipEngineModule : Module() {
           promise.reject("E_EXPORT", "Não foi possível criar o vídeo: ${e.message ?: e.javaClass.simpleName}", e)
         }
       }, "exportar-desenhos").start()
+    }
+
+    // ---------------------------------------------------------- vídeos importados (tablet)
+
+    /** Copia um vídeo escolhido (content:// ou file://) para dentro da app, com progresso. */
+    AsyncFunction("importCopy") { srcUri: String, destPath: String, promise: Promise ->
+      val context = appContext.reactContext!!
+      Thread({
+        val dst = File(Uri.parse(destPath).path ?: destPath)
+        val tmp = File(dst.path + ".tmp")
+        try {
+          dst.parentFile?.mkdirs()
+          val uri = Uri.parse(srcUri)
+          val total = try {
+            context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+          } catch (_: Exception) { -1L }
+          val input = if (uri.scheme == "file") java.io.FileInputStream(File(uri.path!!)) else context.contentResolver.openInputStream(uri)
+            ?: throw IllegalStateException("Não foi possível abrir o vídeo.")
+          var done = 0L
+          var lastPct = -1
+          input.use { ins ->
+            java.io.FileOutputStream(tmp).use { out ->
+              val buf = ByteArray(1 shl 20)
+              while (true) {
+                val r = ins.read(buf)
+                if (r < 0) break
+                out.write(buf, 0, r)
+                done += r
+                if (total > 0) {
+                  val pct = (done * 100 / total).toInt()
+                  if (pct != lastPct) {
+                    lastPct = pct
+                    sendEvent("onImportProgress", mapOf("progress" to done.toDouble() / total))
+                  }
+                }
+              }
+            }
+          }
+          if (!tmp.renameTo(dst)) { tmp.copyTo(dst, overwrite = true); tmp.delete() }
+          promise.resolve(Uri.fromFile(dst).toString())
+        } catch (e: Throwable) {
+          tmp.delete()
+          promise.reject("E_IMPORT", "Não foi possível importar o vídeo: ${e.message ?: e.javaClass.simpleName}", e)
+        }
+      }, "importar-video").start()
+    }
+
+    /** Duração, tamanho e codec de um vídeo (para saber se dá para cortar sem converter). */
+    AsyncFunction("probeVideo") { path: String ->
+      val file = File(Uri.parse(path).path ?: path)
+      val ex = android.media.MediaExtractor()
+      try {
+        ex.setDataSource(file.absolutePath)
+        val f = (0 until ex.trackCount).map { ex.getTrackFormat(it) }
+          .firstOrNull { it.getString(android.media.MediaFormat.KEY_MIME)?.startsWith("video/") == true }
+          ?: throw IllegalStateException("O ficheiro não tem vídeo.")
+        mapOf(
+          "durationMs" to (if (f.containsKey(android.media.MediaFormat.KEY_DURATION)) f.getLong(android.media.MediaFormat.KEY_DURATION) / 1000.0 else 0.0),
+          "width" to f.getInteger(android.media.MediaFormat.KEY_WIDTH),
+          "height" to f.getInteger(android.media.MediaFormat.KEY_HEIGHT),
+          "mime" to (f.getString(android.media.MediaFormat.KEY_MIME) ?: ""),
+          "rotation" to (if (f.containsKey("rotation-degrees")) f.getInteger("rotation-degrees") else 0)
+        )
+      } finally {
+        ex.release()
+      }
+    }
+
+    /**
+     * Clip de um vídeo importado. Primeiro tenta cortar sem converter (rápido, mesma
+     * qualidade); se o formato não o permitir (ex.: VP9 de vídeos do YouTube), converte
+     * esse pedaço para H.264.
+     */
+    AsyncFunction("cutLocal") { srcPath: String, startMs: Double, endMs: Double, outPath: String, promise: Promise ->
+      Thread({
+        val src = File(Uri.parse(srcPath).path ?: srcPath)
+        val out = File(Uri.parse(outPath).path ?: outPath)
+        try {
+          out.parentFile?.mkdirs()
+          val probe = android.media.MediaMetadataRetriever().apply { setDataSource(src.path) }
+          val durUs = (probe.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L) * 1000
+          val rotation = probe.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+          probe.release()
+          val startUs = (startMs * 1000).toLong().coerceAtLeast(0)
+          val endUs = (endMs * 1000).toLong().coerceAtMost(if (durUs > 0) durUs else Long.MAX_VALUE)
+          val result = try {
+            val seg = pt.clipsjogo.engine.core.Segment(0, src.name, 0L, durUs)
+            val r = pt.clipsjogo.engine.media.ClipCutter.cut(src.parentFile!!, listOf(seg), startUs, endUs, out, rotation, withAudio = false)
+            mapOf("startMs" to r.startUs / 1000.0, "endMs" to r.endUs / 1000.0, "sizeBytes" to r.sizeBytes.toDouble(), "converted" to false)
+          } catch (e: Exception) {
+            out.delete()
+            pt.clipsjogo.engine.media.LightTranscoder.export(
+              src, out,
+              pt.clipsjogo.engine.media.LightTranscoder.Options(
+                maxHeight = 1080, bitrate = 9_000_000, startUs = startUs, endUs = endUs, audio = false
+              )
+            )
+            mapOf("startMs" to startMs, "endMs" to endMs, "sizeBytes" to out.length().toDouble(), "converted" to true)
+          }
+          promise.resolve(result)
+        } catch (e: Throwable) {
+          out.delete()
+          promise.reject("E_CUT", "Não foi possível fazer o clip: ${e.message ?: e.javaClass.simpleName}", e)
+        }
+      }, "clip-importado").start()
     }
 
     /** Partilhar vários vídeos de uma vez (ex.: todos os clips de uma jogadora pelo WhatsApp). */

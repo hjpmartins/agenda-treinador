@@ -9,6 +9,8 @@ import { PlayerModal, run, saveToGallery, share } from '../components/media';
 import { MotivePicker } from '../components/MotivePicker';
 import { toneBackground, ToneToggle } from '../components/Tone';
 import { ClipTitle, TitleEditor } from '../components/TitleEditor';
+import { ImportedGame } from '../components/ReviewGame';
+import { deleteImport, importFromPicker, listImports, subscribeImports, type ImportedVideo } from '../remote/imports';
 import { groupByMotive, groupByPlayer, playerLabel, type Player } from '../lib/annotations';
 import { absorbBarTags, allNotes, getMotives, getNotes, getRoster, setNotes, useNotesVersion } from '../remote/notesStore';
 import { Button, Card } from '../components/ui';
@@ -46,6 +48,13 @@ export function ClipsScreen({ onBack }: Props) {
   const [motiveFor, setMotiveFor] = useState<string | null>(null);
   const [playersFor, setPlayersFor] = useState<string | null>(null);
   const [titleFor, setTitleFor] = useState<{ id: string; name: string } | null>(null);
+  const [imports, setImports] = useState<ImportedVideo[]>(() => listImports());
+  const [openImport, setOpenImport] = useState<ImportedVideo | null>(null);
+  useEffect(() => subscribeImports(setImports), []);
+  const doImport = () =>
+    importFromPicker()
+      .then((v) => v && setOpenImport(v))
+      .catch((e) => Alert.alert('Erro', e instanceof Error ? e.message : String(e)));
   // A janela das jogadoras mostra o que está gravado: tem de se atualizar a cada toque.
   useNotesVersion();
   /** Modo "Selecionar": clips marcados para enviar todos de uma vez (null = fora do modo). */
@@ -135,18 +144,50 @@ export function ClipsScreen({ onBack }: Props) {
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
         <Button label="‹ Voltar" variant="ghost" onPress={onBack} />
-        <Text style={styles.title}>Gravações e clips</Text>
+        <Text style={[styles.title, { flex: 1 }]}>Gravações e clips</Text>
+        <Button label="⤓ Importar vídeo" onPress={doImport} />
       </View>
 
       {sessions === null ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: space(4) }} />
-      ) : sessions.length === 0 && received.length === 0 ? (
-        <Text style={styles.empty}>Ainda não há gravações.</Text>
+      ) : sessions.length === 0 && received.length === 0 && imports.length === 0 ? (
+        <Text style={styles.empty}>
+          Ainda não há gravações.{'\n'}Também podes importar um vídeo (outro telemóvel, GoPro, YouTube…) e fazer clips dele.
+        </Text>
       ) : (
         <FlatList
           data={sessions}
           ListHeaderComponent={
-            received.length > 0 ? (
+            <>
+            {imports.length > 0 ? (
+              <Card style={{ gap: space(1), marginBottom: space(2) }}>
+                <Text style={styles.sessionTitle}>Vídeos importados</Text>
+                {imports.map((v) => (
+                  <View key={v.id} style={styles.item}>
+                    <Text style={styles.rowTitle}>{v.name}</Text>
+                    <Text style={styles.muted}>
+                      {formatClock(v.durationMs)} · importado {formatDateTime(v.createdAtMs)}
+                      {v.parts.length > 1 ? ` · ${v.parts.length} partes` : ''}
+                    </Text>
+                    <View style={styles.actions}>
+                      <Button label="▶ Fazer clips" variant="primary" onPress={() => setOpenImport(v)} style={styles.action} />
+                      <Button
+                        label="Apagar vídeo"
+                        variant="ghost"
+                        style={styles.action}
+                        onPress={() =>
+                          Alert.alert('Apagar o vídeo importado?', 'Os clips que já fizeste dele ficam na lista.', [
+                            { text: 'Cancelar', style: 'cancel' },
+                            { text: 'Apagar', style: 'destructive', onPress: () => deleteImport(v.id) },
+                          ])
+                        }
+                      />
+                    </View>
+                  </View>
+                ))}
+              </Card>
+            ) : null}
+            {received.length > 0 ? (
               <ReceivedSection
                 clips={received}
                 selected={selected}
@@ -169,7 +210,8 @@ export function ClipsScreen({ onBack }: Props) {
                   ])
                 }
               />
-            ) : null
+            ) : null}
+            </>
           }
           keyExtractor={(s) => s.id}
           ListFooterComponent={
@@ -280,6 +322,7 @@ export function ClipsScreen({ onBack }: Props) {
         </View>
       ) : null}
 
+      {openImport ? <ImportedGame video={openImport} onClose={() => setOpenImport(null)} /> : null}
       {playing ? <PlayerModal uri={playing.uri} title={playing.title} onClose={() => setPlaying(null)} /> : null}
       {analysis ? <AnalysisPlayer items={analysis.items} startIndex={analysis.index} onClose={() => setAnalysis(null)} /> : null}
       <TitleEditor clip={titleFor} onClose={() => setTitleFor(null)} />

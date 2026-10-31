@@ -157,6 +157,18 @@ Se o telemóvel não estiver no ecrã Gravar, o tablet diz "Abre o ecrã Gravar 
 - Se levares o tablet para longe (ex.: balneário) e a ligação cair, ao voltar carrega em **↻ Voltar a ligar** no Comando
   (o Android não volta sozinho à rede do telemóvel).
 
+### Importar um vídeo e fazer clips
+
+- Em **Ver gravações e clips → ⤓ Importar vídeo**, escolhe um vídeo do aparelho: de outro telemóvel, de uma GoPro, de
+  uma câmara ou descarregado do YouTube. Uma GoPro divide o jogo em vários ficheiros (GX01…, GX02…): escolhe-os todos
+  de uma vez e ficam como partes seguidas.
+- O vídeo é copiado para dentro da app (um jogo inteiro pode levar um ou dois minutos) e abre o mesmo leitor do
+  "Rever jogo": **15s / 25s / 45s / 60s** e **Início / Fim** fazem clips, com título, tipo, motivo e jogadoras.
+- Os clips são cortados no tablet sem converter (mesma qualidade). Se o formato não o permitir (ex.: alguns vídeos do
+  YouTube em VP9), esse pedaço é convertido para H.264 — demora um pouco mais.
+- Os clips ficam em **Ver gravações e clips**, como um jogo. O vídeo importado fica em "Vídeos importados" até o
+  apagares (apagá-lo não apaga os clips).
+
 ### Ver a câmara a partir do tablet
 
 - No Comando, **📷 Ver câmara** mostra o que o telemóvel está a filmar, com uma imagem nova de 1,5 em 1,5 s: serve

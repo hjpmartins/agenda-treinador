@@ -75,6 +75,7 @@ type Events = {
   onError(e: { message: string }): void;
   onUpdateProgress(e: { bytes: number; total: number }): void;
   onExportProgress(e: { progress: number }): void;
+  onImportProgress(e: { progress: number }): void;
 };
 
 declare class ClipEngineNative extends NativeModule<Events> {
@@ -145,7 +146,17 @@ declare class ClipEngineNative extends NativeModule<Events> {
    * Vídeo para enviar: só a parte cortada (endMs 0 = até ao fim), em 720p ou 1080p, com a imagem
    * parada freezeMs em cada desenho. momentsJson = JSON de [{ atMs, strokes }]. Devolve o uri.
    */
-  exportAnnotated(
+  /** Copia um vídeo escolhido (content:// ou file://) para destPath (file://) dentro da app. Devolve o uri. */
+  importCopy(srcUri: string, destPath: string): Promise<string>;
+  probeVideo(path: string): Promise<{ durationMs: number; width: number; height: number; mime: string; rotation: number }>;
+  /** Clip [startMs, endMs] de um vídeo importado; sem converter quando possível. */
+  cutLocal(
+    srcPath: string,
+    startMs: number,
+    endMs: number,
+    outPath: string
+  ): Promise<{ startMs: number; endMs: number; sizeBytes: number; converted: boolean }>;
+    exportAnnotated(
     srcUri: string,
     startMs: number,
     endMs: number,

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PRESET_SECONDS } from '../lib/clipRange';
 import { formatClock, formatDateTime, formatDuration } from '../lib/format';
 import { getNotes, setNotes, useNotesVersion } from '../remote/notesStore';
+import { ImportClipper, type ImportedVideo } from '../remote/imports';
 import { ReviewClient, type PhoneGame, type ReviewClip } from '../remote/ReviewClient';
 import { colors, radius, space } from '../theme';
 import { MotiveChips } from './MotivePicker';
@@ -44,7 +45,7 @@ export function ReviewGame({
     <Modal visible animationType="fade" onRequestClose={onClose} supportedOrientations={['landscape', 'portrait']}>
       <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]}>
         {game ? (
-          <GameView key={game.id} baseUrl={baseUrl} token={token} phoneName={phoneName} game={game} onBack={() => setGame(null)} />
+          <PhoneGameView key={game.id} baseUrl={baseUrl} token={token} phoneName={phoneName} game={game} onBack={() => setGame(null)} />
         ) : (
           <View style={styles.pick}>
             <View style={styles.pickHeader}>
@@ -79,7 +80,16 @@ export function ReviewGame({
 
 const RATES = [0.5, 1, 2];
 
-function GameView({
+/** De onde vêm o vídeo e os clips: o telemóvel (ReviewClient) ou um vídeo importado (ImportClipper). */
+type ClipSource = {
+  start(): void;
+  stop(): void;
+  subscribe(l: (c: ReviewClip[]) => void): () => void;
+  requestClip(startMs: number, endMs: number): string;
+  videoUrl(part: number): string;
+};
+
+function PhoneGameView({
   baseUrl,
   token,
   phoneName,
@@ -93,6 +103,53 @@ function GameView({
   onBack: () => void;
 }) {
   const client = useMemo(() => new ReviewClient(baseUrl, token, game, phoneName), [baseUrl, token, game, phoneName]);
+  return (
+    <GameView
+      client={client}
+      title={`Jogo de ${formatDateTime(game.startedAtMs)}`}
+      parts={game.parts}
+      durationMs={game.durationMs}
+      backLabel="‹ Jogos"
+      onBack={onBack}
+    />
+  );
+}
+
+/** Fazer clips de um vídeo importado (outro telemóvel, GoPro, YouTube…), no próprio tablet. */
+export function ImportedGame({ video, onClose }: { video: ImportedVideo; onClose: () => void }) {
+  const client = useMemo(() => new ImportClipper(video), [video]);
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal visible animationType="fade" onRequestClose={onClose} supportedOrientations={['landscape', 'portrait']}>
+      <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]}>
+        <GameView
+          client={client}
+          title={video.name}
+          parts={video.parts.map((p, index) => ({ index, startMs: p.startMs }))}
+          durationMs={video.durationMs}
+          backLabel="‹ Fechar"
+          onBack={onClose}
+        />
+      </View>
+    </Modal>
+  );
+}
+
+function GameView({
+  client,
+  title,
+  parts,
+  durationMs,
+  backLabel,
+  onBack,
+}: {
+  client: ClipSource;
+  title: string;
+  parts: { index: number; startMs: number }[];
+  durationMs: number;
+  backLabel: string;
+  onBack: () => void;
+}) {
   const [clips, setClips] = useState<ReviewClip[]>([]);
   const [part, setPart] = useState(0);
   const [tagging, setTagging] = useState<string | null>(null);
@@ -104,7 +161,7 @@ function GameView({
       client.stop();
     };
   }, [client]);
-  const p = game.parts[part] ?? game.parts[0];
+  const p = parts[part] ?? parts[0];
 
   return (
     <View style={styles.gameRoot}>
@@ -113,16 +170,16 @@ function GameView({
           key={part}
           url={client.videoUrl(p.index)}
           partStartMs={p.startMs}
-          totalMs={game.durationMs}
+          totalMs={durationMs}
           onClip={(startMs, endMs) => setTagging(client.requestClip(startMs, endMs))}
           header={
             <View style={styles.topBar}>
-              <Button label="‹ Jogos" variant="ghost" onPress={onBack} />
+              <Button label={backLabel} variant="ghost" onPress={onBack} />
               <Text style={styles.title} numberOfLines={1}>
-                Jogo de {formatDateTime(game.startedAtMs)}
+                {title}
               </Text>
-              {game.parts.length > 1
-                ? game.parts.map((x, i) => (
+              {parts.length > 1
+                ? parts.map((x, i) => (
                     <Button key={x.index} label={`Parte ${i + 1}`} variant={i === part ? 'primary' : 'secondary'} onPress={() => setPart(i)} />
                   ))
                 : null}
@@ -203,12 +260,12 @@ function PartPlayer({
         {status === 'loading' || (status === 'idle' && durMs === 0) ? (
           <View style={styles.loading} pointerEvents="none">
             <ActivityIndicator color={colors.accent} size="large" />
-            <Text style={styles.muted}>A abrir o vídeo do telemóvel…</Text>
+            <Text style={styles.muted}>A abrir o vídeo…</Text>
           </View>
         ) : null}
         {status === 'error' ? (
           <View style={styles.loading} pointerEvents="none">
-            <Text style={styles.warn}>Não foi possível ver o vídeo. Confirma a ligação ao telemóvel.</Text>
+            <Text style={styles.warn}>Não foi possível ver o vídeo (se vem do telemóvel, confirma a ligação).</Text>
           </View>
         ) : null}
         {header}

@@ -19,6 +19,9 @@ const STATIC_PROP_TYPES = new Set(["cone", "cone_alto", "circulo", "quadrado", "
 const RESIZABLE_BASE = { circulo: 9, quadrado: 8, escada: 22 };
 const MIN_SIZE = 0.4;
 const MAX_SIZE = 3;
+// O quadrado pode esticar para retângulo (token.sizeX/sizeY, cada eixo à
+// parte) sem limite prático, para servir de zona a dividir o campo.
+const MAX_RECT_SIZE = 40;
 // Em touch (sem cursor a passar por cima antes de tocar, dedo bem mais
 // largo que um ponteiro de rato) é fácil tocar uns milímetros ao lado da
 // ficha pretendida — sobretudo com a bola mesmo em cima/ao lado da jogadora
@@ -91,10 +94,29 @@ function arrowHandles(a) {
   return [];
 }
 
-// Pega de redimensionar da ficha selecionada (círculo/quadrado/escada):
-// um ponto a leste do centro, à distância que corresponde ao tamanho atual.
+// Pegas de redimensionar da ficha selecionada (círculo/quadrado/escada).
+// Círculo: um ponto a leste do centro, à distância do tamanho atual.
+// Quadrado: dois pontos (leste/sul) para esticar largura e altura à parte
+// (retângulo), sem ficarem presos um ao outro.
+// Escada: um ponto que também marca a rotação — arrastá-lo em volta do
+// centro roda a escada, e para dentro/fora muda o comprimento.
 function tokenHandles(t) {
-  const base = t && RESIZABLE_BASE[t.type];
+  if (!t) return [];
+  if (t.type === "quadrado") {
+    const base = RESIZABLE_BASE.quadrado;
+    const sizeX = t.sizeX ?? t.size ?? 1;
+    const sizeY = t.sizeY ?? t.size ?? 1;
+    return [
+      { kind: "resizeX", x: t.x + base * sizeX, y: t.y },
+      { kind: "resizeY", x: t.x, y: t.y + base * sizeY },
+    ];
+  }
+  if (t.type === "escada") {
+    const dist = RESIZABLE_BASE.escada * (t.size || 1);
+    const rotation = t.rotation || 0;
+    return [{ kind: "resizeRot", x: t.x + dist * Math.cos(rotation), y: t.y + dist * Math.sin(rotation) }];
+  }
+  const base = RESIZABLE_BASE[t.type];
   if (!base) return [];
   return [{ kind: "resize", x: t.x + base * (t.size || 1), y: t.y }];
 }
@@ -408,7 +430,7 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
         if (h) {
           commit((l) => l);
           if (h.kind === "control") dragRef.current = { kind: "control", id: selectedId };
-          else if (h.kind === "resize") dragRef.current = { kind: "resize", id: selectedId };
+          else if (h.kind === "resize" || h.kind === "resizeX" || h.kind === "resizeY" || h.kind === "resizeRot") dragRef.current = { kind: h.kind, id: selectedId };
           else {
             // Seta sem pontos gravados: grava os dois de omissão antes de arrastar.
             updateArrow(selectedId, (a) => (hasWaypoints(a) ? a : { ...a, waypoints: defaultWaypoints(a), control: undefined }), true);
@@ -480,6 +502,17 @@ function usePlayEditor({ initial, onChange, sceneRef, stepIndex, editable, enabl
           const size = Math.max(MIN_SIZE, Math.min(MAX_SIZE, distPt(tk, pt) / base));
           replaceCurrent(updateStep((d) => ({ ...d, tokens: d.tokens.map((t) => (t.id === drag.id ? { ...t, size } : t)) })));
         }
+      } else if (drag?.kind === "resizeX") {
+        const sizeX = Math.max(MIN_SIZE, Math.min(MAX_RECT_SIZE, Math.abs(pt.x - step.tokens.find((t) => t.id === drag.id).x) / RESIZABLE_BASE.quadrado));
+        replaceCurrent(updateStep((d) => ({ ...d, tokens: d.tokens.map((t) => (t.id === drag.id ? { ...t, sizeX } : t)) })));
+      } else if (drag?.kind === "resizeY") {
+        const sizeY = Math.max(MIN_SIZE, Math.min(MAX_RECT_SIZE, Math.abs(pt.y - step.tokens.find((t) => t.id === drag.id).y) / RESIZABLE_BASE.quadrado));
+        replaceCurrent(updateStep((d) => ({ ...d, tokens: d.tokens.map((t) => (t.id === drag.id ? { ...t, sizeY } : t)) })));
+      } else if (drag?.kind === "resizeRot") {
+        const tk = step.tokens.find((t) => t.id === drag.id);
+        const size = Math.max(MIN_SIZE, Math.min(MAX_SIZE, distPt(tk, pt) / RESIZABLE_BASE.escada));
+        const rotation = Math.atan2(pt.y - tk.y, pt.x - tk.x);
+        replaceCurrent(updateStep((d) => ({ ...d, tokens: d.tokens.map((t) => (t.id === drag.id ? { ...t, size, rotation } : t)) })));
       } else if (drag?.kind === "wp") {
         updateArrow(drag.id, (a) => ({ ...a, waypoints: a.waypoints.map((w, i) => (i === drag.index ? { x: pt.x, y: pt.y } : w)) }), true);
       } else if (drawing) {

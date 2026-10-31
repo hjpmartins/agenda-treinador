@@ -1131,10 +1131,17 @@ class Court3DScene {
       obj.position.set(p.x, 0, p.z);
       // A tampa do cilindro tem o "cima" da textura ao longo de +x; o tampo
       // do treinador (plano deitado) tem-no ao longo de -z.
-      obj.rotation.y = STATIC_PROP_TYPES.has(tk.type) ? 0 : tk.type === "treinador" ? yaw : yaw + Math.PI / 2;
+      // Escada: rotação própria (pega de redimensionar também roda, em
+      // usePlayEditor.js), não a da câmara — sinal trocado porque o y do
+      // diagrama 2D mapeia direto para o z do mundo 3D (toWorld), ao passo
+      // que rotation.y do three.js roda +x para -z (sentido oposto).
+      obj.rotation.y = tk.type === "escada" ? -(tk.rotation || 0) : STATIC_PROP_TYPES.has(tk.type) ? 0 : tk.type === "treinador" ? yaw : yaw + Math.PI / 2;
       if (RESIZABLE_TYPES.has(tk.type)) {
-        const s = tk.size || 1;
-        obj.scale.set(s, 1, s);
+        if (tk.type === "quadrado") obj.scale.set(tk.sizeX ?? tk.size ?? 1, 1, tk.sizeY ?? tk.size ?? 1);
+        else {
+          const s = tk.size || 1;
+          obj.scale.set(s, 1, s);
+        }
       }
       obj.visible = true;
       seen.add(tk.id);

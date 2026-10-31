@@ -58,23 +58,27 @@ function drawCirculo(ctx, x, y, size = 1) {
   ctx.stroke();
 }
 
-function drawQuadrado(ctx, x, y, size = 1) {
+function drawQuadrado(ctx, x, y, sizeX = 1, sizeY = 1) {
   ctx.strokeStyle = "#4FB0C6";
   ctx.lineWidth = 2.5;
-  ctx.strokeRect(x - 8 * size, y - 8 * size, 16 * size, 16 * size);
+  ctx.strokeRect(x - 8 * sizeX, y - 8 * sizeY, 16 * sizeX, 16 * sizeY);
 }
 
-function drawEscada(ctx, x, y, size = 1) {
+function drawEscada(ctx, x, y, size = 1, rotation = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
   ctx.strokeStyle = "#4FB0C6";
   ctx.lineWidth = 2;
-  ctx.strokeRect(x - 22 * size, y - 7 * size, 44 * size, 14 * size);
+  ctx.strokeRect(-22 * size, -7 * size, 44 * size, 14 * size);
   ctx.lineWidth = 1.5;
   [-14.5, -7, 0, 7, 14.5].forEach((rx) => {
     ctx.beginPath();
-    ctx.moveTo(x + rx * size, y - 7 * size);
-    ctx.lineTo(x + rx * size, y + 7 * size);
+    ctx.moveTo(rx * size, -7 * size);
+    ctx.lineTo(rx * size, 7 * size);
     ctx.stroke();
   });
+  ctx.restore();
 }
 
 // Tampo das fichas (jogadora/defesa/treinador) desenhado numa textura à parte
@@ -103,8 +107,8 @@ function drawToken(ctx, cache, token) {
   if (token.type === "cone") return drawCone(ctx, token.x, token.y);
   if (token.type === "cone_alto") return drawConeAlto(ctx, token.x, token.y);
   if (token.type === "circulo") return drawCirculo(ctx, token.x, token.y, token.size || 1);
-  if (token.type === "quadrado") return drawQuadrado(ctx, token.x, token.y, token.size || 1);
-  if (token.type === "escada") return drawEscada(ctx, token.x, token.y, token.size || 1);
+  if (token.type === "quadrado") return drawQuadrado(ctx, token.x, token.y, token.sizeX ?? token.size ?? 1, token.sizeY ?? token.size ?? 1);
+  if (token.type === "escada") return drawEscada(ctx, token.x, token.y, token.size || 1, token.rotation || 0);
   drawTokenTop(ctx, cache, token);
 }
 

@@ -723,7 +723,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif" }} className="min-h-full w-full bg-[#14181F] text-[#F2EDE3] flex flex-col">
+    <div style={{ fontFamily: "'Inter', sans-serif" }} className="min-h-full w-full bg-[#14181F] text-[#F2EDE3] flex flex-col overflow-x-hidden">
       <TopBar
         onExport={exportBackup}
         onImport={handleImportFile}

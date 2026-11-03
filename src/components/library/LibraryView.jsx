@@ -38,7 +38,7 @@ function LibraryView({ library, onAdd, onImportClick, onEdit, onDelete, onPublis
             {library.length} exercício{library.length === 1 ? "" : "s"} guardado{library.length === 1 ? "" : "s"}
           </div>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 flex-wrap">
           <button onClick={onImportClick} className="flex items-center gap-1.5 border border-[#2E3644] hover:border-[#5A6272] text-[#F2EDE3] text-sm font-medium rounded-md px-3.5 py-2 transition-colors">
             <Upload size={16} /> Importar
           </button>

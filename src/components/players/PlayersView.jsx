@@ -37,7 +37,7 @@ function PlayersView({ players, sessions, clubLogo, onAdd, onImportClick, onEdit
             {totalTreinos > 0 && ` · ${totalTreinos} treino${totalTreinos === 1 ? "" : "s"} realizado${totalTreinos === 1 ? "" : "s"} com presenças registadas`}
           </div>
         </div>
-        <div className="flex gap-2 shrink-0 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
           {players.length > 0 && (
             <a
               href={clipsJogoLink(players)}
